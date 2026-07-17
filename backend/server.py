@@ -19,6 +19,9 @@ ROOT = HERE.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
 
+from src.env import load_dotenv  # noqa: E402
+load_dotenv()   # อ่าน APIFY_TOKEN / FB_COOKIES_JSON จากไฟล์ .env (ถ้ามี)
+
 import jobs  # noqa: E402  (อยู่โฟลเดอร์เดียวกัน)
 
 STATIC = HERE / "static"

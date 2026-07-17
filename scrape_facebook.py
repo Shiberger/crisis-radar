@@ -28,8 +28,11 @@ import json
 import os
 from pathlib import Path
 
+from src.env import load_dotenv
+
 ROOT = Path(__file__).parent
 TARGETS_FILE = ROOT / "data" / "targets.json"
+load_dotenv()   # อ่าน APIFY_TOKEN / FB_COOKIES_JSON จาก .env (ถ้ามี)
 
 
 def load_cookies() -> list | None:
