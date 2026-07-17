@@ -88,10 +88,52 @@ def map_comment_item(it: dict, post_id: str) -> dict:
         "created_at": _parse_date(_pick(it, "date", "createdTime", "time", "timestamp")),
         "reach": int(_pick(it, "likesCount", "likes", "reactionsCount", default=0) or 0)
                  + int(_pick(it, "repliesCount", "commentsCount", default=0) or 0),
+        "comment_url": _pick(it, "commentUrl", "url", default=""),
+        "profile_url": _pick(it, "profileUrl", default=""),
+        "post_title": _pick(it, "postTitle", default=""),
     }
 
 
-def load_apify_export(path, brand: str = "talesrunner", page_id: str = "thehof.talesrunner") -> dict:
+import re as _re
+
+_PHONE = _re.compile(r"0\d[\d\-\s]{7,}")
+_LINE_HANDLE = _re.compile(r"@[A-Za-z0-9_.]{3,}")
+_PROMO_WORDS = (
+    "ยินดีให้คำปรึกษา", "ติดต่อเรา", "พร้อมดูแล", "สนใจทัก", "โปรโมชั่น", "ปรึกษาฟรี",
+    "สอบถามเพิ่มเติม", "ทักแชท", "inbox", "กู้ข้อมูล", "รับซ่อม", "จำหน่าย", "บริการ", "line :",
+)
+
+
+def looks_promotional(text: str) -> bool:
+    """โฆษณา/บริการ (เช่น IDRLAB กู้ข้อมูล) — ไม่ใช่เสียงผู้เล่น จึงกรองออก."""
+    t = text.lower()
+    has_line = bool(_LINE_HANDLE.search(text))
+    has_phone = bool(_PHONE.search(text))
+    has_promo = any(w in t for w in _PROMO_WORDS)
+    return (has_promo and (has_line or has_phone)) or (has_line and has_phone)
+
+
+def filter_noise(comments: list[dict], page_id: str = "", exclude_authors=None):
+    """คัดคอมเมนต์ที่ไม่ใช่เสียงผู้เล่นออก: ของเพจเอง / รายชื่อ block / โฆษณา.
+
+    คืน (kept, dropped_count).
+    """
+    excl = [e.lower() for e in (exclude_authors or [])]
+    kept, dropped = [], 0
+    for c in comments:
+        author = str(c.get("author", "")).lower()
+        purl = str(c.get("profile_url", "")).lower()
+        is_page = bool(page_id) and page_id.lower() in purl
+        is_blocked = any(e in author for e in excl)
+        if is_page or is_blocked or looks_promotional(c.get("text", "")):
+            dropped += 1
+            continue
+        kept.append(c)
+    return kept, dropped
+
+
+def load_apify_export(path, brand: str = "talesrunner", page_id: str = "thehof.talesrunner",
+                      exclude_authors=None) -> dict:
     """อ่านไฟล์ JSON ที่ Download มาจาก Apify Console (Comments Scraper) → fixture schema.
 
     ทางลัดที่ไม่ต้องต่อ token: กด Start ใน Apify UI เอง → Download JSON → ไฟล์นั้นเข้าที่นี่.
@@ -102,19 +144,13 @@ def load_apify_export(path, brand: str = "talesrunner", page_id: str = "thehof.t
     if isinstance(items, dict):
         items = items.get("items") or items.get("results") or [items]
 
-    comments = []
-    skipped_page = 0
-    for it in items:
-        # ข้ามคอมเมนต์ของเพจเอง (โพสต์/ตอบโดยแอดมิน) — ไม่ใช่เสียงผู้เล่น
-        if page_id and page_id in str(_pick(it, "profileUrl", default="")):
-            skipped_page += 1
-            continue
-        c = map_comment_item(it, _pick(it, "postUrl", "facebookUrl", default="import"))
-        if c["text"].strip():
-            comments.append(c)
-    if skipped_page:
-        print(f"  [import] กรองคอมเมนต์ของเพจเองออก {skipped_page} รายการ")
-    return {"page": brand.title(), "page_id": page_id, "brand": brand, "comments": comments}
+    comments = [map_comment_item(it, _pick(it, "postUrl", "facebookUrl", default="import"))
+                for it in items]
+    comments = [c for c in comments if c["text"].strip()]
+    kept, dropped = filter_noise(comments, page_id, exclude_authors)
+    if dropped:
+        print(f"  [import] กรอง admin/โฆษณา/เพจ ออก {dropped} รายการ")
+    return {"page": brand.title(), "page_id": page_id, "brand": brand, "comments": kept}
 
 
 class ApifyFacebookScraper:

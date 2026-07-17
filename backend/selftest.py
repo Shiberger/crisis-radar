@@ -68,7 +68,8 @@ def main() -> int:
         r = result["result"]
         check("ผลลัพธ์เป็น CRISIS (ตรงกับ sample)", r["status"] == "CRISIS", r["status"])
         check("มี alert", len(r["alerts"]) >= 1, f"{len(r['alerts'])} alert")
-        check("มี top_negatives", len(r.get("top_negatives", [])) >= 1, f"{len(r.get('top_negatives',[]))}")
+        check("มีรายการคอมเมนต์ (comments)", len(r.get("comments", [])) >= 1, f"{len(r.get('comments',[]))}")
+        check("comment มี field author/text/sentiment", all(k in (r["comments"][0]) for k in ("author", "text", "sentiment")))
         check("มี timeline buckets", len(r.get("buckets", [])) >= 1, f"{len(r.get('buckets',[]))}")
 
     # 4) job ไม่มีจริง → 404

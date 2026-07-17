@@ -112,7 +112,8 @@ def main() -> None:
     # ทางลัดไม่ต้องต่อ token: import ไฟล์ที่ดาวน์โหลดจาก Apify UI
     if args.import_file:
         from src.sources.facebook_apify import load_apify_export
-        out = load_apify_export(args.import_file, brand=brand, page_id=cfg.get("page_id", brand))
+        out = load_apify_export(args.import_file, brand=brand, page_id=cfg.get("page_id", brand),
+                                exclude_authors=cfg.get("exclude_authors"))
         out_path = ROOT / "data" / f"facebook_live_{brand}.json"
         out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"[import] แปลง {len(out['comments'])} คอมเมนต์ → {out_path}")
@@ -127,7 +128,9 @@ def main() -> None:
 
     print(f"[scrape] method={args.method} · เป้าหมาย {len(targets)} · brand={brand}")
     comments = scrape_apify(targets, cfg, args) if args.method == "apify" else scrape_playwright(targets, cfg, args)
-    print(f"[scrape] รวม {len(comments)} คอมเมนต์")
+    from src.sources.facebook_apify import filter_noise
+    comments, dropped = filter_noise(comments, cfg.get("page_id", ""), cfg.get("exclude_authors"))
+    print(f"[scrape] รวม {len(comments)} คอมเมนต์ (กรอง admin/โฆษณา ออก {dropped})")
 
     out = {
         "_note": f"LIVE scrape ({args.method}) — ดิบก่อน mask PII (mask ตอนเข้า pipeline)",

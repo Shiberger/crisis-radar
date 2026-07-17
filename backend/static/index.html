@@ -3,179 +3,319 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Crisis Radar — เฝ้าระวังดราม่าเกม</title>
+<title>Crisis Radar — Social Listening Console</title>
 <style>
-:root{color-scheme:dark}
+:root{
+  color-scheme: light;
+  --plane:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --base:#c3c2b7; --border:rgba(11,11,11,.10);
+  --pos:#0ca30c; --neu:#898781; --neg:#d03b3b; --warn:#fab219; --serious:#ec835a;
+  --accent:#2a78d6;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --ink:#fff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --base:#383835; --border:rgba(255,255,255,.10); --accent:#3987e5;
+  }
+}
 *{box-sizing:border-box}
-body{font-family:-apple-system,'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;margin:0;
-background:#0f172a;color:#e2e8f0;line-height:1.55}
-.wrap{max-width:1000px;margin:0 auto;padding:24px}
-header h1{font-size:22px;margin:0} header p{color:#94a3b8;font-size:13px;margin:4px 0 0}
-.panel{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;margin:18px 0}
-.panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin:0 0 14px}
-.opts{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
-.opt{border:1px solid #334155;border-radius:10px;padding:12px 16px;cursor:pointer;flex:1;min-width:200px;
-background:#0f172a;transition:.15s}
-.opt:hover{border-color:#3b82f6}
-.opt.active{border-color:#3b82f6;background:#1d4ed822}
-.opt b{display:block;font-size:14px} .opt span{font-size:12px;color:#94a3b8}
-.fbopts{display:none;gap:14px;flex-wrap:wrap;align-items:end;margin-bottom:16px}
-.fbopts.show{display:flex}
-.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#94a3b8}
-.fld input,.fld select{background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:8px 10px;font-size:14px}
-.btn{background:#2563eb;color:#fff;border:0;border-radius:10px;padding:14px 22px;font-size:16px;font-weight:700;
-cursor:pointer;width:100%;transition:.15s}
-.btn:hover{background:#1d4ed8} .btn:disabled{opacity:.5;cursor:not-allowed}
-.hint{font-size:12px;color:#64748b;margin-top:8px}
-.log{background:#0b1220;border-radius:10px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;
-max-height:180px;overflow:auto;white-space:pre-wrap;color:#93c5fd}
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid #334155;border-top-color:#3b82f6;
-border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px}
-@keyframes spin{to{transform:rotate(360deg)}}
-.banner{padding:16px 20px;border-radius:12px;font-size:19px;font-weight:800;margin-bottom:16px;
-display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:720px){.grid{grid-template-columns:1fr}.banner{font-size:16px}}
-.row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}
-.lbl{width:130px;color:#cbd5e1} .track{flex:1;background:#334155;border-radius:6px;height:12px;overflow:hidden}
-.fill{display:block;height:100%} .val{width:34px;text-align:right;font-variant-numeric:tabular-nums}
-.alerts{list-style:none;padding:0;margin:0} .alerts li{background:#334155;border-left:3px solid #dc2626;
-padding:9px 12px;border-radius:6px;margin:6px 0;font-size:13px}
-.tl{display:flex;align-items:flex-end;gap:8px;height:120px;padding-top:8px}
-.tl-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
-.tl-bar{width:100%;background:#3b82f6;border-radius:4px 4px 0 0;min-height:3px}
-.tl-bar.spike{background:#dc2626} .tl-x{font-size:11px;color:#94a3b8;margin-top:4px}
-table{width:100%;border-collapse:collapse;font-size:13px} th,td{text-align:left;padding:8px;border-bottom:1px solid #334155;vertical-align:top}
-th{color:#94a3b8;font-size:11px;text-transform:uppercase} .r{text-align:right}
-.hidden{display:none} .muted{color:#64748b;font-size:13px}
-.badge{font-size:11px;background:#334155;padding:2px 7px;border-radius:20px;color:#cbd5e1}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","Noto Sans Thai",sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:20px}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* header */
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+header h1{font-size:18px;margin:0;font-weight:650;letter-spacing:-.01em}
+header .sub{color:var(--muted);font-size:12px;margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+  padding:5px 11px;border-radius:999px;border:1px solid var(--border)}
+.pill .dot{width:8px;height:8px;border-radius:50%}
+.gen{color:var(--muted);font-size:11px;margin-top:6px;text-align:right}
+
+/* card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.card h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 12px;font-weight:650}
+.mb{margin-bottom:14px}
+
+/* controls */
+.controls{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{background:var(--surface);border:0;padding:9px 14px;font-size:13px;cursor:pointer;color:var(--ink2)}
+.seg button.on{background:var(--accent);color:#fff;font-weight:600}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted)}
+.fld input,.fld select{background:var(--surface);border:1px solid var(--border);color:var(--ink);
+  border-radius:8px;padding:8px 10px;font-size:13px}
+.run{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 20px;font-size:14px;
+  font-weight:650;cursor:pointer} .run:disabled{opacity:.5;cursor:not-allowed}
+.hint{color:var(--muted);font-size:11px;flex-basis:100%}
+
+/* progress */
+.log{background:var(--plane);border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+  font-family:ui-monospace,SFMono-Regular,monospace;font-size:11.5px;max-height:150px;overflow:auto;
+  white-space:pre-wrap;color:var(--ink2)}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--grid);border-top-color:var(--accent);
+  border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* kpi */
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+@media(max-width:860px){.kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:520px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px 14px}
+.kpi .v{font-size:23px;font-weight:680;letter-spacing:-.02em;line-height:1.1}
+.kpi .l{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* bars */
+.row{display:flex;align-items:center;gap:10px;margin:7px 0;font-size:13px}
+.row .k{width:132px;color:var(--ink2);display:flex;align-items:center;gap:7px}
+.row .k .sw{width:9px;height:9px;border-radius:2px;flex:none}
+.track{flex:1;background:var(--grid);border-radius:4px;height:10px;overflow:hidden}
+.track .fill{display:block;height:100%;border-radius:4px}
+.row .n{width:70px;text-align:right;color:var(--ink2)}
+
+/* timeline */
+.tl{display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:6px;overflow-x:auto}
+.tl .col{flex:1;min-width:26px;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
+.tl .bar{width:100%;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+.tl .bar.sp{background:var(--neg)}
+.tl .x{font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap}
+
+/* alerts */
+.alert{border:1px solid var(--border);border-left:3px solid var(--neg);background:var(--plane);
+  border-radius:8px;padding:9px 12px;font-size:13px;margin:7px 0}
+
+/* explorer toolbar */
+.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.chip{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:6px 12px;
+  font-size:12.5px;cursor:pointer;color:var(--ink2);display:inline-flex;gap:6px;align-items:center}
+.chip.on{border-color:var(--ink);color:var(--ink);font-weight:600}
+.chip .c{color:var(--muted);font-variant-numeric:tabular-nums}
+.tools input[type=search],.tools select{background:var(--surface);border:1px solid var(--border);
+  color:var(--ink);border-radius:8px;padding:8px 11px;font-size:13px}
+.tools input[type=search]{flex:1;min-width:180px}
+.grow{flex:1}
+
+/* table */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{position:sticky;top:0;background:var(--surface);text-align:left;padding:10px 12px;
+  font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:650;
+  border-bottom:1px solid var(--border);white-space:nowrap}
+tbody td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+tbody tr:hover{background:var(--plane)}
+tbody tr{border-left:3px solid transparent}
+tr.s-negative{border-left-color:var(--neg)} tr.s-positive{border-left-color:var(--pos)}
+td.when{color:var(--muted);white-space:nowrap;font-size:12px}
+td.who{white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+td.txt{min-width:280px;max-width:460px}
+td.rch{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.post{color:var(--muted);font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.tag .dot{width:7px;height:7px;border-radius:50%}
+.topic{display:inline-block;font-size:11px;color:var(--ink2);background:var(--plane);border:1px solid var(--border);
+  border-radius:5px;padding:1px 7px;margin:1px 3px 1px 0;white-space:nowrap}
+.ai{font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:0 4px;margin-left:5px}
+.ext{color:var(--muted)}
+.count{color:var(--muted);font-size:12px;margin:10px 2px 0}
+.hidden{display:none}
+.empty{padding:26px;text-align:center;color:var(--muted)}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>📡 Crisis Radar</h1>
-    <p>เฝ้าระวังดราม่าบน Social ของเกมที่เราดูแล — กดปุ่มเดียว ระบบดึงคอมเมนต์ + วิเคราะห์ + เตือนให้</p>
+    <div>
+      <h1>Crisis Radar</h1>
+      <div class="sub">Social Listening &amp; Crisis Early-Warning · TalesRunner · Facebook</div>
+    </div>
+    <div style="text-align:right">
+      <span class="pill" id="statusPill"><span class="dot" style="background:var(--muted)"></span><span id="statusText">ยังไม่ได้ดึงข้อมูล</span></span>
+      <div class="gen" id="genAt"></div>
+    </div>
   </header>
 
-  <!-- Control panel -->
-  <div class="panel">
-    <h2>1 · เลือกแหล่งข้อมูล แล้วกดเริ่ม</h2>
-    <div class="opts" id="opts">
-      <div class="opt active" data-source="sample">
-        <b>🧪 ข้อมูลตัวอย่าง (Demo)</b><span>ดูตัว tool ทำงานทันที ไม่ต้องตั้งค่าอะไร</span>
+  <!-- controls -->
+  <div class="card mb">
+    <h2>แหล่งข้อมูล</h2>
+    <div class="controls">
+      <div class="seg" id="srcSeg">
+        <button data-src="sample" class="on">ข้อมูลตัวอย่าง</button>
+        <button data-src="facebook">Facebook จริง</button>
       </div>
-      <div class="opt" data-source="facebook">
-        <b>📘 ดึง Facebook จริง</b><span>เพจ Talesrunner (ต้องตั้ง APIFY_TOKEN ที่ server)</span>
-      </div>
-    </div>
-
-    <div class="fbopts" id="fbopts">
-      <label class="fld">แหล่ง
-        <select id="only"><option value="page">เพจ (public)</option>
-          <option value="all">เพจ + กลุ่ม (ต้องมี cookie)</option></select>
+      <label class="fld" id="fldComments">คอมเมนต์/โพสต์
+        <input id="maxc" type="number" value="30" min="5" max="200" style="width:100px">
       </label>
-      <label class="fld">จำนวนโพสต์<input id="maxposts" type="number" value="10" min="1" max="50" style="width:90px"></label>
-      <label class="fld">คอมเมนต์/โพสต์<input id="maxcomments" type="number" value="30" min="1" max="100" style="width:90px"></label>
+      <button class="run" id="runBtn">ดึงข้อมูล &amp; วิเคราะห์</button>
+      <div class="hint" id="hint">โหมดตัวอย่าง: ใช้ข้อมูลจำลองเพื่อดูการทำงาน · โหมด Facebook จริง: ดึงสดผ่าน Apify (ตั้ง APIFY_TOKEN แล้ว)</div>
     </div>
-
-    <button class="btn" id="runBtn">▶ ดึงข้อมูล &amp; วิเคราะห์</button>
-    <div class="hint" id="hint">โหมด Demo ใช้ข้อมูลตัวอย่างของ Talesrunner — เหมาะสำหรับดูว่าเครื่องมือทำงานยังไง</div>
   </div>
 
-  <!-- Progress -->
-  <div class="panel hidden" id="progressPanel">
-    <h2><span id="statusText">กำลังทำงาน…</span></h2>
+  <!-- progress -->
+  <div class="card mb hidden" id="prog">
+    <h2 id="progTitle">กำลังทำงาน</h2>
     <div class="log" id="log"></div>
   </div>
 
-  <!-- Results -->
+  <!-- results -->
   <div id="results" class="hidden">
-    <div class="banner" id="banner"></div>
-    <div class="panel"><h2>🔔 การแจ้งเตือน</h2><ul class="alerts" id="alerts"></ul></div>
-    <div class="grid">
-      <div class="panel"><h2>อารมณ์คอมเมนต์ (Sentiment)</h2><div id="sentiment"></div></div>
-      <div class="panel"><h2>ประเด็นที่คนบ่น (Topic)</h2><div id="topics"></div></div>
+    <div class="kpis mb" id="kpis"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px" class="mb" id="analysisGrid">
+      <div class="card"><h2>อารมณ์คอมเมนต์</h2><div id="sentiment"></div></div>
+      <div class="card"><h2>ประเด็นที่ถูกพูดถึง (เชิงลบ)</h2><div id="topics"></div></div>
     </div>
-    <div class="panel"><h2>ไทม์ไลน์ — ความรุนแรงคอมเมนต์ลบ (แดง = พุ่งผิดปกติ)</h2><div class="tl" id="timeline"></div></div>
-    <div class="panel"><h2>คอมเมนต์ลบที่คนเห็นเยอะสุด</h2>
-      <table><thead><tr><th>เวลา</th><th>คอมเมนต์</th><th>ประเด็น</th><th class="r">reach</th></tr></thead>
-      <tbody id="topneg"></tbody></table>
-      <p class="muted" id="genat"></p>
+
+    <div class="card mb"><h2>ไทม์ไลน์ความรุนแรง (แดง = พุ่งผิดปกติ)</h2><div class="tl" id="timeline"></div></div>
+
+    <div class="card mb" id="alertCard"><h2>การแจ้งเตือน</h2><div id="alerts"></div></div>
+
+    <!-- comment explorer -->
+    <div class="card">
+      <h2>รายการคอมเมนต์ (ค้นหา / กรอง / เรียงได้)</h2>
+      <div class="tools">
+        <div id="sentChips"></div>
+        <div class="grow"></div>
+        <select id="topicFilter"><option value="">ทุกประเด็น</option></select>
+        <select id="sortBy">
+          <option value="reach">เรียงตาม reach มากสุด</option>
+          <option value="new">ใหม่สุดก่อน</option>
+          <option value="old">เก่าสุดก่อน</option>
+        </select>
+        <input type="search" id="search" placeholder="ค้นหาข้อความ / ชื่อผู้คอมเมนต์…">
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>เวลา</th><th>ผู้คอมเมนต์</th><th>คอมเมนต์</th><th>อารมณ์</th><th>ประเด็น</th>
+            <th style="text-align:right">Reach</th><th>โพสต์</th><th></th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="count" id="count"></div>
     </div>
   </div>
 </div>
 
 <script>
-const SENT_COLOR={positive:'#16a34a',neutral:'#94a3b8',negative:'#dc2626'};
-const STATUS={NORMAL:['#16a34a','🟢','ปกติ'],WATCH:['#d97706','🟡','เฝ้าระวัง'],CRISIS:['#dc2626','🔴','วิกฤต']};
-let source='sample';
+const SENT={positive:{c:'var(--pos)',t:'บวก'},neutral:{c:'var(--neu)',t:'กลาง'},negative:{c:'var(--neg)',t:'ลบ'}};
+const STAT={NORMAL:['var(--pos)','ปกติ'],WATCH:['var(--warn)','เฝ้าระวัง'],CRISIS:['var(--neg)','วิกฤต']};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let SRC='sample', DATA=null, FILT={sent:'all',topic:'',q:'',sort:'reach'};
 
-const $=id=>document.getElementById(id);
-document.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{
-  document.querySelectorAll('.opt').forEach(x=>x.classList.remove('active'));
-  o.classList.add('active'); source=o.dataset.source;
-  $('fbopts').classList.toggle('show',source==='facebook');
-  $('hint').textContent = source==='facebook'
-    ? '⚠️ เพจ public ปลอดภัยสุด · กลุ่มต้องมี cookie + เช็ก PDPA · ต้องตั้ง APIFY_TOKEN ที่ server ก่อน'
-    : 'โหมด Demo ใช้ข้อมูลตัวอย่างของ Talesrunner — เหมาะสำหรับดูว่าเครื่องมือทำงานยังไง';
-});
+// source toggle
+$('#srcSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  [...$('#srcSeg').children].forEach(x=>x.classList.remove('on'));b.classList.add('on');SRC=b.dataset.src;
+  $('#fldComments').style.display=SRC==='facebook'?'flex':'none';
+  $('#hint').textContent=SRC==='facebook'
+    ?'โหมด Facebook จริง: ดึงสดผ่าน Apify · กรองคอมเมนต์ของเพจ/โฆษณาออกให้อัตโนมัติ'
+    :'โหมดตัวอย่าง: ใช้ข้อมูลจำลองเพื่อดูการทำงาน';};
+$('#fldComments').style.display='none';
 
-$('runBtn').onclick=async()=>{
-  $('runBtn').disabled=true; $('results').classList.add('hidden');
-  $('progressPanel').classList.remove('hidden'); $('log').textContent='';
-  $('statusText').innerHTML='<span class="spinner"></span> กำลังทำงาน…';
-  const body={source,only:$('only').value,max_posts:+$('maxposts').value,max_comments:+$('maxcomments').value};
-  const {job_id}=await(await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
-  poll(job_id);
+$('#runBtn').onclick=async()=>{
+  $('#runBtn').disabled=true;$('#results').classList.add('hidden');
+  $('#prog').classList.remove('hidden');$('#log').textContent='';
+  $('#progTitle').innerHTML='<span class="spin"></span>กำลังทำงาน';
+  const body={source:SRC,only:'page',max_comments:+$('#maxc').value};
+  const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  poll((await r.json()).job_id);
 };
-
 async function poll(id){
   const j=await(await fetch('/api/jobs/'+id)).json();
-  $('log').textContent=(j.logs||[]).join('\n'); $('log').scrollTop=$('log').scrollHeight;
-  if(j.status==='done'){ $('statusText').textContent='✅ เสร็จแล้ว'; $('runBtn').disabled=false; render(j.result); }
-  else if(j.status==='error'){ $('statusText').textContent='❌ ผิดพลาด'; $('runBtn').disabled=false;
-    $('log').textContent+='\n\n'+(j.error||''); }
+  $('#log').textContent=(j.logs||[]).join('\n');$('#log').scrollTop=1e9;
+  if(j.status==='done'){$('#progTitle').textContent='เสร็จแล้ว';$('#runBtn').disabled=false;render(j.result);}
+  else if(j.status==='error'){$('#progTitle').textContent='เกิดข้อผิดพลาด';$('#runBtn').disabled=false;
+    $('#log').textContent+='\n\n'+(j.error||'');}
   else setTimeout(()=>poll(id),1000);
 }
 
-function bar(label,value,max,color){
-  const pct=max?value/max*100:0;
-  return `<div class="row"><span class="lbl">${esc(label)}</span>
-    <span class="track"><span class="fill" style="width:${pct.toFixed(1)}%;background:${color}"></span></span>
-    <span class="val">${value}</span></div>`;
+function setStatus(s){const[c,t]=STAT[s];$('#statusPill').innerHTML=
+  `<span class="dot" style="background:${c}"></span>${t} (${s})`;$('#statusPill').style.borderColor=c;}
+
+function bar(k,v,max,color,sw){
+  const p=max?v/max*100:0;
+  return `<div class="row"><span class="k">${sw?`<span class="sw" style="background:${color}"></span>`:''}${esc(k)}</span>
+    <span class="track"><span class="fill" style="width:${p.toFixed(1)}%;background:${color}"></span></span>
+    <span class="n">${v}</span></div>`;
 }
-const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
 function render(r){
-  $('results').classList.remove('hidden');
-  const [col,dot,th]=STATUS[r.status];
-  const b=$('banner'); b.style.background=col;
-  b.innerHTML=`<span>${dot} สถานะ: ${th} (${r.status})</span>
-    <span style="font-size:13px;font-weight:400">คอมเมนต์ ${r.total} · ส่งต่อ LLM ${r.escalated_count} · ${esc(r.source==='facebook'?'Facebook จริง':'Demo')}</span>`;
+  DATA=r;FILT={sent:'all',topic:'',q:'',sort:'reach'};
+  $('#results').classList.remove('hidden');setStatus(r.status);
+  $('#genAt').textContent='อัปเดต '+(r.generated_at||'')+' · '+(r.source==='facebook'?'Facebook จริง':'ตัวอย่าง');
 
-  $('alerts').innerHTML=(r.alerts&&r.alerts.length)?r.alerts.map(a=>`<li>${esc(a)}</li>`).join('')
-    :'<li style="border-left-color:#16a34a">ไม่มีสัญญาณผิดปกติ</li>';
+  const sm=r.sentiment_mix||{},tot=r.total||1;
+  const negP=Math.round((sm.negative||0)/tot*100),escP=Math.round((r.escalated_count||0)/tot*100);
+  const kpi=[['คอมเมนต์ทั้งหมด',r.total],['เชิงลบ',`${negP}%`],['จำนวนลบ',sm.negative||0],
+    ['ผู้คอมเมนต์',r.unique_authors??'–'],['reach เฉลี่ย',r.avg_reach??'–'],['reach สูงสุด',r.max_reach??'–']];
+  $('#kpis').innerHTML=kpi.map(([l,v])=>`<div class="kpi"><div class="v tnum">${v}</div><div class="l">${l}</div></div>`).join('');
 
-  const sm=r.sentiment_mix||{};
-  $('sentiment').innerHTML=['positive','neutral','negative'].map(k=>
-    bar({positive:'บวก',neutral:'กลาง',negative:'ลบ'}[k],sm[k]||0,r.total,SENT_COLOR[k])).join('');
+  $('#sentiment').innerHTML=['negative','neutral','positive'].map(k=>
+    bar(SENT[k].t,sm[k]||0,tot,SENT[k].c,true)).join('')
+    + `<div class="row" style="color:var(--muted);font-size:12px;margin-top:8px">
+       <span class="k">ส่งต่อ LLM</span><span class="track" style="background:none"></span><span class="n">${escP}%</span></div>`;
 
-  const tb=r.topic_breakdown||[]; const tmax=Math.max(1,...tb.map(x=>x[1]));
-  $('topics').innerHTML=tb.length?tb.map(([t,n])=>bar(t,n,tmax,'#dc2626')).join(''):'<div class="muted">ไม่มีประเด็นลบ</div>';
+  const tb=r.topic_breakdown||[],tmax=Math.max(1,...tb.map(x=>x[1]));
+  $('#topics').innerHTML=tb.length?tb.map(([t,n])=>bar(t,n,tmax,'var(--accent)',false)).join('')
+    :'<div style="color:var(--muted);font-size:13px">ไม่มีประเด็นเชิงลบ</div>';
 
-  const smax=Math.max(1,...r.buckets.map(x=>x.severity));
-  $('timeline').innerHTML=r.buckets.map(s=>`<div class="tl-col">
-    <div class="tl-bar ${s.is_spike?'spike':''}" style="height:${(s.severity/smax*100).toFixed(0)}%" title="severity ${s.severity}"></div>
-    <div class="tl-x">${s.start}</div></div>`).join('');
+  const sev=Math.max(1,...r.buckets.map(b=>b.severity));
+  $('#timeline').innerHTML=r.buckets.map(b=>`<div class="col">
+    <div class="bar ${b.is_spike?'sp':''}" style="height:${(b.severity/sev*100).toFixed(0)}%"
+      title="${b.start} · ลบ ${b.negative} · severity ${b.severity}"></div><div class="x">${b.start}</div></div>`).join('');
 
-  $('topneg').innerHTML=(r.top_negatives||[]).map(c=>`<tr>
-    <td>${c.time}</td><td>${esc(c.text)}</td>
-    <td>${esc((c.topics||[]).join(', ')||'-')} ${c.escalated?'<span class="badge">LLM</span>':''}</td>
-    <td class="r">${c.reach}</td></tr>`).join('');
-  $('genat').textContent='อัปเดตล่าสุด: '+(r.generated_at||'');
-  $('results').scrollIntoView({behavior:'smooth'});
+  $('#alerts').innerHTML=(r.alerts&&r.alerts.length)?r.alerts.map(a=>`<div class="alert">${esc(a)}</div>`).join('')
+    :'<div class="alert" style="border-left-color:var(--pos)">ไม่มีสัญญาณผิดปกติ</div>';
+
+  // topic filter options
+  $('#topicFilter').innerHTML='<option value="">ทุกประเด็น</option>'+
+    tb.map(([t])=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  renderChips();renderTable();
+  $('#results').scrollIntoView({behavior:'smooth',block:'start'});
 }
+
+function renderChips(){
+  const cs=DATA.comments,cnt=s=>s==='all'?cs.length:cs.filter(c=>c.sentiment===s).length;
+  const defs=[['all','ทั้งหมด'],['negative','ลบ'],['neutral','กลาง'],['positive','บวก']];
+  $('#sentChips').innerHTML=defs.map(([k,l])=>
+    `<span class="chip ${FILT.sent===k?'on':''}" data-s="${k}">${l}<span class="c">${cnt(k)}</span></span>`).join(' ');
+  $('#sentChips').querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{FILT.sent=ch.dataset.s;renderChips();renderTable();});
+}
+
+function renderTable(){
+  let cs=DATA.comments.slice();
+  if(FILT.sent!=='all')cs=cs.filter(c=>c.sentiment===FILT.sent);
+  if(FILT.topic)cs=cs.filter(c=>(c.topics||[]).includes(FILT.topic));
+  if(FILT.q){const q=FILT.q.toLowerCase();cs=cs.filter(c=>(c.text||'').toLowerCase().includes(q)||(c.author||'').toLowerCase().includes(q));}
+  cs.sort((a,b)=>FILT.sort==='reach'?b.reach-a.reach:
+    FILT.sort==='new'?b.created_at.localeCompare(a.created_at):a.created_at.localeCompare(b.created_at));
+
+  $('#rows').innerHTML=cs.slice(0,300).map(c=>{
+    const s=SENT[c.sentiment],d=c.created_at.replace('T',' ').slice(0,16);
+    const who=c.profile_url?`<a href="${esc(c.profile_url)}" target="_blank" rel="noopener">${esc(c.author)}</a>`:esc(c.author);
+    const link=c.comment_url?`<a class="ext" href="${esc(c.comment_url)}" target="_blank" rel="noopener" title="เปิดคอมเมนต์">↗</a>`:'';
+    const topics=(c.topics||[]).map(t=>`<span class="topic">${esc(t)}</span>`).join('')||'<span style="color:var(--muted)">—</span>';
+    return `<tr class="s-${c.sentiment}">
+      <td class="when">${d}</td>
+      <td class="who" title="${esc(c.author)}">${who}</td>
+      <td class="txt">${esc(c.text)}${c.escalated_to_llm?'<span class="ai">AI</span>':''}</td>
+      <td><span class="tag" style="color:${s.c};background:color-mix(in srgb,${s.c} 12%,transparent)"><span class="dot" style="background:${s.c}"></span>${s.t}</span></td>
+      <td>${topics}</td>
+      <td class="rch">${c.reach}</td>
+      <td class="post" title="${esc(c.post_title||'')}">${esc(c.post_title||'—')}</td>
+      <td>${link}</td></tr>`;
+  }).join('')||'<tr><td colspan="8" class="empty">ไม่พบคอมเมนต์ตามเงื่อนไข</td></tr>';
+  $('#count').textContent=`แสดง ${Math.min(cs.length,300)} จาก ${cs.length} คอมเมนต์`+(cs.length>300?' (จำกัด 300 แถวแรก)':'');
+}
+
+$('#topicFilter').onchange=e=>{FILT.topic=e.target.value;renderTable();};
+$('#sortBy').onchange=e=>{FILT.sort=e.target.value;renderTable();};
+$('#search').oninput=e=>{FILT.q=e.target.value;renderTable();};
 </script>
 </body>
 </html>

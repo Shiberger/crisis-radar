@@ -17,12 +17,15 @@ class Comment:
     platform: str            # 'facebook' | 'pantip' | 'google_play' ...
     source_id: str           # page/post id (หรือ thread id)
     comment_id: str
-    author: str              # ชื่อผู้คอมเมนต์ — จะถูก mask ก่อนเก็บ (ดู security.py)
+    author: str              # ชื่อผู้คอมเมนต์ (แสดงในหน้าภายในเพื่อให้ทีมตอบ crisis ได้)
     text: str
     created_at: datetime
     url: str = ""
     reach: int = 0           # like + reply — ใช้ถ่วงน้ำหนักความรุนแรงของ crisis
     brand: str = ""          # 'talesrunner' | 'warz' ...
+    comment_url: str = ""    # ลิงก์ตรงไปคอมเมนต์นั้น (ให้ทีมคลิกไปตอบได้)
+    profile_url: str = ""    # โปรไฟล์ผู้คอมเมนต์
+    post_title: str = ""     # โพสต์ที่คอมเมนต์นี้อยู่ใต้ (บริบท)
 
     def to_dict(self) -> dict:
         d = asdict(self)

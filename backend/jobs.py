@@ -85,6 +85,11 @@ def _fetch_facebook(job_id: str, params: dict):
             comments += scraper.scrape_target(t, int(params.get("max_posts", 10)),
                                               int(params.get("max_comments", 30)))
 
+    from src.sources.facebook_apify import filter_noise
+    comments, dropped = filter_noise(comments, cfg.get("page_id", ""), cfg.get("exclude_authors"))
+    if dropped:
+        _log(job_id, f"กรอง admin/โฆษณา (เช่น IDRLAB) ออก {dropped} รายการ")
+
     live = {"page": cfg.get("page_name"), "page_id": cfg.get("page_id"),
             "brand": cfg["brand"], "comments": comments}
     live_path = ROOT / "data" / f"facebook_live_{cfg['brand']}.json"
@@ -119,13 +124,12 @@ def _run(job_id: str, params: dict) -> None:
         rep = detector.detect(classified, brand=brand)
 
         result = detector.report_to_dict(rep)
-        top_neg = sorted([c for c in classified if c.sentiment == "negative"],
-                         key=lambda c: c.comment.reach, reverse=True)[:10]
-        result["top_negatives"] = [
-            {"time": c.comment.created_at.strftime("%H:%M"), "text": c.comment.text,
-             "topics": c.topics, "reach": c.comment.reach, "escalated": c.escalated_to_llm}
-            for c in top_neg
-        ]
+        # ส่งคอมเมนต์ครบทุกอัน (พร้อมชื่อ/ลิงก์/รายละเอียด) ให้หน้าเว็บทำตารางกรอง/ค้นหาเอง
+        result["comments"] = [c.to_dict() for c in classified]
+        reaches = [c.comment.reach for c in classified]
+        result["unique_authors"] = len({c.comment.author for c in classified})
+        result["avg_reach"] = round(sum(reaches) / len(reaches), 1) if reaches else 0
+        result["max_reach"] = max(reaches) if reaches else 0
         result["generated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
         result["source"] = source
 

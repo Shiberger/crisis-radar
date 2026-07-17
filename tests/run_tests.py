@@ -88,17 +88,28 @@ calm = [Classified(_mk_comment("เกมสนุกดีชอบมาก"),
 calm_rep = detector.detect(calm, brand="test")
 check("T4 calm → ไม่มี spike", not any(b.is_spike for b in calm_rep.buckets), f"status={calm_rep.status}")
 
-# ---- T5: PII masking ----
-masked = mask_author("Somchai R")
-raw_names_in_output = any("Somchai" in c.author or "Nong" in c.author for c in comments)
-check("T5 ชื่อผู้คอมเมนต์ถูก mask", masked.startswith("user_") and not raw_names_in_output,
-      f"'Somchai R' → '{masked}'")
+# ---- T5: mask util (ยังใช้ตอน export/แชร์ภายนอก) ----
+m1, m2 = mask_author("Somchai R"), mask_author("Somchai R")
+check("T5 mask_author util (stable + non-reversible)",
+      m1 == m2 and m1.startswith("user_") and "Somchai" not in m1, m1)
 
 # ---- T6: connector interface ----
 sample_c = comments[0]
 has_fields = all(getattr(sample_c, f, None) is not None
                  for f in ("platform", "comment_id", "author", "text", "created_at"))
 check("T6 connector คืน field ครบตาม interface", has_fields and len(comments) > 0, f"{len(comments)} comments")
+
+# ---- T7: กรอง admin / โฆษณา (IDRLAB) / เพจ ออก ----
+from src.sources.facebook_apify import filter_noise   # noqa: E402
+noise = [
+    {"author": "Player X", "text": "เกมสนุกดีชอบมาก", "profile_url": "https://facebook.com/playerx"},
+    {"author": "IDRLAB", "text": "บริการกู้ข้อมูล ปรึกษาฟรี LINE : @idrlab โทร 094-692-8080",
+     "profile_url": "https://facebook.com/idrlab"},
+    {"author": "Tales Runner", "text": "ประกาศจากทีมงาน", "profile_url": "https://facebook.com/thehof.talesrunner"},
+]
+kept, dropped = filter_noise(noise, page_id="thehof.talesrunner", exclude_authors=["Tales Runner", "IDRLAB"])
+check("T7 กรอง admin/โฆษณา (IDRLAB/เพจ) ออก เหลือแต่ผู้เล่น", len(kept) == 1 and dropped == 2,
+      f"kept={len(kept)} dropped={dropped}")
 
 # ---- output ----
 print("=" * 64)

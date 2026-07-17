@@ -3,6 +3,7 @@
   "brand": "talesrunner",
   "page_id": "thehof.talesrunner",
   "page_name": "TalesRunner Thailand (Official / thehof)",
+  "exclude_authors": ["Tales Runner", "IDRLAB", "idrlab", "HOF"],
   "post_urls": [
     "https://www.facebook.com/share/p/17gB7HTXch/",
     "https://www.facebook.com/share/p/17Kn4iXpZ2/",
