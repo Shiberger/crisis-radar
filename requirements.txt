@@ -1,8 +1,8 @@
 # เดโม่ pipeline (run_demo.py + tests) ไม่ต้องติดตั้งอะไร — ใช้ Python stdlib ล้วน (Python 3.10+)
 
-# ---- ดึง Facebook จริง (scrape_facebook.py) — ติดตั้งตามวิธีที่เลือก ----
-# apify-client>=1.6          # วิธี A: Apify (แนะนำ) — ต้องมี APIFY_TOKEN
-# playwright>=1.44           # วิธี B: Playwright — + `python -m playwright install chromium`
+# ---- ดึง Facebook จริง ----
+# วิธี A: Apify — *ไม่ต้องลงอะไรเลย* เรียกผ่าน REST API (urllib stdlib) แค่ใส่ APIFY_TOKEN ใน .env
+# playwright>=1.44           # วิธี B (สำรอง): Playwright — + `python -m playwright install chromium`
 
 # ---- Production (เปิดใช้เมื่อขึ้นจริง) ----
 # anthropic>=0.40            # LLM escalation (Claude Haiku)

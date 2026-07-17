@@ -15,14 +15,15 @@
 
 ---
 
-## วิธี A — Apify (แนะนำ: เสถียรสุด)
+## วิธี A — Apify (แนะนำ: เสถียรสุด) — ผ่าน REST API ไม่ต้องลง package
 
 ```bash
-pip install apify-client
-export APIFY_TOKEN=xxxx          # console.apify.com > Settings > Integrations
-
-# เพจ public เท่านั้น (demo ปลอดภัย) — ดึงแล้วรัน pipeline ต่อเลย
-python scrape_facebook.py --method apify --only page --max-posts 10 --max-comments 30 --run
+# 1) ใส่ token ใน .env (ไม่ต้อง pip install อะไร — เรียก Apify REST ผ่าน urllib)
+cp .env.example .env      # แล้วแก้ APIFY_TOKEN=... ในไฟล์
+# 2) ใส่ URL โพสต์ใน data/targets.json > post_urls
+# 3) ดึง + วิเคราะห์
+python scrape_facebook.py --run            # ใช้ post_urls ใน targets.json
+# หรือกดปุ่ม "ดึง Facebook จริง" บนหน้าเว็บ (backend/server.py)
 ```
 
 ผลลัพธ์: `data/facebook_live_talesrunner.json` → เข้า pipeline → `output/dashboard.html`

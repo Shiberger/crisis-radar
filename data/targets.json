@@ -4,8 +4,9 @@
   "page_id": "thehof.talesrunner",
   "page_name": "TalesRunner Thailand (Official / thehof)",
   "post_urls": [
-    "วางลิงก์โพสต์ที่นี่ เช่น https://www.facebook.com/thehof.talesrunner/posts/xxxx",
-    "วางได้หลายอัน เอาโพสต์ล่าสุด 5-10 อันที่มีคอมเมนต์เยอะ"
+    "https://www.facebook.com/share/p/17gB7HTXch/",
+    "https://www.facebook.com/share/p/17Kn4iXpZ2/",
+    "https://www.facebook.com/share/p/1camdLMTfS/"
   ],
   "targets": [
     {"type": "page",  "name": "TalesRunner Thailand (thehof)", "url": "https://www.facebook.com/thehof.talesrunner", "private": false},

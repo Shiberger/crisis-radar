@@ -9,8 +9,8 @@
   2) facebook-comments-scraper : จากแต่ละ URL โพสต์ → คอมเมนต์
 
 ต้องมี:
-  pip install apify-client
-  export APIFY_TOKEN=xxxx          # จาก console.apify.com
+  APIFY_TOKEN ในไฟล์ .env          # จาก console.apify.com > Settings > Integrations
+  (เรียกผ่าน REST API ด้วย urllib — ไม่ต้องลง apify-client)
   (กลุ่ม private) FB_COOKIES_JSON=path/to/cookies.json  # export cookie ตอนล็อกอินแล้ว
 
 หมายเหตุ field mapping: ชื่อ field ของ output แต่ละ actor/เวอร์ชันอาจต่างกันเล็กน้อย
@@ -26,6 +26,24 @@ from typing import Any, Optional
 
 POSTS_ACTOR = "apify/facebook-posts-scraper"
 COMMENTS_ACTOR = "apify/facebook-comments-scraper"
+
+
+def _ssl_context():
+    """หา CA bundle ให้เจอเอง (python.org build บน mac มักหา cert ไม่เจอ).
+
+    ยัง verify cert ตามปกติ (ไม่ปิด verification) — ปลอดภัยเวลาส่ง token.
+    """
+    import ssl
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        pass
+    for p in ("/etc/ssl/cert.pem", "/etc/ssl/certs/ca-certificates.crt",
+              "/usr/local/etc/openssl@3/cert.pem"):
+        if os.path.exists(p):
+            return ssl.create_default_context(cafile=p)
+    return ssl.create_default_context()
 
 
 def _pick(item: dict, *keys, default=None):
@@ -101,21 +119,37 @@ def load_apify_export(path, brand: str = "talesrunner", page_id: str = "thehof.t
 
 class ApifyFacebookScraper:
     platform = "facebook"
+    API = "https://api.apify.com/v2"
 
     def __init__(self, token: Optional[str] = None, cookies: Optional[list] = None):
-        try:
-            from apify_client import ApifyClient
-        except ImportError as e:
-            raise ImportError("ต้อง `pip install apify-client` ก่อน") from e
         self.token = token or os.environ.get("APIFY_TOKEN")
         if not self.token:
-            raise RuntimeError("ไม่พบ APIFY_TOKEN (env). ดู console.apify.com > Settings > Integrations")
-        self.client = ApifyClient(self.token)
+            raise RuntimeError("ไม่พบ APIFY_TOKEN — ใส่ในไฟล์ .env (ดู .env.example)")
         self.cookies = cookies   # สำหรับกลุ่ม private
 
+    def check_token(self) -> str:
+        """เช็กว่า token ใช้ได้จริง (ไม่เสียเงิน) — คืน username. raise ถ้า token ผิด."""
+        import json as _json
+        import urllib.request
+        req = urllib.request.Request(f"{self.API}/users/me",
+                                     headers={"Authorization": f"Bearer {self.token}"})
+        with urllib.request.urlopen(req, timeout=15, context=_ssl_context()) as r:
+            return _json.loads(r.read()).get("data", {}).get("username", "?")
+
     def _run(self, actor: str, run_input: dict) -> list[dict]:
-        run = self.client.actor(actor).call(run_input=run_input)
-        return list(self.client.dataset(run["defaultDatasetId"]).iterate_items())
+        """เรียก actor ผ่าน REST (run-sync-get-dataset-items) — stdlib urllib ล้วน."""
+        import json as _json
+        import urllib.error
+        import urllib.request
+        url = f"{self.API}/acts/{actor.replace('/', '~')}/run-sync-get-dataset-items"
+        req = urllib.request.Request(
+            url, data=_json.dumps(run_input).encode("utf-8"), method="POST",
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.token}"})
+        try:
+            with urllib.request.urlopen(req, timeout=300, context=_ssl_context()) as r:
+                return _json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            raise RuntimeError(f"Apify API error {e.code}: {e.read().decode('utf-8', 'ignore')[:300]}") from e
 
     def get_post_urls(self, target_url: str, max_posts: int) -> list[str]:
         run_input: dict = {"startUrls": [{"url": target_url}], "resultsLimit": max_posts}

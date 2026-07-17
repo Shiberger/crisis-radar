@@ -22,12 +22,15 @@ python3 tests/run_tests.py # → 9 test, ผลจริง
 python3 backend/selftest.py # → ทดสอบ web backend end-to-end (9 test)
 ```
 
-## ดึง Facebook จริง (รัน local — ดู [docs/SCRAPING.md](docs/SCRAPING.md))
+## ดึง Facebook จริง (ผ่าน Apify — ไม่ต้องลง package)
+1. ใส่ `APIFY_TOKEN` ในไฟล์ `.env` (ดู `.env.example`) · ใส่ URL โพสต์ใน `data/targets.json` → `post_urls`
+2. **ผ่านเว็บ:** เปิด server → กดปุ่ม **📘 ดึง Facebook จริง** (ใช้ Apify REST API สดผ่าน urllib stdlib)
+3. **หรือ CLI:** `python3 scrape_facebook.py --run`
 ```bash
-pip install apify-client && export APIFY_TOKEN=xxxx
-python3 scrape_facebook.py --method apify --only page --run   # เพจ public → รัน pipeline ต่อเลย
+# ทางลัดไม่ต้องต่อ token: import ไฟล์ JSON ที่ Download จาก Apify Console
+python3 scrape_facebook.py --import ไฟล์.json --run
 ```
-> ⚠️ ดึงเพจ public ก่อน (ปลอดภัย). กลุ่ม private ต้องเป็นสมาชิก + cookie + เช็ก PDPA (ดู SCRAPING.md)
+> ⚠️ เพจ public ก่อน (ปลอดภัย). กลุ่ม private ต้องเป็นสมาชิก + cookie + เช็ก PDPA (ดู [docs/SCRAPING.md](docs/SCRAPING.md))
 
 ## สถาปัตยกรรม (สลับ scraper → API ได้โดยไม่แก้ pipeline)
 ```
