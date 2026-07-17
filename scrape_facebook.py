@@ -42,9 +42,22 @@ def load_cookies() -> list | None:
     return None
 
 
+def valid_post_urls(cfg) -> list[str]:
+    return [u for u in cfg.get("post_urls", []) if isinstance(u, str) and u.startswith("http")]
+
+
 def scrape_apify(targets, cfg, args) -> list[dict]:
     from src.sources.facebook_apify import ApifyFacebookScraper
     scraper = ApifyFacebookScraper(cookies=load_cookies())
+
+    # ทางแนะนำ: ถ้ามี post_urls ระบุไว้ → ดึงคอมเมนต์ actor เดียว (ถูกสุด)
+    urls = valid_post_urls(cfg)
+    if urls:
+        print(f"  [apify] ใช้ post_urls ที่ระบุ {len(urls)} โพสต์ (Comments Scraper อย่างเดียว)")
+        return scraper.scrape_post_urls(urls, args.max_comments)
+
+    # fallback: ไม่มี post_urls → พยายามหา actor list โพสต์จากเพจ
+    print("  [apify] ไม่มี post_urls ใน targets.json → ลองหา actor list โพสต์ (แพงกว่า)")
     all_comments: list[dict] = []
     for t in targets:
         if t["type"] == "group" and not scraper.cookies:
@@ -84,6 +97,8 @@ def main() -> None:
     ap.add_argument("--max-posts", type=int, default=10)
     ap.add_argument("--max-comments", type=int, default=30)
     ap.add_argument("--inspect", action="store_true", help="ดู raw item ตัวแรก (แก้ field mapping)")
+    ap.add_argument("--import", dest="import_file", metavar="FILE",
+                    help="import ไฟล์ JSON ที่ Download จาก Apify Console (ไม่ต้องต่อ token)")
     ap.add_argument("--show", action="store_true", help="playwright: เปิด browser ให้เห็น (ไม่ headless)")
     ap.add_argument("--run", action="store_true", help="รัน pipeline ต่อทันทีหลัง scrape")
     args = ap.parse_args()
@@ -93,6 +108,19 @@ def main() -> None:
     targets = cfg["targets"]
     if args.only != "all":
         targets = [t for t in targets if t["type"] == args.only]
+
+    # ทางลัดไม่ต้องต่อ token: import ไฟล์ที่ดาวน์โหลดจาก Apify UI
+    if args.import_file:
+        from src.sources.facebook_apify import load_apify_export
+        out = load_apify_export(args.import_file, brand=brand, page_id=cfg.get("page_id", brand))
+        out_path = ROOT / "data" / f"facebook_live_{brand}.json"
+        out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"[import] แปลง {len(out['comments'])} คอมเมนต์ → {out_path}")
+        if args.run and out["comments"]:
+            from run_demo import run_pipeline
+            print("\n[pipeline] รันต่อบน data จริง…\n")
+            run_pipeline(out_path, brand=brand)
+        return
 
     if args.inspect:
         inspect_apify(targets, args); return

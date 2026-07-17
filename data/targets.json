@@ -1,8 +1,12 @@
 {
-  "_note": "เป้าหมายที่จะ scrape. เพจ public ทำ demo ได้เลย. กลุ่ม private ต้องเป็นสมาชิก + ใส่ cookie (ดู docs/SCRAPING.md).",
+  "_note": "เป้าหมายที่จะ scrape. วิธีถูกสุด: ก็อป URL โพสต์จากเพจมาใส่ post_urls (ดึงคอมเมนต์ actor เดียว). ถ้า post_urls ว่าง จะ fallback ไปหา actor list โพสต์.",
   "brand": "talesrunner",
   "page_id": "thehof.talesrunner",
   "page_name": "TalesRunner Thailand (Official / thehof)",
+  "post_urls": [
+    "วางลิงก์โพสต์ที่นี่ เช่น https://www.facebook.com/thehof.talesrunner/posts/xxxx",
+    "วางได้หลายอัน เอาโพสต์ล่าสุด 5-10 อันที่มีคอมเมนต์เยอะ"
+  ],
   "targets": [
     {"type": "page",  "name": "TalesRunner Thailand (thehof)", "url": "https://www.facebook.com/thehof.talesrunner", "private": false},
     {"type": "group", "name": "TalesRunner TH Group",           "url": "https://www.facebook.com/groups/talesrunnerthgroup", "private": true},

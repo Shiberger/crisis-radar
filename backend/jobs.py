@@ -70,13 +70,20 @@ def _fetch_facebook(job_id: str, params: dict):
 
     scraper = ApifyFacebookScraper(cookies=cookies)   # raise ถ้าไม่มี token/lib
     comments: list[dict] = []
-    for t in targets:
-        if t["type"] == "group" and not scraper.cookies:
-            _log(job_id, f"ข้าม {t['name']} — กลุ่ม private ต้องมี cookie")
-            continue
-        _log(job_id, f"ดึง {t['name']} …")
-        comments += scraper.scrape_target(t, int(params.get("max_posts", 10)),
-                                          int(params.get("max_comments", 30)))
+
+    # ทางแนะนำ: ใช้ post_urls ที่ระบุใน targets.json (Comments Scraper อย่างเดียว, ถูกสุด)
+    post_urls = [u for u in cfg.get("post_urls", []) if isinstance(u, str) and u.startswith("http")]
+    if post_urls:
+        _log(job_id, f"ใช้ post_urls {len(post_urls)} โพสต์ (Comments Scraper)")
+        comments = scraper.scrape_post_urls(post_urls, int(params.get("max_comments", 30)))
+    else:
+        for t in targets:
+            if t["type"] == "group" and not scraper.cookies:
+                _log(job_id, f"ข้าม {t['name']} — กลุ่ม private ต้องมี cookie")
+                continue
+            _log(job_id, f"ดึง {t['name']} …")
+            comments += scraper.scrape_target(t, int(params.get("max_posts", 10)),
+                                              int(params.get("max_comments", 30)))
 
     live = {"page": cfg.get("page_name"), "page_id": cfg.get("page_id"),
             "brand": cfg["brand"], "comments": comments}
