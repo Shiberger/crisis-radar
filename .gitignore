@@ -1,6 +1,11 @@
-# secrets
+# secrets & session
 .env
 *.key
+fb_cookies.json
+fb_state.json
+
+# data จริงที่ scrape มา (มี PII — ห้ามขึ้น git)
+data/facebook_live_*.json
 
 # python
 __pycache__/

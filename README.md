@@ -12,6 +12,13 @@ python3 run_demo.py        # → output/crisis_report.md, classified.json, dashb
 python3 tests/run_tests.py # → 9 test, ผลจริง
 ```
 
+## ดึง Facebook จริง (รัน local — ดู [docs/SCRAPING.md](docs/SCRAPING.md))
+```bash
+pip install apify-client && export APIFY_TOKEN=xxxx
+python3 scrape_facebook.py --method apify --only page --run   # เพจ public → รัน pipeline ต่อเลย
+```
+> ⚠️ ดึงเพจ public ก่อน (ปลอดภัย). กลุ่ม private ต้องเป็นสมาชิก + cookie + เช็ก PDPA (ดู SCRAPING.md)
+
 ## สถาปัตยกรรม (สลับ scraper → API ได้โดยไม่แก้ pipeline)
 ```
 sources/  → classify/           → crisis/       → dashboard.py

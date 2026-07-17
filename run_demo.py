@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Crisis Radar — รัน end-to-end บน sample data ของ Talesrunner.
+"""Crisis Radar — รัน pipeline end-to-end.
 
 flow:  SampleFacebookSource → HybridClassifier → crisis.detect → report (md + json + html)
 
-รัน:   python run_demo.py
-ผลลัพธ์อยู่ใน output/
+รัน:
+  python run_demo.py                       # ใช้ sample fixture (Talesrunner)
+  python run_demo.py --fixture data/facebook_live_talesrunner.json   # ใช้ data จริงที่ scrape มา
 """
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -17,17 +19,17 @@ from src.dashboard import render_html
 from src.sources.sample import SampleFacebookSource
 
 ROOT = Path(__file__).parent
-FIXTURE = ROOT / "data" / "sample_talesrunner_fb_comments.json"
+DEFAULT_FIXTURE = ROOT / "data" / "sample_talesrunner_fb_comments.json"
 OUT = ROOT / "output"
 
 
-def main() -> None:
+def run_pipeline(fixture_path: Path, brand: str = "talesrunner") -> detector.CrisisReport:
     OUT.mkdir(exist_ok=True)
 
     # 1) ingest (masked PII แล้วในตัว source)
-    source = SampleFacebookSource(FIXTURE, brand="talesrunner")
+    source = SampleFacebookSource(fixture_path, brand=brand)
     comments = source.fetch()
-    print(f"[ingest] ดึง {len(comments)} คอมเมนต์จาก {source.platform}")
+    print(f"[ingest] ดึง {len(comments)} คอมเมนต์จาก {source.platform} ({fixture_path.name})")
 
     # 2) hybrid classify (lexicon → LLM เฉพาะเคสไม่มั่นใจ)
     clf = HybridClassifier()
@@ -36,7 +38,7 @@ def main() -> None:
     print(f"[classify] เสร็จ {len(classified)} · ส่งต่อ LLM {escalated} เคส")
 
     # 3) crisis detection
-    report = detector.detect(classified, brand="talesrunner")
+    report = detector.detect(classified, brand=brand)
     print(f"[crisis] สถานะ = {report.status} · alert {len(report.alerts)} รายการ")
 
     # 4) outputs
@@ -45,9 +47,18 @@ def main() -> None:
         json.dumps([c.to_dict() for c in classified], ensure_ascii=False, indent=2), encoding="utf-8"
     )
     (OUT / "dashboard.html").write_text(render_html(report, classified), encoding="utf-8")
-    print(f"[output] เขียน crisis_report.md / classified.json / dashboard.html ไปที่ {OUT}")
-
+    print(f"[output] เขียน crisis_report.md / classified.json / dashboard.html → {OUT}")
     print("\n" + detector.render_markdown(report))
+    return report
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE,
+                    help="ไฟล์ comments (fixture schema). default = sample")
+    ap.add_argument("--brand", default="talesrunner")
+    args = ap.parse_args()
+    run_pipeline(args.fixture, args.brand)
 
 
 if __name__ == "__main__":
