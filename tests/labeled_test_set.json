@@ -1,0 +1,29 @@
+{
+  "_note": "ชุดทดสอบ sentiment มี gold label (ทำมือ) — ใช้วัดความถูกต้องของ classifier. curated set เล็ก เพื่อ smoke-test logic + วัดผลของชั้น LLM (ไม่ใช่ benchmark generalization).",
+  "cases": [
+    {"text": "เกมสนุกมากเล่นเพลินเลย", "gold": "positive"},
+    {"text": "กราฟิกสวยประทับใจสุด ๆ", "gold": "positive"},
+    {"text": "แอดมินน่ารักตอบเร็วดีใจมาก", "gold": "positive"},
+    {"text": "เติมชุดใหม่มาคุ้มมาก", "gold": "positive"},
+    {"text": "อัปเดตนี้ดีขึ้นเยอะเลย", "gold": "positive"},
+    {"text": "เล่นมา 5 ปียังสนุกเหมือนเดิม ชอบมาก", "gold": "positive"},
+    {"text": "เข้าเกมไม่ได้เลยเด้งตลอด", "gold": "negative"},
+    {"text": "เซิร์ฟล่มอีกแล้ว", "gold": "negative"},
+    {"text": "กาชาโคตรแพงไม่คุ้มเลย", "gold": "negative"},
+    {"text": "เกมกากขึ้นทุกวันเลิกเล่นดีกว่า", "gold": "negative"},
+    {"text": "แย่มากแก้ปัญหาไม่ได้สักที ผิดหวัง", "gold": "negative"},
+    {"text": "ระบบพังหมด บั๊กเต็มไปหมด", "gold": "negative"},
+    {"text": "จ่ายเงินรายเดือนมาเพื่อเข้าไม่ได้เนี่ยนะ", "gold": "negative"},
+    {"text": "ไม่สนุกเลยเล่นแล้วเบื่อ", "gold": "negative"},
+    {"text": "ราคาไอเทมแพงไปแต่ไม่ซื้อก็ได้", "gold": "negative"},
+    {"text": "คืนเงินให้ด้วยระบบล่มเงินหาย", "gold": "negative"},
+    {"text": "ดีจริง ๆ นะคะที่ล่มตอนคนกำลังจะเล่น ขอบคุณมากค่า", "gold": "negative", "hard": "sarcasm"},
+    {"text": "แหม ดีมากเลยนะที่เข้าเกมไม่ได้", "gold": "negative", "hard": "sarcasm"},
+    {"text": "เก่งมากแอดมิน ล่มได้ทุกวันเลย", "gold": "negative", "hard": "sarcasm"},
+    {"text": "วันนี้มีกิจกรรมอะไรพิเศษไหมครับ", "gold": "neutral"},
+    {"text": "อยากได้ตัวละครใหม่ ๆ บ้าง", "gold": "neutral"},
+    {"text": "มีใครเล่นเซิร์ฟ 2 บ้างครับ", "gold": "neutral"},
+    {"text": "โหลดช้านิดนึงแต่พอเข้าได้ก็โอเค", "gold": "neutral", "hard": "mixed"},
+    {"text": "ใจเย็น ๆ เดี๋ยวแอดมินก็แก้", "gold": "neutral"}
+  ]
+}

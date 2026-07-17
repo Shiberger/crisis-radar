@@ -1,0 +1,9 @@
+# เดโม่ (run_demo.py + tests) ไม่ต้องติดตั้งอะไร — ใช้ Python stdlib ล้วน (Python 3.10+)
+
+# ---- Production (เปิดใช้เมื่อขึ้นจริง) ----
+# anthropic>=0.40            # LLM escalation (Claude Haiku)
+# transformers>=4.40         # Thai sentiment (Wisesight / WangchanBERTa)
+# torch>=2.2                 # backend ของ transformers
+# httpx>=0.27                # ดึงข้อมูล API
+# google-play-scraper>=1.2   # เฟสถัดไป: รีวิว Google Play
+# apify-client>=1.6          # เฟสถัดไป: Facebook Comments Scraper

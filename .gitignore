@@ -1,0 +1,18 @@
+# secrets
+.env
+*.key
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# generated output (เก็บโค้ด ไม่เก็บผลรัน)
+output/*.html
+output/*.json
+output/*.md
+!output/.gitkeep
+
+# os
+.DS_Store

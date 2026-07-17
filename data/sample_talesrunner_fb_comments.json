@@ -1,0 +1,48 @@
+{
+  "_note": "SYNTHETIC FIXTURE — ข้อมูลสังเคราะห์สำหรับสร้าง/ทดสอบ pipeline ก่อนได้ API จริง. ไม่ใช่คอมเมนต์ผู้เล่นจริง. ชื่อผู้ใช้เป็นชื่อสมมติทั้งหมด.",
+  "page": "Talesrunner Thailand (Official)",
+  "page_id": "talesrunner.th",
+  "brand": "talesrunner",
+  "scenario": "วันที่ 15/7/2026 ช่วงเช้าคอมเมนต์ปกติ (baseline) จากนั้น 13:30 ปล่อยแพตช์ + กาชาใหม่ → 14:00 เป็นต้นไปเกิดดราม่า (เข้าเกมไม่ได้/เซิร์ฟล่ม + กาชาแพงเกิน) = spike",
+  "posts": [
+    { "post_id": "p_daily", "caption": "สวัสดีชาว Talesrunner วันนี้อากาศดี ออกไปวิ่งกันเถอะ!" },
+    { "post_id": "p_patch", "caption": "[อัปเดต] แพตช์ใหม่ + กาชาชุด Summer Dash เปิดแล้ว! เวลา 13:30" }
+  ],
+  "comments": [
+    {"comment_id": "c01", "post_id": "p_daily", "author": "Nong Ploy", "text": "เกมนี้เล่นมา 5 ปีแล้ว ยังสนุกเหมือนเดิมเลยค่ะ ชอบมาก", "created_at": "2026-07-15T10:05:00", "reach": 24},
+    {"comment_id": "c02", "post_id": "p_daily", "author": "TaneRunner", "text": "แผนที่ใหม่สวยดีนะ กราฟิกอัปเกรดขึ้นเยอะ", "created_at": "2026-07-15T10:12:00", "reach": 11},
+    {"comment_id": "c03", "post_id": "p_daily", "author": "mickmax", "text": "วันนี้มีกิจกรรมอะไรพิเศษไหมครับ", "created_at": "2026-07-15T10:20:00", "reach": 3},
+    {"comment_id": "c04", "post_id": "p_daily", "author": "Bell BM", "text": "คิดถึงเพื่อนเก่าในเกมจัง กลับมาเล่นกันเถอะ", "created_at": "2026-07-15T10:41:00", "reach": 8},
+    {"comment_id": "c05", "post_id": "p_daily", "author": "zaza007", "text": "ช่วงนี้คนเล่นเยอะขึ้นนะ ดีใจด้วย", "created_at": "2026-07-15T11:03:00", "reach": 6},
+    {"comment_id": "c06", "post_id": "p_daily", "author": " Orn", "text": "แอดมินจัดอีเวนต์วิ่งแข่งอีกได้ไหมคะ สนุกดี", "created_at": "2026-07-15T11:15:00", "reach": 14},
+    {"comment_id": "c07", "post_id": "p_daily", "author": "KittyGamer", "text": "ระบบเพื่อนมีบั๊กเล็กน้อย แอดเพื่อนแล้วไม่ขึ้นชื่อ แต่ไม่เป็นไรรอแก้ได้", "created_at": "2026-07-15T11:32:00", "reach": 9},
+    {"comment_id": "c08", "post_id": "p_daily", "author": "Golf TR", "text": "เติมเงินซื้อชุดใหม่มา คุ้มมากสวยจริง", "created_at": "2026-07-15T11:48:00", "reach": 5},
+    {"comment_id": "c09", "post_id": "p_daily", "author": "namtan_p", "text": "เกมโหลดช้านิดนึงตอนเข้า แต่พอเข้าได้ก็โอเค", "created_at": "2026-07-15T12:10:00", "reach": 4},
+    {"comment_id": "c10", "post_id": "p_daily", "author": "RunnerX", "text": "อยากได้ตัวละครใหม่ ๆ บ้างอะ เล่นตัวเดิมนานแล้ว", "created_at": "2026-07-15T12:25:00", "reach": 7},
+    {"comment_id": "c11", "post_id": "p_daily", "author": "pui pui", "text": "แอดมินน่ารักดีตอบเร็ว ประทับใจ", "created_at": "2026-07-15T12:40:00", "reach": 12},
+    {"comment_id": "c12", "post_id": "p_daily", "author": "darklord99", "text": "ราคาไอเทมในช็อปแพงไปนิดนะ แต่ไม่ซื้อก็ได้", "created_at": "2026-07-15T12:52:00", "reach": 6},
+    {"comment_id": "c13", "post_id": "p_daily", "author": "mild.z", "text": "เล่นเพลิน ๆ ฆ่าเวลาดี", "created_at": "2026-07-15T13:05:00", "reach": 2},
+    {"comment_id": "c14", "post_id": "p_daily", "author": "TowTae", "text": "อยากให้เปิดเซิร์ฟใหม่นะ เซิร์ฟเดิมคนแน่น", "created_at": "2026-07-15T13:18:00", "reach": 5},
+    {"comment_id": "c15", "post_id": "p_patch", "author": "first blood", "text": "โอ้ กาชาใหม่มาแล้ว รอเลย", "created_at": "2026-07-15T13:40:00", "reach": 3},
+
+    {"comment_id": "c16", "post_id": "p_patch", "author": "angry_neko", "text": "อัปเดตเสร็จแล้วเข้าเกมไม่ได้เลย เด้งตลอด แก้ด่วน", "created_at": "2026-07-15T14:02:00", "reach": 88},
+    {"comment_id": "c17", "post_id": "p_patch", "author": "progamerTH", "text": "เซิร์ฟล่มอีกแล้วเหรอ เข้าไม่ได้เหมือนกัน", "created_at": "2026-07-15T14:05:00", "reach": 121},
+    {"comment_id": "c18", "post_id": "p_patch", "author": "Somchai R", "text": "กาชาใหม่โคตรแพง อัตราดรอปก็ห่วย เปย์ไป 2000 ไม่ได้ตัว SSR เลย เอาเปรียบผู้เล่นมาก", "created_at": "2026-07-15T14:08:00", "reach": 203},
+    {"comment_id": "c18b", "post_id": "p_patch", "author": "lookkade", "text": "เห็นด้วยค่ะ กาชารอบนี้แพงเกินไปจริง ๆ ไม่คุ้มเลย", "created_at": "2026-07-15T14:11:00", "reach": 64},
+    {"comment_id": "c19", "post_id": "p_patch", "author": "bomber_x", "text": "เข้าเกมไม่ได้ค้างหน้าโหลด 90% ใครเป็นบ้าง", "created_at": "2026-07-15T14:12:00", "reach": 77},
+    {"comment_id": "c20", "post_id": "p_patch", "author": "meen_meen", "text": "ล่มแบบนี้คืนเวลาไอเทมให้ด้วยนะ", "created_at": "2026-07-15T14:14:00", "reach": 41},
+    {"comment_id": "c21", "post_id": "p_patch", "author": "Kong91", "text": "แพตช์มาพร้อมบั๊ก เข้าเกมทีเด้งที ระบบพังหมด", "created_at": "2026-07-15T14:16:00", "reach": 95},
+    {"comment_id": "c22", "post_id": "p_patch", "author": "veryhappy", "text": "ดีจริง ๆ นะคะที่ล่มตอนคนกำลังจะเล่น ขอบคุณมากค่า", "created_at": "2026-07-15T14:18:00", "reach": 58},
+    {"comment_id": "c23", "post_id": "p_patch", "author": "night.owl", "text": "จ่ายเงินรายเดือนมาเพื่อเข้าไม่ได้เนี่ยนะ เซ็งสุด", "created_at": "2026-07-15T14:20:00", "reach": 47},
+    {"comment_id": "c24", "post_id": "p_patch", "author": "poko", "text": "กาชานี่ pay to win ชัด ๆ คนไม่เติมเล่นไม่ได้แล้ว", "created_at": "2026-07-15T14:22:00", "reach": 66},
+    {"comment_id": "c25", "post_id": "p_patch", "author": "mild.z", "text": "เมื่อกี้ยังเล่นได้อยู่เลย ตอนนี้หลุดแล้วเข้าไม่ได้", "created_at": "2026-07-15T14:24:00", "reach": 19},
+    {"comment_id": "c26", "post_id": "p_patch", "author": "TaneRunner", "text": "ใจเย็น ๆ เดี๋ยวแอดมินก็แก้ ทุกเกมมันมีล่มบ้าง", "created_at": "2026-07-15T14:26:00", "reach": 22},
+    {"comment_id": "c27", "post_id": "p_patch", "author": "reddragon", "text": "แก้ช้ามากแอดมิน หายไปไหนหมด ลูกค้าจ่ายเงินรออยู่", "created_at": "2026-07-15T14:28:00", "reach": 53},
+    {"comment_id": "c28", "post_id": "p_patch", "author": "jubjib", "text": "เติมกาชาไป 1500 ระบบล่มเงินหายไม่ได้ของ จะเอาคืนยังไง", "created_at": "2026-07-15T14:30:00", "reach": 132},
+    {"comment_id": "c29", "post_id": "p_patch", "author": "cool_guy", "text": "เกมกากขึ้นทุกวัน เลิกเล่นดีกว่า ลาก่อน", "created_at": "2026-07-15T14:33:00", "reach": 38},
+    {"comment_id": "c30", "post_id": "p_patch", "author": "fewfew", "text": "ตอนนี้เข้าได้แล้วนะ ลองรีสตาร์ทเราเตอร์ดู", "created_at": "2026-07-15T14:36:00", "reach": 27},
+    {"comment_id": "c31", "post_id": "p_patch", "author": "Somsri T", "text": "ยังเข้าไม่ได้เลยค่ะ ขึ้น error 1023 ตลอด", "created_at": "2026-07-15T14:38:00", "reach": 31},
+    {"comment_id": "c32", "post_id": "p_patch", "author": "mokkori", "text": "กิจกรรมใหม่ดีนะถ้าไม่ล่มก่อน 555", "created_at": "2026-07-15T14:41:00", "reach": 15},
+    {"comment_id": "c33", "post_id": "p_patch", "author": "bigboss", "text": "แย่มาก แก้ปัญหาไม่ได้สักที ผิดหวังกับทีมงานจริง ๆ", "created_at": "2026-07-15T14:44:00", "reach": 44}
+  ]
+}
