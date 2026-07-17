@@ -83,9 +83,19 @@ def load_apify_export(path, brand: str = "talesrunner", page_id: str = "thehof.t
     items = json.loads(Path(path).read_text(encoding="utf-8"))
     if isinstance(items, dict):
         items = items.get("items") or items.get("results") or [items]
-    comments = [map_comment_item(it, _pick(it, "postUrl", "facebookUrl", default="import"))
-                for it in items]
-    comments = [c for c in comments if c["text"].strip()]
+
+    comments = []
+    skipped_page = 0
+    for it in items:
+        # ข้ามคอมเมนต์ของเพจเอง (โพสต์/ตอบโดยแอดมิน) — ไม่ใช่เสียงผู้เล่น
+        if page_id and page_id in str(_pick(it, "profileUrl", default="")):
+            skipped_page += 1
+            continue
+        c = map_comment_item(it, _pick(it, "postUrl", "facebookUrl", default="import"))
+        if c["text"].strip():
+            comments.append(c)
+    if skipped_page:
+        print(f"  [import] กรองคอมเมนต์ของเพจเองออก {skipped_page} รายการ")
     return {"page": brand.title(), "page_id": page_id, "brand": brand, "comments": comments}
 
 

@@ -6,6 +6,8 @@ fb_state.json
 
 # data จริงที่ scrape มา (มี PII — ห้ามขึ้น git)
 data/facebook_live_*.json
+data/dataset*.json
+data/*.csv
 
 # python
 __pycache__/
