@@ -6,10 +6,20 @@
 > ดึงคอมเมนต์ → จัด sentiment (บวก/กลาง/ลบ) + topic → **ตรวจจับการพุ่งผิดปกติ (spike)** →
 > แจ้งเตือนทีม Community ให้เข้าไปจัดการก่อนดราม่าลุกลาม รักษาภาพลักษณ์แบรนด์
 
-## รันเดโม่ (offline, ไม่ต้องเน็ต)
+## 🖥️ ใช้ผ่านเว็บ (สำหรับทีม — กดปุ่มเดียว ไม่ต้องพิมพ์คำสั่ง)
+```bash
+python3 backend/server.py         # แล้วเปิด http://127.0.0.1:8000
+```
+- macOS: **ดับเบิลคลิก `start_web.command`** ได้เลย (เปิดเบราว์เซอร์ให้อัตโนมัติ)
+- แชร์ให้ทีมในออฟฟิศ: `python3 backend/server.py --host 0.0.0.0` แล้วให้ทีมเข้า `http://<ip-เครื่อง>:8000`
+- ไม่ต้อง `pip install` อะไรเลย — backend เป็น Python stdlib ล้วน
+- หน้าเว็บมีปุ่ม **"ดึงข้อมูล & วิเคราะห์"**: เลือก *Demo* (ดูทันที) หรือ *Facebook จริง* (owner ตั้ง `APIFY_TOKEN` ที่ server ก่อน)
+
+## รันแบบ CLI (สำหรับ dev)
 ```bash
 python3 run_demo.py        # → output/crisis_report.md, classified.json, dashboard.html
 python3 tests/run_tests.py # → 9 test, ผลจริง
+python3 backend/selftest.py # → ทดสอบ web backend end-to-end (9 test)
 ```
 
 ## ดึง Facebook จริง (รัน local — ดู [docs/SCRAPING.md](docs/SCRAPING.md))

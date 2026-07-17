@@ -122,6 +122,24 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
     )
 
 
+def report_to_dict(rep: CrisisReport) -> dict:
+    """serialize CrisisReport เป็น JSON สำหรับ web API/frontend."""
+    return {
+        "brand": rep.brand,
+        "status": rep.status,
+        "total": rep.total,
+        "sentiment_mix": rep.sentiment_mix,
+        "escalated_count": rep.escalated_count,
+        "alerts": rep.alerts,
+        "topic_breakdown": [[t, n] for t, n in rep.topic_breakdown],
+        "buckets": [
+            {"start": b.start.strftime("%H:%M"), "total": b.total, "negative": b.negative,
+             "severity": round(b.severity, 1), "baseline": b.baseline, "is_spike": b.is_spike}
+            for b in rep.buckets
+        ],
+    }
+
+
 def render_markdown(rep: CrisisReport) -> str:
     icon = {"NORMAL": "🟢", "WATCH": "🟡", "CRISIS": "🔴"}[rep.status]
     lines = [

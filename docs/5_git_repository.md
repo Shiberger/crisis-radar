@@ -9,7 +9,14 @@
 crisis_radar/
 ├── README.md
 ├── requirements.txt
-├── run_demo.py                 # รัน pipeline end-to-end
+├── run_demo.py                 # รัน pipeline end-to-end (CLI)
+├── scrape_facebook.py          # ดึง Facebook จริง (CLI)
+├── start_web.command           # macOS: ดับเบิลคลิกเปิดเว็บ
+├── backend/                    # 🖥️ web app (stdlib) — team กดปุ่มใช้
+│   ├── server.py               # http server + API
+│   ├── jobs.py                 # background job runner
+│   ├── selftest.py             # ทดสอบ web e2e (9 test)
+│   └── static/index.html       # หน้าเว็บ (ปุ่มเดียว)
 ├── data/
 │   └── sample_talesrunner_fb_comments.json   # synthetic fixture (ชื่อสมมติ)
 ├── src/

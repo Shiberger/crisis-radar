@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crisis Radar — เฝ้าระวังดราม่าเกม</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;margin:0;
+background:#0f172a;color:#e2e8f0;line-height:1.55}
+.wrap{max-width:1000px;margin:0 auto;padding:24px}
+header h1{font-size:22px;margin:0} header p{color:#94a3b8;font-size:13px;margin:4px 0 0}
+.panel{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;margin:18px 0}
+.panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin:0 0 14px}
+.opts{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+.opt{border:1px solid #334155;border-radius:10px;padding:12px 16px;cursor:pointer;flex:1;min-width:200px;
+background:#0f172a;transition:.15s}
+.opt:hover{border-color:#3b82f6}
+.opt.active{border-color:#3b82f6;background:#1d4ed822}
+.opt b{display:block;font-size:14px} .opt span{font-size:12px;color:#94a3b8}
+.fbopts{display:none;gap:14px;flex-wrap:wrap;align-items:end;margin-bottom:16px}
+.fbopts.show{display:flex}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#94a3b8}
+.fld input,.fld select{background:#0f172a;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:8px 10px;font-size:14px}
+.btn{background:#2563eb;color:#fff;border:0;border-radius:10px;padding:14px 22px;font-size:16px;font-weight:700;
+cursor:pointer;width:100%;transition:.15s}
+.btn:hover{background:#1d4ed8} .btn:disabled{opacity:.5;cursor:not-allowed}
+.hint{font-size:12px;color:#64748b;margin-top:8px}
+.log{background:#0b1220;border-radius:10px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:12px;
+max-height:180px;overflow:auto;white-space:pre-wrap;color:#93c5fd}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #334155;border-top-color:#3b82f6;
+border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.banner{padding:16px 20px;border-radius:12px;font-size:19px;font-weight:800;margin-bottom:16px;
+display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}.banner{font-size:16px}}
+.row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}
+.lbl{width:130px;color:#cbd5e1} .track{flex:1;background:#334155;border-radius:6px;height:12px;overflow:hidden}
+.fill{display:block;height:100%} .val{width:34px;text-align:right;font-variant-numeric:tabular-nums}
+.alerts{list-style:none;padding:0;margin:0} .alerts li{background:#334155;border-left:3px solid #dc2626;
+padding:9px 12px;border-radius:6px;margin:6px 0;font-size:13px}
+.tl{display:flex;align-items:flex-end;gap:8px;height:120px;padding-top:8px}
+.tl-col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
+.tl-bar{width:100%;background:#3b82f6;border-radius:4px 4px 0 0;min-height:3px}
+.tl-bar.spike{background:#dc2626} .tl-x{font-size:11px;color:#94a3b8;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:13px} th,td{text-align:left;padding:8px;border-bottom:1px solid #334155;vertical-align:top}
+th{color:#94a3b8;font-size:11px;text-transform:uppercase} .r{text-align:right}
+.hidden{display:none} .muted{color:#64748b;font-size:13px}
+.badge{font-size:11px;background:#334155;padding:2px 7px;border-radius:20px;color:#cbd5e1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📡 Crisis Radar</h1>
+    <p>เฝ้าระวังดราม่าบน Social ของเกมที่เราดูแล — กดปุ่มเดียว ระบบดึงคอมเมนต์ + วิเคราะห์ + เตือนให้</p>
+  </header>
+
+  <!-- Control panel -->
+  <div class="panel">
+    <h2>1 · เลือกแหล่งข้อมูล แล้วกดเริ่ม</h2>
+    <div class="opts" id="opts">
+      <div class="opt active" data-source="sample">
+        <b>🧪 ข้อมูลตัวอย่าง (Demo)</b><span>ดูตัว tool ทำงานทันที ไม่ต้องตั้งค่าอะไร</span>
+      </div>
+      <div class="opt" data-source="facebook">
+        <b>📘 ดึง Facebook จริง</b><span>เพจ Talesrunner (ต้องตั้ง APIFY_TOKEN ที่ server)</span>
+      </div>
+    </div>
+
+    <div class="fbopts" id="fbopts">
+      <label class="fld">แหล่ง
+        <select id="only"><option value="page">เพจ (public)</option>
+          <option value="all">เพจ + กลุ่ม (ต้องมี cookie)</option></select>
+      </label>
+      <label class="fld">จำนวนโพสต์<input id="maxposts" type="number" value="10" min="1" max="50" style="width:90px"></label>
+      <label class="fld">คอมเมนต์/โพสต์<input id="maxcomments" type="number" value="30" min="1" max="100" style="width:90px"></label>
+    </div>
+
+    <button class="btn" id="runBtn">▶ ดึงข้อมูล &amp; วิเคราะห์</button>
+    <div class="hint" id="hint">โหมด Demo ใช้ข้อมูลตัวอย่างของ Talesrunner — เหมาะสำหรับดูว่าเครื่องมือทำงานยังไง</div>
+  </div>
+
+  <!-- Progress -->
+  <div class="panel hidden" id="progressPanel">
+    <h2><span id="statusText">กำลังทำงาน…</span></h2>
+    <div class="log" id="log"></div>
+  </div>
+
+  <!-- Results -->
+  <div id="results" class="hidden">
+    <div class="banner" id="banner"></div>
+    <div class="panel"><h2>🔔 การแจ้งเตือน</h2><ul class="alerts" id="alerts"></ul></div>
+    <div class="grid">
+      <div class="panel"><h2>อารมณ์คอมเมนต์ (Sentiment)</h2><div id="sentiment"></div></div>
+      <div class="panel"><h2>ประเด็นที่คนบ่น (Topic)</h2><div id="topics"></div></div>
+    </div>
+    <div class="panel"><h2>ไทม์ไลน์ — ความรุนแรงคอมเมนต์ลบ (แดง = พุ่งผิดปกติ)</h2><div class="tl" id="timeline"></div></div>
+    <div class="panel"><h2>คอมเมนต์ลบที่คนเห็นเยอะสุด</h2>
+      <table><thead><tr><th>เวลา</th><th>คอมเมนต์</th><th>ประเด็น</th><th class="r">reach</th></tr></thead>
+      <tbody id="topneg"></tbody></table>
+      <p class="muted" id="genat"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const SENT_COLOR={positive:'#16a34a',neutral:'#94a3b8',negative:'#dc2626'};
+const STATUS={NORMAL:['#16a34a','🟢','ปกติ'],WATCH:['#d97706','🟡','เฝ้าระวัง'],CRISIS:['#dc2626','🔴','วิกฤต']};
+let source='sample';
+
+const $=id=>document.getElementById(id);
+document.querySelectorAll('.opt').forEach(o=>o.onclick=()=>{
+  document.querySelectorAll('.opt').forEach(x=>x.classList.remove('active'));
+  o.classList.add('active'); source=o.dataset.source;
+  $('fbopts').classList.toggle('show',source==='facebook');
+  $('hint').textContent = source==='facebook'
+    ? '⚠️ เพจ public ปลอดภัยสุด · กลุ่มต้องมี cookie + เช็ก PDPA · ต้องตั้ง APIFY_TOKEN ที่ server ก่อน'
+    : 'โหมด Demo ใช้ข้อมูลตัวอย่างของ Talesrunner — เหมาะสำหรับดูว่าเครื่องมือทำงานยังไง';
+});
+
+$('runBtn').onclick=async()=>{
+  $('runBtn').disabled=true; $('results').classList.add('hidden');
+  $('progressPanel').classList.remove('hidden'); $('log').textContent='';
+  $('statusText').innerHTML='<span class="spinner"></span> กำลังทำงาน…';
+  const body={source,only:$('only').value,max_posts:+$('maxposts').value,max_comments:+$('maxcomments').value};
+  const {job_id}=await(await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  poll(job_id);
+};
+
+async function poll(id){
+  const j=await(await fetch('/api/jobs/'+id)).json();
+  $('log').textContent=(j.logs||[]).join('\n'); $('log').scrollTop=$('log').scrollHeight;
+  if(j.status==='done'){ $('statusText').textContent='✅ เสร็จแล้ว'; $('runBtn').disabled=false; render(j.result); }
+  else if(j.status==='error'){ $('statusText').textContent='❌ ผิดพลาด'; $('runBtn').disabled=false;
+    $('log').textContent+='\n\n'+(j.error||''); }
+  else setTimeout(()=>poll(id),1000);
+}
+
+function bar(label,value,max,color){
+  const pct=max?value/max*100:0;
+  return `<div class="row"><span class="lbl">${esc(label)}</span>
+    <span class="track"><span class="fill" style="width:${pct.toFixed(1)}%;background:${color}"></span></span>
+    <span class="val">${value}</span></div>`;
+}
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function render(r){
+  $('results').classList.remove('hidden');
+  const [col,dot,th]=STATUS[r.status];
+  const b=$('banner'); b.style.background=col;
+  b.innerHTML=`<span>${dot} สถานะ: ${th} (${r.status})</span>
+    <span style="font-size:13px;font-weight:400">คอมเมนต์ ${r.total} · ส่งต่อ LLM ${r.escalated_count} · ${esc(r.source==='facebook'?'Facebook จริง':'Demo')}</span>`;
+
+  $('alerts').innerHTML=(r.alerts&&r.alerts.length)?r.alerts.map(a=>`<li>${esc(a)}</li>`).join('')
+    :'<li style="border-left-color:#16a34a">ไม่มีสัญญาณผิดปกติ</li>';
+
+  const sm=r.sentiment_mix||{};
+  $('sentiment').innerHTML=['positive','neutral','negative'].map(k=>
+    bar({positive:'บวก',neutral:'กลาง',negative:'ลบ'}[k],sm[k]||0,r.total,SENT_COLOR[k])).join('');
+
+  const tb=r.topic_breakdown||[]; const tmax=Math.max(1,...tb.map(x=>x[1]));
+  $('topics').innerHTML=tb.length?tb.map(([t,n])=>bar(t,n,tmax,'#dc2626')).join(''):'<div class="muted">ไม่มีประเด็นลบ</div>';
+
+  const smax=Math.max(1,...r.buckets.map(x=>x.severity));
+  $('timeline').innerHTML=r.buckets.map(s=>`<div class="tl-col">
+    <div class="tl-bar ${s.is_spike?'spike':''}" style="height:${(s.severity/smax*100).toFixed(0)}%" title="severity ${s.severity}"></div>
+    <div class="tl-x">${s.start}</div></div>`).join('');
+
+  $('topneg').innerHTML=(r.top_negatives||[]).map(c=>`<tr>
+    <td>${c.time}</td><td>${esc(c.text)}</td>
+    <td>${esc((c.topics||[]).join(', ')||'-')} ${c.escalated?'<span class="badge">LLM</span>':''}</td>
+    <td class="r">${c.reach}</td></tr>`).join('');
+  $('genat').textContent='อัปเดตล่าสุด: '+(r.generated_at||'');
+  $('results').scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>
