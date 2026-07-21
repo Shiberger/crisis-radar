@@ -56,6 +56,34 @@ def start_job(params: dict) -> str:
     return job_id
 
 
+def get_targets() -> dict:
+    """ค่าตั้งต้นสำหรับฟอร์มหน้าเว็บ — URL เพจ/โพสต์ที่ตั้งไว้ใน data/targets.json."""
+    try:
+        cfg = json.loads(TARGETS_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"page_url": "", "post_urls": []}
+    page = next((t for t in cfg.get("targets", []) if t.get("type") == "page"), None)
+    return {"page_name": cfg.get("page_name", ""),
+            "page_url": (page or {}).get("url", ""),
+            "post_urls": cfg.get("post_urls", [])}
+
+
+def _clean_fb_urls(raw) -> list[str]:
+    """กรอง URL ที่ผู้ใช้พิมพ์บนหน้าเว็บ — รับเฉพาะ facebook.com/fb.com เท่านั้น.
+
+    กันไม่ให้ endpoint ถูกใช้ยิง Apify ไปที่เว็บอื่น (เปลืองเครดิตเจ้าของ token).
+    """
+    ok = []
+    for u in raw if isinstance(raw, list) else []:
+        u = str(u).strip()
+        if not u.startswith(("http://", "https://")):
+            continue
+        host = u.split("/", 3)[2].lower().split(":")[0]
+        if host == "fb.com" or host.endswith(("facebook.com", ".fb.com")):
+            ok.append(u)
+    return ok
+
+
 def _fetch_facebook(job_id: str, params: dict):
     """ดึง Facebook จริงผ่าน Apify → เขียน live file → คืน comments (masked)."""
     from src.sources.facebook_apify import ApifyFacebookScraper
@@ -64,6 +92,15 @@ def _fetch_facebook(job_id: str, params: dict):
     only = params.get("only", "page")
     targets = [t for t in cfg["targets"] if only == "all" or t["type"] == only]
 
+    # ถ้าผู้ใช้พิมพ์ URL เพจเองบนหน้าเว็บ → ใช้อันนั้นแทนที่ตั้งไว้ใน targets.json
+    # พิมพ์มาแล้วแต่ใช้ไม่ได้ → ฟ้องเลย ไม่เงียบ ๆ ไปใช้ค่า default (ผู้ใช้จะเข้าใจผิดว่าดึงเพจที่ตัวเองใส่)
+    raw_page = str(params.get("page_url") or "").strip()
+    custom_page = _clean_fb_urls([raw_page])
+    if raw_page and not custom_page:
+        raise ValueError(f"URL เพจไม่ถูกต้อง (ต้องเป็นลิงก์ facebook.com): {raw_page}")
+    if custom_page:
+        targets = [{"type": "page", "name": custom_page[0], "url": custom_page[0]}]
+
     cookies = None
     cpath = os.environ.get("FB_COOKIES_JSON")
     if cpath and Path(cpath).exists():
@@ -71,20 +108,32 @@ def _fetch_facebook(job_id: str, params: dict):
 
     scraper = ApifyFacebookScraper(cookies=cookies)   # raise ถ้าไม่มี token/lib
     comments: list[dict] = []
+    max_comments = int(params.get("max_comments", 30))
+    max_posts = int(params.get("max_posts", 10))
 
-    # ทางแนะนำ: ใช้ post_urls ที่ระบุใน targets.json (Comments Scraper อย่างเดียว, ถูกสุด)
-    post_urls = [u for u in cfg.get("post_urls", []) if isinstance(u, str) and u.startswith("http")]
-    if post_urls:
-        _log(job_id, f"ใช้ post_urls {len(post_urls)} โพสต์ (Comments Scraper)")
-        comments = scraper.scrape_post_urls(post_urls, int(params.get("max_comments", 30)))
+    # scope = 'page' → กวาดทั้งเพจ: Posts Scraper หาโพสต์ล่าสุด N โพสต์ → Comments Scraper ทีละโพสต์
+    #         'urls' → เจาะเฉพาะโพสต์ที่ระบุ (actor เดียว ถูกกว่า/เร็วกว่า)
+    # URL เอาจากที่ผู้ใช้พิมพ์บนหน้าเว็บก่อน ถ้าไม่พิมพ์ค่อย fallback ไป targets.json
+    scope = params.get("scope", "page")
+    raw_posts = [u for u in (params.get("post_urls") or []) if str(u).strip()]
+    user_posts = _clean_fb_urls(raw_posts)
+    if raw_posts and not user_posts:
+        raise ValueError("URL โพสต์ที่ใส่มาใช้ไม่ได้เลย — ต้องเป็นลิงก์ facebook.com")
+    post_urls = user_posts or _clean_fb_urls(cfg.get("post_urls"))
+
+    if scope == "urls" and post_urls:
+        _log(job_id, f"เจาะ {len(post_urls)} โพสต์ที่ระบุ (Comments Scraper)")
+        comments = scraper.scrape_post_urls(post_urls, max_comments, log=lambda m: _log(job_id, m))
     else:
+        if scope == "urls":
+            _log(job_id, "ไม่มี URL โพสต์ที่ใช้ได้ (ต้องเป็นลิงก์ facebook.com) — สลับไปโหมดทั้งเพจให้")
         for t in targets:
             if t["type"] == "group" and not scraper.cookies:
                 _log(job_id, f"ข้าม {t['name']} — กลุ่ม private ต้องมี cookie")
                 continue
-            _log(job_id, f"ดึง {t['name']} …")
-            comments += scraper.scrape_target(t, int(params.get("max_posts", 10)),
-                                              int(params.get("max_comments", 30)))
+            _log(job_id, f"กวาดทั้งเพจ {t['name']} — โพสต์ล่าสุด {max_posts} โพสต์ …")
+            comments += scraper.scrape_target(t, max_posts, max_comments,
+                                              log=lambda m: _log(job_id, m))
 
     from src.sources.facebook_apify import filter_noise
     comments, dropped = filter_noise(comments, cfg.get("page_id", ""), cfg.get("exclude_authors"))

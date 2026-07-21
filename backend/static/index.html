@@ -154,6 +154,22 @@ td.own{color:var(--ink2);white-space:nowrap}
         <button data-src="sample" class="on">ข้อมูลตัวอย่าง</button>
         <button data-src="facebook">Facebook จริง</button>
       </div>
+      <label class="fld" id="fldScope">ขอบเขต
+        <select id="scope" style="width:180px">
+          <option value="page">ทั้งเพจ (โพสต์ล่าสุด)</option>
+          <option value="urls">ระบุโพสต์เอง</option>
+        </select>
+      </label>
+      <label class="fld" id="fldPageUrl">URL เพจ
+        <input id="pageUrl" type="url" placeholder="https://www.facebook.com/…" style="width:280px">
+      </label>
+      <label class="fld" id="fldPosts">จำนวนโพสต์
+        <input id="maxp" type="number" value="10" min="1" max="50" style="width:100px">
+      </label>
+      <label class="fld" id="fldPostUrls" style="flex-basis:100%">URL โพสต์ (บรรทัดละ 1 ลิงก์)
+        <textarea id="postUrls" rows="3" placeholder="https://www.facebook.com/share/p/…&#10;https://www.facebook.com/share/p/…"
+                  style="width:100%;font:inherit;font-size:12px"></textarea>
+      </label>
       <label class="fld" id="fldComments">คอมเมนต์/โพสต์
         <input id="maxc" type="number" value="30" min="5" max="200" style="width:100px">
       </label>
@@ -220,11 +236,31 @@ const TLabel=t=>(DATA&&DATA.topic_labels&&DATA.topic_labels[t])||t;   // ชื�
 // source toggle
 $('#srcSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;
   [...$('#srcSeg').children].forEach(x=>x.classList.remove('on'));b.classList.add('on');SRC=b.dataset.src;
-  $('#fldComments').style.display=SRC==='facebook'?'flex':'none';
-  $('#hint').textContent=SRC==='facebook'
-    ?'โหมด Facebook จริง: ดึงสดผ่าน Apify · กรองคอมเมนต์ของเพจ/โฆษณาออกให้อัตโนมัติ'
-    :'โหมดตัวอย่าง: ใช้ข้อมูลจำลองเพื่อดูการทำงาน';};
-$('#fldComments').style.display='none';
+  syncFields();};
+
+// โชว์เฉพาะช่องที่โหมดนั้นใช้จริง — กันสับสนว่าช่องไหนมีผล
+function syncFields(){
+  const fb=SRC==='facebook', page=$('#scope').value==='page';
+  $('#fldScope').style.display=fb?'flex':'none';
+  $('#fldComments').style.display=fb?'flex':'none';
+  $('#fldPageUrl').style.display=(fb&&page)?'flex':'none';
+  $('#fldPosts').style.display=(fb&&page)?'flex':'none';
+  $('#fldPostUrls').style.display=(fb&&!page)?'flex':'none';
+  $('#hint').textContent=!fb
+    ?'โหมดตัวอย่าง: ใช้ข้อมูลจำลองเพื่อดูการทำงาน'
+    :page
+      ?`กวาดทั้งเพจ: ดึงโพสต์ล่าสุด ${$('#maxp').value} โพสต์ แล้วเก็บคอมเมนต์ทุกโพสต์ · ครอบคลุมกว่า แต่ใช้เวลาหลายนาทีและกิน Apify credit ตามจำนวนโพสต์`
+      :'เจาะเฉพาะโพสต์ที่วางลิงก์ไว้ · เร็วและถูกกว่ามาก เหมาะกับตอนรู้อยู่แล้วว่าดราม่าอยู่โพสต์ไหน';
+}
+$('#scope').onchange=syncFields;
+$('#maxp').oninput=syncFields;
+
+// เติมค่าตั้งต้นจาก data/targets.json ให้ กดใช้ได้เลยโดยไม่ต้องหา URL เอง
+fetch('/api/targets').then(r=>r.json()).then(t=>{
+  $('#pageUrl').placeholder=t.page_url||'https://www.facebook.com/…';
+  if(!$('#postUrls').value)$('#postUrls').value=(t.post_urls||[]).join('\n');
+}).catch(()=>{}).finally(syncFields);
+syncFields();
 
 // ตอน deploy จะตั้งรหัสไว้กันคนกดยิง Apify เล่น — เช็กจาก /api/health ตอนโหลดหน้า
 let NEED_PASS=false;
@@ -240,7 +276,10 @@ $('#runBtn').onclick=async()=>{
   $('#runBtn').disabled=true;$('#results').classList.add('hidden');
   $('#prog').classList.remove('hidden');$('#log').textContent='';
   $('#progTitle').innerHTML='<span class="spin"></span>กำลังทำงาน';
-  const body={source:SRC,only:'page',max_comments:+$('#maxc').value};
+  const body={source:SRC,only:'page',scope:$('#scope').value,
+              page_url:$('#pageUrl').value.trim(),
+              post_urls:$('#postUrls').value.split('\n').map(s=>s.trim()).filter(Boolean),
+              max_posts:+$('#maxp').value,max_comments:+$('#maxc').value};
   const r=await fetch('/api/run',{method:'POST',headers,body:JSON.stringify(body)});
   if(r.status===401){
     sessionStorage.removeItem('runPass');

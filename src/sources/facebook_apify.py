@@ -203,23 +203,28 @@ class ApifyFacebookScraper:
         out = [map_comment_item(it, post_id) for it in self._run(COMMENTS_ACTOR, run_input)]
         return [c for c in out if c["text"].strip()]
 
-    def scrape_post_urls(self, post_urls: list[str], max_comments: int) -> list[dict]:
-        """ทางที่แนะนำ: ป้อน URL โพสต์ตรง ๆ (ก็อปจากเพจเอง) → ดึงคอมเมนต์ actor เดียว ถูกสุด."""
+    def scrape_post_urls(self, post_urls: list[str], max_comments: int, log=print) -> list[dict]:
+        """เจาะเฉพาะ URL โพสต์ที่ระบุ (ก็อปจากเพจเอง) → ดึงคอมเมนต์ actor เดียว ถูกสุด.
+
+        log: ฟังก์ชันรับ str — ค่า default พิมพ์ลง console (CLI);
+             ฝั่งเว็บส่ง callback เข้ามาเพื่อให้ progress ขึ้นบนหน้าจอระหว่างรอ
+        """
         comments: list[dict] = []
         for i, url in enumerate(post_urls, 1):
             cs = self.get_comments(url, f"post_{i}", max_comments)
             comments += cs
-            print(f"    - โพสต์ {i}/{len(post_urls)}: {len(cs)} คอมเมนต์")
+            log(f"    - โพสต์ {i}/{len(post_urls)}: {len(cs)} คอมเมนต์")
         return comments
 
-    def scrape_target(self, target: dict, max_posts: int, max_comments: int) -> list[dict]:
-        print(f"  [apify] {target['type']}: {target['name']} — หาโพสต์…")
+    def scrape_target(self, target: dict, max_posts: int, max_comments: int, log=print) -> list[dict]:
+        """กวาดทั้งเพจ/กลุ่ม: หาโพสต์ล่าสุด max_posts โพสต์ → ดึงคอมเมนต์ทีละโพสต์."""
+        log(f"  [apify] {target['type']}: {target['name']} — หาโพสต์…")
         post_urls = self.get_post_urls(target["url"], max_posts)
-        print(f"  [apify] เจอ {len(post_urls)} โพสต์ → ดึงคอมเมนต์…")
+        log(f"  [apify] เจอ {len(post_urls)} โพสต์ → ดึงคอมเมนต์…")
         comments: list[dict] = []
         for i, url in enumerate(post_urls, 1):
             pid = f"{target['type']}_{i}"
             cs = self.get_comments(url, pid, max_comments)
             comments += cs
-            print(f"    - โพสต์ {i}/{len(post_urls)}: {len(cs)} คอมเมนต์")
+            log(f"    - โพสต์ {i}/{len(post_urls)}: {len(cs)} คอมเมนต์")
         return comments

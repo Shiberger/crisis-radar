@@ -1,5 +1,5 @@
 {
-  "_note": "เป้าหมายที่จะ scrape. วิธีถูกสุด: ก็อป URL โพสต์จากเพจมาใส่ post_urls (ดึงคอมเมนต์ actor เดียว). ถ้า post_urls ว่าง จะ fallback ไปหา actor list โพสต์.",
+  "_note": "เป้าหมายที่จะ scrape. หน้าเว็บเลือกขอบเขตได้ 2 แบบ: 'ทั้งเพจ' = ใช้ targets[].url หาโพสต์ล่าสุด N โพสต์อัตโนมัติ (ค่าเริ่มต้น ไม่ต้องแก้ไฟล์นี้) · 'เฉพาะโพสต์ที่ระบุไว้' = ใช้ post_urls ข้างล่าง (เร็ว/ถูกกว่า เหมาะตอนรู้ว่าดราม่าอยู่โพสต์ไหน).",
   "brand": "talesrunner",
   "page_id": "thehof.talesrunner",
   "page_name": "TalesRunner Thailand (Official / thehof)",

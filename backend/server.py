@@ -59,6 +59,9 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/health":
             # passcode_required → หน้าเว็บใช้ตัดสินว่าต้องถามรหัสก่อนดึง Facebook จริงไหม
             self._send(200, {"ok": True, "passcode_required": bool(RUN_PASSCODE)})
+        elif self.path == "/api/targets":
+            # ค่าตั้งต้นให้ฟอร์ม (URL เพจ/โพสต์จาก data/targets.json) — ไม่มีอะไรลับ
+            self._send(200, jobs.get_targets())
         elif self.path.startswith("/api/jobs/"):
             job = jobs.get_job(self.path.rsplit("/", 1)[-1])
             if not job:
