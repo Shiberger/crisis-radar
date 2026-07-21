@@ -56,6 +56,24 @@ class TopicStat:
     owner: str
     peak: str             # ช่วงเวลาที่ประเด็นนี้หนักสุด
     is_emerging: bool     # เพิ่งพุ่งในช่วงล่าสุด (ประเด็นใหม่ / โตเกิน baseline ของตัวเอง)
+    peak_iso: str = ""    # เวลาเดียวกับ peak แต่เต็มวันที่ — ให้หน้าเว็บกรองข้ามวันได้
+
+
+@dataclass
+class AlertItem:
+    """Alert แบบมีโครงสร้าง — หน้าเว็บเอาไปทำการ์ด + ปุ่ม 'ดูคอมเมนต์' ได้.
+
+    ข้อความ string เดิม (CrisisReport.alerts) ยังอยู่ครบสำหรับ CLI/markdown
+    ที่นี่แค่แยกส่วนประกอบออกมา ไม่ให้ฝั่ง UI ต้อง regex แกะข้อความเอง.
+    """
+    kind: str             # 'spike' | 'emerging' | 'viral'
+    level: str            # 'high' | 'medium'
+    title: str            # พาดหัวภาษาคน
+    detail: str           # ตัวเลขประกอบ
+    owner: str = ""       # ทีมที่ควรรับเรื่อง
+    topic: str = ""       # topic key — ใช้เป็นตัวกรองตอนกดดูคอมเมนต์
+    bucket_iso: str = ""  # ช่วงเวลาที่เกี่ยวข้อง — ใช้เป็นตัวกรอง
+    comment_id: str = ""  # เฉพาะ viral: คอมเมนต์ต้นเรื่อง
 
 
 @dataclass
@@ -70,6 +88,7 @@ class CrisisReport:
     escalated_count: int
     total: int
     topic_trends: list[TopicStat] = field(default_factory=list)
+    alert_items: list[AlertItem] = field(default_factory=list)
 
 
 def _bucket_key(ts: datetime) -> datetime:
@@ -115,6 +134,7 @@ def _topic_trends(items: list[Classified], ordered_keys: list[datetime]) -> list
             owner=TOPIC_OWNER.get(topic, "Community"),
             peak=f"{peak_b:%H:%M}",
             is_emerging=emerging,
+            peak_iso=peak_b.isoformat(),
         ))
     return sorted(out, key=lambda s: s.severity, reverse=True)
 
@@ -127,6 +147,7 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
     ordered = sorted(buckets_map.items())
     stats: list[BucketStat] = []
     alerts: list[str] = []
+    items_out: list[AlertItem] = []
     severities_so_far: list[float] = []
 
     for start, group in ordered:
@@ -152,6 +173,18 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
                 f"🚨 {start:%H:%M} คอมเมนต์ลบพุ่ง (severity {severity:.0f} vs baseline {baseline:.0f}) "
                 f"· ประเด็นหลัก: {top}"
             )
+            lead = topic_counter.most_common(1)
+            lead_topic = lead[0][0] if lead else ""
+            times = severity / baseline if baseline else 0
+            items_out.append(AlertItem(
+                kind="spike", level="high",
+                title=f"คอมเมนต์ลบพุ่งผิดปกติช่วง {start:%H:%M} น. — แรงกว่าปกติ {times:.0f} เท่า",
+                detail=f"ชั่วโมงนี้มีคอมเมนต์ลบ {len(negs)} จาก {len(group)} คอมเมนต์ · "
+                       f"เรื่องที่คนบ่นมากสุดคือ "
+                       f"{TOPIC_LABELS.get(lead_topic, lead_topic) or 'ทั่วไป'}",
+                owner=TOPIC_OWNER.get(lead_topic, "Community"),
+                topic=lead_topic, bucket_iso=start.isoformat(),
+            ))
 
         severities_so_far.append(severity)
 
@@ -163,6 +196,13 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
                 f"📈 ประเด็น '{t.label}' กำลังมาแรง ({t.negative} คอมเมนต์ลบ · severity {t.severity:.0f}) "
                 f"· ส่งต่อ: {t.owner}"
             )
+            items_out.append(AlertItem(
+                kind="emerging", level="medium",
+                title=f"เรื่อง “{t.label}” กำลังมาแรงในชั่วโมงล่าสุด",
+                detail=f"มีคอมเมนต์ลบเรื่องนี้ {t.negative} รายการ "
+                       f"({t.share:.0f}% ของคอมเมนต์ลบทั้งหมด) · หนักสุดช่วง {t.peak} น.",
+                owner=t.owner, topic=t.topic, bucket_iso=t.peak_iso,
+            ))
 
     # viral negative (ไม่ต้องรอ spike ของช่วงเวลา)
     viral = sorted(
@@ -174,6 +214,15 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
             f"🔥 คอมเมนต์ลบไวรัล reach {v.comment.reach} ({', '.join(v.topics) or 'ทั่วไป'}): "
             f"\"{v.comment.text[:60]}...\""
         )
+        vt = v.topics[0] if v.topics else ""
+        items_out.append(AlertItem(
+            kind="viral", level="medium",
+            title=f"คอมเมนต์ลบ 1 อันกำลังกระจายวงกว้าง (คนกดไลก์/ตอบกลับ {v.comment.reach} ครั้ง)",
+            detail=f"“{v.comment.text[:90]}{'…' if len(v.comment.text) > 90 else ''}” — โดย {v.comment.author}",
+            owner=TOPIC_OWNER.get(vt, "Community"),
+            topic=vt, bucket_iso=_bucket_key(v.comment.created_at).isoformat(),
+            comment_id=v.comment.comment_id,
+        ))
 
     # สรุปภาพรวม
     sentiment_mix = Counter(it.sentiment for it in items)
@@ -198,6 +247,7 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
         escalated_count=sum(1 for it in items if it.escalated_to_llm),
         total=len(items),
         topic_trends=trends,
+        alert_items=items_out,
     )
 
 
@@ -210,17 +260,30 @@ def report_to_dict(rep: CrisisReport) -> dict:
         "sentiment_mix": rep.sentiment_mix,
         "escalated_count": rep.escalated_count,
         "alerts": rep.alerts,
+        # alerts แบบแยกส่วน — หน้าเว็บใช้ทำการ์ด + ปุ่มกรองคอมเมนต์ที่เกี่ยวข้อง
+        "alert_items": [
+            {"kind": a.kind, "level": a.level, "title": a.title, "detail": a.detail,
+             "owner": a.owner, "topic": a.topic, "bucket_iso": a.bucket_iso,
+             "comment_id": a.comment_id}
+            for a in rep.alert_items
+        ],
         "topic_breakdown": [[t, n] for t, n in rep.topic_breakdown],
         "topic_trends": [
             {"topic": t.topic, "label": t.label, "negative": t.negative, "severity": t.severity,
-             "share": t.share, "owner": t.owner, "peak": t.peak, "is_emerging": t.is_emerging}
+             "share": t.share, "owner": t.owner, "peak": t.peak, "is_emerging": t.is_emerging,
+             "peak_iso": t.peak_iso}
             for t in rep.topic_trends
         ],
+        # start_iso ต้องมีคู่กับ start เพราะข้อมูลจริงกินหลายวัน — %H:%M อย่างเดียวซ้ำกันข้ามวัน
         "buckets": [
-            {"start": b.start.strftime("%H:%M"), "total": b.total, "negative": b.negative,
+            {"start": b.start.strftime("%H:%M"), "start_iso": b.start.isoformat(),
+             "total": b.total, "negative": b.negative,
              "severity": round(b.severity, 1), "baseline": b.baseline, "is_spike": b.is_spike}
             for b in rep.buckets
         ],
+        "bucket_minutes": BUCKET_MINUTES,
+        "thresholds": {"spike_factor": SPIKE_FACTOR, "min_severity": MIN_SEVERITY,
+                       "viral_reach": VIRAL_REACH},
     }
 
 
