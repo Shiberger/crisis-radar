@@ -290,12 +290,24 @@ $('#runBtn').onclick=async()=>{
   if(headers['X-Run-Passcode'])sessionStorage.setItem('runPass',headers['X-Run-Passcode']);
   poll((await r.json()).job_id);
 };
-async function poll(id){
-  const j=await(await fetch('/api/jobs/'+id)).json();
-  $('#log').textContent=(j.logs||[]).join('\n');$('#log').scrollTop=1e9;
+function stopPoll(msg){
+  $('#progTitle').textContent='เกิดข้อผิดพลาด';$('#runBtn').disabled=false;
+  $('#log').textContent+='\n\n'+msg;$('#log').scrollTop=1e9;
+}
+// miss = จำนวนครั้งที่ต่อเซิร์ฟเวอร์ไม่ติดติดกัน (เผื่อเน็ตสะดุดชั่วคราว)
+async function poll(id,miss=0){
+  let res,j;
+  try{res=await fetch('/api/jobs/'+id);j=await res.json();}
+  catch(e){
+    if(miss<10)return setTimeout(()=>poll(id,miss+1),2000);
+    return stopPoll('ต่อเซิร์ฟเวอร์ไม่ได้ — กด "ดึงข้อมูล & วิเคราะห์" ใหม่อีกครั้ง');
+  }
+  // job หายจากหน่วยความจำ = เซิร์ฟเวอร์รีสตาร์ทระหว่างทาง (deploy ใหม่ / free tier หลับ)
+  // ถ้าไม่ดักตรงนี้ status จะเป็น undefined แล้ววน poll ค้างไม่รู้จบ
+  if(res.status===404)return stopPoll('งานหายไป — เซิร์ฟเวอร์รีสตาร์ทระหว่างทำงาน กดดึงข้อมูลใหม่อีกครั้งได้เลย');
+  if(j.logs&&j.logs.length){$('#log').textContent=j.logs.join('\n');$('#log').scrollTop=1e9;}
   if(j.status==='done'){$('#progTitle').textContent='เสร็จแล้ว';$('#runBtn').disabled=false;render(j.result);}
-  else if(j.status==='error'){$('#progTitle').textContent='เกิดข้อผิดพลาด';$('#runBtn').disabled=false;
-    $('#log').textContent+='\n\n'+(j.error||'');}
+  else if(j.status==='error'){stopPoll(j.error||'ไม่ทราบสาเหตุ');}
   else setTimeout(()=>poll(id),1000);
 }
 
