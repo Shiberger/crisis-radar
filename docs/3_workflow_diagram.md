@@ -27,7 +27,7 @@ flowchart LR
     H --> I
     subgraph OUT["4 · Output"]
       I["Dashboard (สถานะรายแบรนด์)"]
-      G --> J["แจ้งเตือน LINE ทีม Community"]
+      G --> J["แจ้งเตือน Discord<br/>(ตาม channel ของทีม)"]
     end
 ```
 
@@ -37,7 +37,7 @@ flowchart LR
     T["⏰ Schedule<br/>(ทุก 30–60 นาที)"] --> S["ดึงคอมเมนต์<br/>ทุกเพจ/เกม"]
     S --> P["Crisis Radar pipeline"]
     P --> Q{"สถานะ = CRISIS ?"}
-    Q -->|ใช่| L["ส่ง LINE alert +<br/>tag ทีมเกมนั้น"]
+    Q -->|ใช่| L["ส่ง Discord alert +<br/>mention role ทีมเจ้าของประเด็น"]
     Q -->|ไม่| M["อัปเดต dashboard เงียบ ๆ"]
     L --> R["ทีมเข้าไปจัดการ"]
 ```

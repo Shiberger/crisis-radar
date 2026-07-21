@@ -3,10 +3,11 @@
   "page": "Talesrunner Thailand (Official)",
   "page_id": "talesrunner.th",
   "brand": "talesrunner",
-  "scenario": "วันที่ 15/7/2026 ช่วงเช้าคอมเมนต์ปกติ (baseline) จากนั้น 13:30 ปล่อยแพตช์ + กาชาใหม่ → 14:00 เป็นต้นไปเกิดดราม่า (เข้าเกมไม่ได้/เซิร์ฟล่ม + กาชาแพงเกิน) = spike",
+  "scenario": "วันที่ 15/7/2026 ช่วงเช้าคอมเมนต์ปกติ (baseline) → 13:30 ปล่อยแพตช์ + กาชาใหม่ → 14:00 ดราม่าคลื่นที่ 1 (เข้าเกมไม่ได้/เซิร์ฟล่ม + กาชาแพง) = spike → 15:00 ดราม่าคลื่นที่ 2 คนละเรื่อง (โค้ดจากแคมเปญโฆษณาใช้ไม่ได้/ของไม่เข้า) ใช้ทดสอบว่าระบบแยกประเด็นและส่งต่อคนละทีมได้",
   "posts": [
     { "post_id": "p_daily", "caption": "สวัสดีชาว Talesrunner วันนี้อากาศดี ออกไปวิ่งกันเถอะ!" },
-    { "post_id": "p_patch", "caption": "[อัปเดต] แพตช์ใหม่ + กาชาชุด Summer Dash เปิดแล้ว! เวลา 13:30" }
+    { "post_id": "p_patch", "caption": "[อัปเดต] แพตช์ใหม่ + กาชาชุด Summer Dash เปิดแล้ว! เวลา 13:30" },
+    { "post_id": "p_code", "caption": "[กิจกรรม] ดูโฆษณา/กรอกโค้ด SUMMER2026 รับไอเทมฟรี!" }
   ],
   "comments": [
     {"comment_id": "c01", "post_id": "p_daily", "author": "Nong Ploy", "text": "เกมนี้เล่นมา 5 ปีแล้ว ยังสนุกเหมือนเดิมเลยค่ะ ชอบมาก", "created_at": "2026-07-15T10:05:00", "reach": 24},
@@ -43,6 +44,14 @@
     {"comment_id": "c30", "post_id": "p_patch", "author": "fewfew", "text": "ตอนนี้เข้าได้แล้วนะ ลองรีสตาร์ทเราเตอร์ดู", "created_at": "2026-07-15T14:36:00", "reach": 27},
     {"comment_id": "c31", "post_id": "p_patch", "author": "Somsri T", "text": "ยังเข้าไม่ได้เลยค่ะ ขึ้น error 1023 ตลอด", "created_at": "2026-07-15T14:38:00", "reach": 31},
     {"comment_id": "c32", "post_id": "p_patch", "author": "mokkori", "text": "กิจกรรมใหม่ดีนะถ้าไม่ล่มก่อน 555", "created_at": "2026-07-15T14:41:00", "reach": 15},
-    {"comment_id": "c33", "post_id": "p_patch", "author": "bigboss", "text": "แย่มาก แก้ปัญหาไม่ได้สักที ผิดหวังกับทีมงานจริง ๆ", "created_at": "2026-07-15T14:44:00", "reach": 44}
+    {"comment_id": "c33", "post_id": "p_patch", "author": "bigboss", "text": "แย่มาก แก้ปัญหาไม่ได้สักที ผิดหวังกับทีมงานจริง ๆ", "created_at": "2026-07-15T14:44:00", "reach": 44},
+
+    {"comment_id": "c34", "post_id": "p_code", "author": "แม่หมูอ้วน", "text": "กรอกโค้ดจากโฆษณาแล้วขึ้นว่าโค้ดหมดอายุ ทั้งที่กิจกรรมยังไม่จบนะคะ", "created_at": "2026-07-15T15:03:00", "reach": 62},
+    {"comment_id": "c35", "post_id": "p_code", "author": "Toey_TR", "text": "ใส่โค้ดแล้วไม่ติดเหมือนกันครับ ขึ้น error ตลอด", "created_at": "2026-07-15T15:07:00", "reach": 48},
+    {"comment_id": "c36", "post_id": "p_code", "author": "ploy.ny", "text": "แลกโค้ดสำเร็จแล้วแต่ของไม่เข้าคลังเลยค่ะ หายไปไหน", "created_at": "2026-07-15T15:11:00", "reach": 91},
+    {"comment_id": "c37", "post_id": "p_code", "author": "zeronine", "text": "ดูโฆษณาครบแล้วไม่ได้ของ เสียเวลาดูฟรี ๆ", "created_at": "2026-07-15T15:15:00", "reach": 57},
+    {"comment_id": "c38", "post_id": "p_code", "author": "mickmax", "text": "ไอเทมโค้ดที่แจกในเพจใช้ไม่ได้นะครับ ใครได้บ้าง", "created_at": "2026-07-15T15:19:00", "reach": 73},
+    {"comment_id": "c39", "post_id": "p_code", "author": "nutcha.w", "text": "เช็คอินครบ 7 วันแล้วไม่ได้รางวัลค่ะ แจ้งไปยังไม่มีใครตอบ", "created_at": "2026-07-15T15:24:00", "reach": 66},
+    {"comment_id": "c40", "post_id": "p_code", "author": "Golf TR", "text": "ของรางวัลเข้าแล้วนะ ลองล็อกอินใหม่ดู", "created_at": "2026-07-15T15:29:00", "reach": 18}
   ]
 }

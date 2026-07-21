@@ -1,0 +1,516 @@
+<title>Crisis Radar — ภาคผนวก: Baseline AI · Discord Alert · Team Routing</title>
+<style>
+:root{
+  color-scheme: light;
+  --plane:#f9f9f7; --surface:#fcfcfb; --sunk:#f2f2ee;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --border:rgba(11,11,11,.11); --hair:rgba(11,11,11,.06);
+  --accent:#2a78d6; --pos:#0ca30c; --warn:#fab219; --neg:#d03b3b;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI","Noto Sans Thai","Sarabun",sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#191918; --sunk:#121211;
+    --ink:#fff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --border:rgba(255,255,255,.12); --hair:rgba(255,255,255,.06);
+    --accent:#4b95ea; --pos:#3cbb3c; --warn:#fabc33; --neg:#e2564f;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --plane:#0d0d0d; --surface:#191918; --sunk:#121211;
+  --ink:#fff; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --border:rgba(255,255,255,.12); --hair:rgba(255,255,255,.06);
+  --accent:#4b95ea; --pos:#3cbb3c; --warn:#fabc33; --neg:#e2564f;
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --plane:#f9f9f7; --surface:#fcfcfb; --sunk:#f2f2ee;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --border:rgba(11,11,11,.11); --hair:rgba(11,11,11,.06);
+  --accent:#2a78d6; --pos:#0ca30c; --warn:#fab219; --neg:#d03b3b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.page{max-width:1080px;margin:0 auto;padding:40px 22px 72px;display:flex;flex-direction:column;gap:34px}
+h1,h2,h3{text-wrap:balance;margin:0;letter-spacing:-.015em}
+p{margin:0}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+.num{font-variant-numeric:tabular-nums}
+code,.m{font-family:var(--mono)}
+
+/* ---- masthead ---- */
+.mast{display:flex;flex-direction:column;gap:12px;padding-bottom:26px;border-bottom:1px solid var(--border)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.mast h1{font-size:clamp(26px,4.2vw,38px);font-weight:680;line-height:1.18}
+.mast .lede{color:var(--ink2);max-width:62ch;font-size:16px}
+.mast .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.tagch{font-family:var(--mono);font-size:11px;color:var(--ink2);background:var(--sunk);
+  border:1px solid var(--border);border-radius:5px;padding:3px 9px}
+
+/* ---- section ---- */
+section{display:flex;flex-direction:column;gap:18px}
+.shead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  padding-bottom:10px;border-bottom:2px solid var(--ink)}
+.sno{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--accent)}
+.shead h2{font-size:clamp(20px,2.8vw,25px);font-weight:670;flex:1;min-width:220px}
+.shead .why{color:var(--muted);font-size:12.5px;font-family:var(--mono)}
+.claim{font-size:17px;color:var(--ink);max-width:70ch;border-left:2px solid var(--accent);padding-left:14px}
+h3{font-size:12px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:650}
+
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:20px}
+.panel-sunk{background:var(--sunk)}
+.stack{display:flex;flex-direction:column;gap:13px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:780px){.two{grid-template-columns:1fr}}
+
+/* ---- confidence ruler ---- */
+.ruler{position:relative;margin:34px 0 46px}
+.track{position:relative;height:34px;background:var(--sunk);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.zone{position:absolute;top:0;bottom:0}
+.zone.esc{left:0;width:60%;background:repeating-linear-gradient(135deg,
+  color-mix(in srgb,var(--warn) 17%,transparent) 0 7px,transparent 7px 14px)}
+.zone.trust{left:60%;right:0;background:color-mix(in srgb,var(--pos) 11%,transparent)}
+.zlabel{position:absolute;top:8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--ink2);white-space:nowrap}
+.gate{position:absolute;top:-9px;bottom:-9px;width:2px;background:var(--neg);z-index:3}
+.gate::after{content:attr(data-l);position:absolute;top:-21px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--neg);white-space:nowrap}
+.pt{position:absolute;top:0;bottom:0;width:1px;background:var(--ink);opacity:.42;z-index:2}
+.pin{position:absolute;top:38px;transform:translateX(-50%);text-align:center;width:96px}
+.pin .v{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--ink)}
+.pin .k{font-size:11px;color:var(--muted);line-height:1.35}
+.pin.lo .v{color:var(--warn)} .pin.hi .v{color:var(--pos)}
+.pin.end{transform:none;right:0;left:auto!important;text-align:right}  /* กันล้นขอบขวา */
+.axis{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;
+  color:var(--muted);margin-top:6px}
+
+/* ---- formula ---- */
+.formula{font-family:var(--mono);font-size:15px;background:var(--sunk);border:1px solid var(--border);
+  border-radius:8px;padding:15px 17px;overflow-x:auto;white-space:nowrap;color:var(--ink)}
+.formula em{font-style:normal;color:var(--accent);font-weight:700}
+
+/* ---- tables ---- */
+.tw{overflow-x:auto;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--muted);font-weight:650;padding:11px 13px;border-bottom:1px solid var(--border);white-space:nowrap;
+  background:var(--sunk)}
+td{padding:11px 13px;border-bottom:1px solid var(--hair);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.c{font-family:var(--mono);white-space:nowrap}
+.esc-y{color:var(--warn);font-weight:650} .esc-n{color:var(--pos);font-weight:650}
+
+/* ---- confusion ---- */
+.cm{display:grid;grid-template-columns:auto repeat(3,1fr);gap:3px;font-family:var(--mono);font-size:13px}
+.cm div{padding:9px 6px;text-align:center;border-radius:5px;background:var(--sunk);color:var(--muted);font-size:11px}
+.cm .cell{background:var(--surface);border:1px solid var(--border);color:var(--ink);font-size:15px;font-weight:650}
+.cm .cell.hit{background:color-mix(in srgb,var(--pos) 15%,transparent);border-color:color-mix(in srgb,var(--pos) 45%,transparent)}
+.cm .cell.miss{background:color-mix(in srgb,var(--neg) 15%,transparent);border-color:color-mix(in srgb,var(--neg) 45%,transparent)}
+.cm .cell.zero{color:var(--muted);font-weight:400}
+.cm .rh{text-align:right;padding-right:10px;background:none}
+
+/* ---- n8n chain ---- */
+.chain{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:4px}
+.node{flex:1;min-width:132px;background:var(--surface);border:1px solid var(--border);
+  border-radius:9px;padding:12px 13px;display:flex;flex-direction:column;gap:3px}
+.node .nk{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.node .nv{font-size:13px;font-weight:620;line-height:1.3}
+.node .nd{font-size:11.5px;color:var(--muted);font-family:var(--mono)}
+.node.fork{border-color:var(--warn)} .node.fire{border-color:var(--neg)}
+.arrow{flex:0 0 26px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-family:var(--mono)}
+
+/* ---- discord mock (คงธีมมืดของ Discord ไว้ทั้งสองโหมด — เป็นภาพจำลองหน้าจอ) ---- */
+.dc{border:1px solid var(--border);border-radius:11px;overflow:hidden;background:#313338;
+  display:grid;grid-template-columns:186px 1fr;font-size:14px;color:#dbdee1}
+@media(max-width:640px){.dc{grid-template-columns:1fr}.dc .dc-side{display:none}}
+.dc-side{background:#2b2d31;padding:13px 9px;display:flex;flex-direction:column;gap:2px}
+.dc-srv{color:#f2f3f5;font-weight:700;font-size:14px;padding:5px 8px 11px;border-bottom:1px solid #1f2023;margin-bottom:7px}
+.dc-ch{padding:6px 9px;border-radius:5px;color:#949ba4;font-size:14px;display:flex;gap:6px;align-items:center}
+.dc-ch .h{color:#6d6f78;font-weight:600}
+.dc-ch.on{background:#404249;color:#f2f3f5}
+.dc-ch.alert{color:#f2f3f5;font-weight:600}
+.dc-main{padding:15px 18px 19px;display:flex;flex-direction:column;gap:13px;min-width:0}
+.dc-top{color:#f2f3f5;font-weight:700;font-size:15px;padding-bottom:11px;border-bottom:1px solid #3f4147}
+.dc-msg{display:flex;gap:12px}
+.dc-av{flex:0 0 38px;height:38px;border-radius:50%;background:#5865f2;color:#fff;display:flex;
+  align-items:center;justify-content:center;font-size:17px}
+.dc-body{min-width:0;flex:1;display:flex;flex-direction:column;gap:7px}
+.dc-name{color:#f2f3f5;font-weight:600;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.dc-bot{background:#5865f2;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;letter-spacing:.02em}
+.dc-time{color:#949ba4;font-size:12px;font-weight:400}
+.dc-embed{background:#2b2d31;border-left:4px solid var(--eb,#d03b3b);border-radius:5px;padding:13px 16px;
+  display:flex;flex-direction:column;gap:9px;max-width:560px}
+.dc-etitle{color:#f2f3f5;font-weight:700;font-size:15px;line-height:1.35}
+.dc-edesc{color:#dbdee1;font-size:13.5px;line-height:1.5}
+.dc-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+@media(max-width:520px){.dc-fields{grid-template-columns:1fr 1fr}}
+.dc-f .fk{color:#f2f3f5;font-size:12px;font-weight:700;margin-bottom:2px}
+.dc-f .fv{color:#b5bac1;font-size:13px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.dc-quote{border-left:3px solid #4e5058;padding-left:11px;color:#b5bac1;font-size:13px}
+.dc-foot{color:#949ba4;font-size:11.5px;border-top:1px solid #3f4147;padding-top:8px}
+.dc-btns{display:flex;gap:8px;flex-wrap:wrap}
+.dc-btn{background:#4e5058;color:#fff;border-radius:4px;padding:7px 14px;font-size:13px;font-weight:600}
+.dc-btn.primary{background:#5865f2}
+.dc-mention{background:rgba(88,101,242,.3);color:#c9cdfb;border-radius:3px;padding:0 3px;font-weight:600}
+.mocklabel{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+
+/* ---- routing ---- */
+.route{display:flex;flex-direction:column;gap:0}
+.rrow{display:grid;grid-template-columns:1fr 26px 1fr 26px 1.25fr;align-items:center;gap:0;
+  padding:11px 0;border-bottom:1px solid var(--hair)}
+.rrow:last-child{border-bottom:0}
+@media(max-width:760px){.rrow{grid-template-columns:1fr;gap:5px;padding:13px 0}
+  .rrow .rarr{display:none}}
+.rtopic{font-weight:620;font-size:14px;display:flex;align-items:center;gap:8px}
+.rdot{width:8px;height:8px;border-radius:2px;flex:0 0 8px}
+.rteam{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--sunk);
+  border:1px solid var(--border);border-radius:5px;padding:4px 9px;display:inline-block}
+.rdec{font-size:13px;color:var(--ink2)}
+.rarr{color:var(--muted);font-family:var(--mono);text-align:center;font-size:12px}
+
+/* ---- before/after ---- */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:780px){.ba{grid-template-columns:1fr}}
+.bacol{border:1px solid var(--border);border-radius:11px;overflow:hidden;background:var(--surface)}
+.bahead{padding:12px 16px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  font-weight:700;border-bottom:1px solid var(--border)}
+.bacol.b .bahead{background:color-mix(in srgb,var(--neg) 10%,transparent);color:var(--neg)}
+.bacol.a .bahead{background:color-mix(in srgb,var(--pos) 10%,transparent);color:var(--pos)}
+.balist{padding:6px 16px 14px;display:flex;flex-direction:column}
+.baitem{padding:10px 0;border-bottom:1px solid var(--hair);font-size:13.5px;color:var(--ink2)}
+.baitem:last-child{border-bottom:0}
+.baitem b{color:var(--ink);font-weight:620}
+
+.note{border:1px solid var(--border);border-left:3px solid var(--accent);background:var(--sunk);
+  border-radius:0 8px 8px 0;padding:13px 16px;font-size:13.5px;color:var(--ink2)}
+.note b{color:var(--ink)}
+.note.warn{border-left-color:var(--warn)}
+.foot{border-top:1px solid var(--border);padding-top:20px;color:var(--muted);font-size:12px;font-family:var(--mono)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="page">
+
+<header class="mast">
+  <div class="eyebrow">Crisis Radar · ภาคผนวกประกอบการนำเสนอ</div>
+  <h1>Baseline ของ AI · ตัวอย่าง Alert จริงบน Discord · ใครรับเรื่องต่อ</h1>
+  <p class="lede">เอกสารนี้ตอบ 3 คำถามที่มักโดนถามตอนรีวิว: <b>AI มั่นใจแค่ไหนถึงกล้าตัดสิน</b>,
+    <b>alert หน้าตาเป็นยังไงเวลาเด้งเข้าทีมจริง</b>, และ <b>เครื่องมือนี้ทำให้ทีมไหนตัดสินใจอะไรได้</b>
+    ตัวเลขทุกตัวมาจากการรัน pipeline จริง ไม่ได้ประมาณ</p>
+  <div class="meta">
+    <span class="tagch">sample 41 คอมเมนต์</span>
+    <span class="tagch">accuracy 97% (29/30)</span>
+    <span class="tagch">escalate LLM 22%</span>
+    <span class="tagch">test 13/13 passed</span>
+  </div>
+</header>
+
+<!-- ═══════════ §2 ═══════════ -->
+<section>
+  <div class="shead">
+    <span class="sno">§2</span>
+    <h2>Baseline ของ AI — แยกบวก / กลาง / ลบ ที่ความมั่นใจเท่าไร</h2>
+    <span class="why">confidence model</span>
+  </div>
+
+  <p class="claim">AI ไม่ได้ตอบว่า "ลบ" เฉย ๆ แต่ตอบพร้อม <b>ค่าความมั่นใจ 0–1</b> เสมอ
+    และมี <b>เส้นตัดที่ 0.60</b> เป็นตัวตัดสินว่าจะเชื่อคำตอบนั้น หรือส่งต่อให้ LLM อ่านซ้ำ</p>
+
+  <div class="panel stack">
+    <h3>ชั้นที่ 1 · Thai lexicon — ความมั่นใจมาจาก "ส่วนต่างของคำ"</h3>
+    <div class="formula">
+      sentiment = sign( <em>จำนวนคำบวก − จำนวนคำลบ</em> ) &nbsp;·&nbsp;
+      confidence = min(1.0, <em>0.45</em> + margin × <em>0.20</em>)
+    </div>
+
+    <div class="ruler">
+      <div class="track">
+        <div class="zone esc"></div>
+        <div class="zone trust"></div>
+        <div class="zlabel" style="left:12px">ไม่เชื่อ → ส่งต่อ LLM</div>
+        <div class="zlabel" style="left:calc(60% + 12px)">เชื่อผลได้เลย</div>
+        <div class="pt" style="left:45%"></div>
+        <div class="pt" style="left:65%"></div>
+        <div class="pt" style="left:85%"></div>
+        <div class="gate" style="left:60%" data-l="เส้นตัด 0.60"></div>
+      </div>
+      <div class="axis"><span>0.00</span><span>0.50</span><span>1.00</span></div>
+      <div class="pin lo" style="left:45%"><div class="v">0.45</div><div class="k">margin 0<br>ไม่เจอคำชี้นำ</div></div>
+      <div class="pin hi" style="left:65%"><div class="v">0.65</div><div class="k">margin 1<br>ต่างกัน 1 คำ</div></div>
+      <div class="pin hi" style="left:85%"><div class="v">0.85</div><div class="k">margin 2<br>ต่างกัน 2 คำ</div></div>
+      <div class="pin hi end"><div class="v">1.00</div><div class="k">margin ≥3<br>ชัดมาก</div></div>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>สถานการณ์ในข้อความ</th><th>confidence</th><th>ผลที่ได้</th><th>ระบบทำต่อ</th></tr></thead>
+        <tbody>
+          <tr><td>คำลบมากกว่าคำบวก ≥3 คำ <span class="m" style="color:var(--muted)">"เกมกาก เลิกเล่น ผิดหวัง"</span></td>
+              <td class="n">1.00</td><td>ลบ</td><td class="esc-n">เชื่อ lexicon</td></tr>
+          <tr><td>ต่างกัน 2 คำ</td><td class="n">0.85</td><td>บวก / ลบ</td><td class="esc-n">เชื่อ lexicon</td></tr>
+          <tr><td>ต่างกัน 1 คำ</td><td class="n">0.65</td><td>บวก / ลบ</td><td class="esc-n">เชื่อ lexicon</td></tr>
+          <tr><td><b>มีทั้งคำบวกและคำลบ</b> (mixed)</td><td class="n">≤ 0.50</td><td>ยังไม่สรุป</td><td class="esc-y">→ LLM</td></tr>
+          <tr><td><b>เจอร่องรอยประชด</b> <span class="m" style="color:var(--muted)">"555", "ขอบคุณมากค่า"</span></td>
+              <td class="n">≤ 0.50</td><td>ยังไม่สรุป</td><td class="esc-y">→ LLM</td></tr>
+          <tr><td>ไม่เจอคำชี้นำเลย แต่ข้อความยาว &gt;15 ตัวอักษร</td><td class="n">0.45</td><td>กลาง (ชั่วคราว)</td><td class="esc-y">→ LLM</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note warn"><b>ทำไมต้องมีเส้นตัด ไม่ใช่เชื่อ lexicon ทั้งหมด:</b> ภาษาไทยไม่เว้นวรรค
+      การจับคำจึงชนกันได้ เช่น <span class="m">"ไม่ติด"</span> (โค้ดใช้ไม่ได้ = ลบ) ไปโผล่ใน
+      <span class="m">"ไม่ติดตั้ง"</span> (แค่เล่าขั้นตอน = ไม่ลบ) — เคสคลุมเครือจึงต้องถูกส่งต่อ ไม่ใช่เดา</div>
+  </div>
+
+  <div class="panel stack">
+    <h3>ชั้นที่ 2 · LLM — รับเฉพาะเคสที่ชั้นแรกไม่มั่นใจ</h3>
+    <div class="ruler" style="margin-bottom:52px">
+      <div class="track">
+        <div class="zone trust" style="left:0;width:100%"></div>
+        <div class="pt" style="left:55%"></div>
+        <div class="pt" style="left:70%"></div>
+        <div class="pt" style="left:82%"></div>
+      </div>
+      <div class="axis"><span>0.00</span><span>0.50</span><span>1.00</span></div>
+      <div class="pin" style="left:55%"><div class="v">0.55</div><div class="k">อ่านแล้วยังกลาง ๆ<br>→ กลาง</div></div>
+      <div class="pin" style="left:70%"><div class="v">0.70</div><div class="k">บริบทปัญหาชัด<br>→ ลบ</div></div>
+      <div class="pin" style="left:82%"><div class="v">0.82</div><div class="k">จับประชดได้<br>→ ลบ</div></div>
+    </div>
+    <div class="note"><b>ตัวอย่างที่ชั้น LLM พลิกคำตอบ:</b>
+      <span class="m">"ดีจริง ๆ นะคะที่ล่มตอนคนกำลังจะเล่น ขอบคุณมากค่า"</span> —
+      lexicon เห็นคำบวกล้วนเลยตอบ "กลาง/บวก" (มั่นใจแค่ 0.50 จึงส่งต่อ) ชั้น LLM เห็นคำว่า
+      <span class="m">"ล่ม"</span> คู่กับน้ำเสียงขอบคุณ → สรุปเป็น <b>ลบ ที่ 0.82</b> ถูกต้อง</div>
+  </div>
+
+  <div class="two">
+    <div class="panel stack">
+      <h3>ผลวัดจริง · labeled set 30 เคส</h3>
+      <div class="cm">
+        <div class="rh"></div><div>ทาย บวก</div><div>ทาย กลาง</div><div>ทาย ลบ</div>
+        <div class="rh">จริง: บวก</div><div class="cell hit">6</div><div class="cell zero">0</div><div class="cell zero">0</div>
+        <div class="rh">จริง: กลาง</div><div class="cell zero">0</div><div class="cell hit">5</div><div class="cell miss">1</div>
+        <div class="rh">จริง: ลบ</div><div class="cell zero">0</div><div class="cell zero">0</div><div class="cell hit">18</div>
+      </div>
+      <p style="font-size:13px;color:var(--ink2)">พลาด 1 เคสเดียว เป็นประโยคที่มีทั้งบวกและลบ
+        (<span class="m">"โหลดช้านิดนึงแต่พอเข้าได้ก็โอเค"</span>) ระบบเอนไปทางลบ —
+        ฝั่งที่ปลอดภัยกว่าสำหรับงานเฝ้าวิกฤต</p>
+    </div>
+    <div class="panel stack">
+      <h3>Baseline ที่ใช้อ้างอิง</h3>
+      <div class="tw" style="border:0">
+        <table>
+          <tbody>
+            <tr><td>lexicon อย่างเดียว</td><td class="n">93%</td></tr>
+            <tr><td><b>hybrid (lexicon + LLM)</b></td><td class="n" style="color:var(--pos);font-weight:700">97%</td></tr>
+            <tr><td>เคสประชดที่จับถูก</td><td class="n">3 / 3</td></tr>
+            <tr><td>สัดส่วนที่ต้องพึ่ง LLM</td><td class="n">9 / 41 &nbsp;(22%)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note"><b>นัยเชิงต้นทุน:</b> ค่า LLM ผันตาม "ปริมาณเคสกำกวม" ไม่ใช่ปริมาณคอมเมนต์ทั้งหมด
+        — วันปกติที่ไม่มีดราม่า ต้นทุนเกือบเป็นศูนย์</div>
+      <div class="note warn">ชุดทดสอบ 30 เคสเป็น <b>smoke-test พิสูจน์ว่า logic ถูก</b> ไม่ใช่ benchmark
+        ตอน pilot ต้องมี labeled holdout จากคอมเมนต์จริง</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ §3 ═══════════ -->
+<section>
+  <div class="shead">
+    <span class="sno">§3</span>
+    <h2>Alert จริงเวลาเด้งเข้า Discord (ผ่าน n8n)</h2>
+    <span class="why">เปลี่ยนจาก LINE → Discord</span>
+  </div>
+
+  <p class="claim">ย้ายปลายทางแจ้งเตือนจาก LINE มาเป็น <b>Discord</b> เพราะชุมชนเกมและทีมงานอยู่บน Discord อยู่แล้ว
+    — ในคอมเมนต์จริงผู้เล่นยังอ้างถึง <span class="m">"ส่งเรื่องให้แอดมินเพจหรือทางดิสได้เลย"</span> —
+    และที่สำคัญกว่านั้น Discord <b>แยก channel กับ mention role ตามทีมได้</b> ซึ่งเป็นหัวใจของการส่งเรื่องให้ถูกคน</p>
+
+  <div class="panel stack">
+    <h3>n8n workflow</h3>
+    <div class="chain">
+      <div class="node"><span class="nk">trigger</span><span class="nv">Schedule</span><span class="nd">ทุก 30 นาที</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="nk">http</span><span class="nv">POST /api/run</span><span class="nd">source: facebook</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="nk">wait</span><span class="nv">poll job</span><span class="nd">จน status=done</span></div>
+      <div class="arrow">→</div>
+      <div class="node fork"><span class="nk">if</span><span class="nv">status ≠ NORMAL</span><span class="nd">หรือมี topic มาแรง</span></div>
+      <div class="arrow">→</div>
+      <div class="node fire"><span class="nk">discord</span><span class="nv">Webhook</span><span class="nd">เลือก channel ตามประเด็น</span></div>
+    </div>
+    <p style="font-size:13px;color:var(--ink2)">ถ้าสถานะเป็น NORMAL จะไม่ส่งอะไรเลย — อัปเดต dashboard เงียบ ๆ
+      เพื่อไม่ให้ทีมชินกับการเพิกเฉยต่อ alert</p>
+  </div>
+
+  <div class="stack">
+    <div class="mocklabel">ภาพจำลองข้อความที่ทีมจะได้รับ (mockup)</div>
+    <div class="dc">
+      <div class="dc-side">
+        <div class="dc-srv">HOF · Game Ops</div>
+        <div class="dc-ch"><span class="h">#</span>general</div>
+        <div class="dc-ch on alert"><span class="h">#</span>crisis-alert</div>
+        <div class="dc-ch"><span class="h">#</span>dev-hotfix</div>
+        <div class="dc-ch"><span class="h">#</span>marketing-campaign</div>
+        <div class="dc-ch"><span class="h">#</span>cs-frontline</div>
+      </div>
+      <div class="dc-main">
+        <div class="dc-top"># crisis-alert</div>
+
+        <div class="dc-msg">
+          <div class="dc-av">📡</div>
+          <div class="dc-body">
+            <div class="dc-name">Crisis Radar <span class="dc-bot">APP</span> <span class="dc-time">วันนี้ 14:05</span></div>
+            <div class="dc-embed" style="--eb:#d03b3b">
+              <div class="dc-etitle">🔴 CRISIS — Talesrunner (Facebook)</div>
+              <div class="dc-edesc">คอมเมนต์ลบพุ่งผิดปกติในช่วง 14:00 หลังปล่อยแพตช์เมื่อ 13:30</div>
+              <div class="dc-fields">
+                <div class="dc-f"><div class="fk">Severity</div><div class="fv">1232</div></div>
+                <div class="dc-f"><div class="fk">Baseline</div><div class="fv">8</div></div>
+                <div class="dc-f"><div class="fk">คอมเมนต์ลบ</div><div class="fv">18 / 19</div></div>
+              </div>
+              <div class="dc-f"><div class="fk">ประเด็นหลัก</div>
+                <div class="fv">บั๊ก/เทคนิค (12) · เติมเงิน/ราคา (6) · บริการ/ทีมงาน (4)</div></div>
+              <div class="dc-f"><div class="fk">คอมเมนต์ไวรัลที่สุด · reach 203</div></div>
+              <div class="dc-quote">"กาชาใหม่โคตรแพง อัตราดรอปก็ห่วย เปย์ไป 2000 ไม่ได้ตัว SSR เลย เอาเปรียบผู้เล่นมาก"</div>
+              <div class="dc-btns">
+                <span class="dc-btn primary">เปิด Dashboard</span>
+                <span class="dc-btn">ไปที่คอมเมนต์</span>
+                <span class="dc-btn">รับเรื่องแล้ว</span>
+              </div>
+              <div class="dc-foot">Crisis Radar · ตรวจ 41 คอมเมนต์ · ส่งต่อ: Dev / QA</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dc-msg">
+          <div class="dc-av">📡</div>
+          <div class="dc-body">
+            <div class="dc-name">Crisis Radar <span class="dc-bot">APP</span> <span class="dc-time">วันนี้ 15:30</span></div>
+            <div class="dc-edesc"><span class="dc-mention">@Marketing</span> <span class="dc-mention">@CS</span></div>
+            <div class="dc-embed" style="--eb:#fab219">
+              <div class="dc-etitle">📈 ประเด็นใหม่กำลังมาแรง — "ของรางวัล/โค้ด"</div>
+              <div class="dc-edesc">โค้ดจากแคมเปญโฆษณาใช้ไม่ได้ / ดูโฆษณาครบแล้วของไม่เข้า</div>
+              <div class="dc-fields">
+                <div class="dc-f"><div class="fk">คอมเมนต์ลบ</div><div class="fv">7</div></div>
+                <div class="dc-f"><div class="fk">Severity</div><div class="fv">536</div></div>
+                <div class="dc-f"><div class="fk">หนักสุด</div><div class="fv">15:00</div></div>
+              </div>
+              <div class="dc-quote">"กรอกโค้ดจากโฆษณาแล้วขึ้นว่าโค้ดหมดอายุ ทั้งที่กิจกรรมยังไม่จบนะคะ"</div>
+              <div class="dc-foot">⚠️ ประเด็นนี้ <b>ไม่ทริกเกอร์ spike รวม</b> เพราะถูกเหตุเซิร์ฟล่มกลบ — จับได้ด้วยการตรวจแยกรายประเด็น</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note"><b>จุดที่อยากให้สังเกตในข้อความที่สอง:</b> severity 536 ของเรื่องโค้ด สูงกว่าคอมเมนต์ลบช่วงเช้าทั้งวันรวมกัน
+    แต่ถ้านับคอมเมนต์ลบกองเดียวจะไม่มีวันเตือน เพราะ baseline ถูกดันขึ้นไป 253 จากเหตุเซิร์ฟล่มเมื่อชั่วโมงก่อน
+    — <b>วิกฤตใหญ่กลบวิกฤตเล็กที่ตามมา ทั้งที่คนละทีมต้องแก้</b> จึงต้องคิด severity แยกรายประเด็น</div>
+</section>
+
+<!-- ═══════════ §4 ═══════════ -->
+<section>
+  <div class="shead">
+    <span class="sno">§4</span>
+    <h2>ใครได้ประโยชน์ และเรื่องถูกส่งต่อไปทีมไหน</h2>
+    <span class="why">before → after</span>
+  </div>
+
+  <p class="claim">ของเดิมทุกเรื่องกองที่ทีม Community ทีมเดียว แล้วค่อยไล่ถามต่อว่า "อันนี้ใครดู"
+    — Crisis Radar จัดประเด็นให้เสร็จตั้งแต่ต้นทาง แล้วส่งเข้า channel ของทีมเจ้าของเรื่องโดยตรง</p>
+
+  <div class="ba">
+    <div class="bacol b">
+      <div class="bahead">Before · ไล่ส่องด้วยตา</div>
+      <div class="balist">
+        <div class="baitem"><b>ใครเฝ้า</b> — ทีม Community เปิดทีละเพจ วนอ่านเอง หลายรอบต่อวัน</div>
+        <div class="baitem"><b>ตัดสินยังไง</b> — อ่านแล้วรู้สึกเอาเองว่าวันนี้ดราม่าเยอะ ไม่มีตัวเลขเทียบ</div>
+        <div class="baitem"><b>ส่งต่อยังไง</b> — แคปหน้าจอโยนเข้ากลุ่มรวม แล้วรอว่าใครจะหยิบ</div>
+        <div class="baitem"><b>รู้ตัวตอนไหน</b> — ตอนเรื่องลุกลามไปแล้ว โดยเฉพาะนอกเวลางาน</div>
+      </div>
+    </div>
+    <div class="bacol a">
+      <div class="bahead">After · ระบบเฝ้า คนตัดสินใจ</div>
+      <div class="balist">
+        <div class="baitem"><b>ใครเฝ้า</b> — ระบบดึงทุกเพจตามรอบ ไม่มีช่วงตาบอด</div>
+        <div class="baitem"><b>ตัดสินยังไง</b> — เทียบ baseline ของตัวเอง + ถ่วงน้ำหนัก reach ได้สถานะชัด</div>
+        <div class="baitem"><b>ส่งต่อยังไง</b> — alert เข้า channel ของทีมเจ้าของประเด็น พร้อม mention role</div>
+        <div class="baitem"><b>รู้ตัวตอนไหน</b> — ตั้งแต่ชั่วโมงแรกที่เริ่มพุ่ง พร้อมหลักฐานเป็นตัวเลข</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel stack">
+    <h3>เส้นทางส่งต่อ · ประเด็น → ทีม → การตัดสินใจ</h3>
+    <div class="route">
+      <div class="rrow">
+        <div class="rtopic"><span class="rdot" style="background:var(--neg)"></span>บั๊ก/เทคนิค</div>
+        <div class="rarr">→</div><div><span class="rteam">Dev / QA</span></div><div class="rarr">→</div>
+        <div class="rdec">ออก hotfix เดี๋ยวนี้ หรือ rollback แพตช์</div>
+      </div>
+      <div class="rrow">
+        <div class="rtopic"><span class="rdot" style="background:var(--warn)"></span>ของรางวัล/โค้ด</div>
+        <div class="rarr">→</div><div><span class="rteam">Marketing (แคมเปญ) + CS</span></div><div class="rarr">→</div>
+        <div class="rdec">หยุดหรือต่ออายุแคมเปญ · ตั้งรอบชดเชย · เตรียมสคริปต์ตอบ</div>
+      </div>
+      <div class="rrow">
+        <div class="rtopic"><span class="rdot" style="background:var(--accent)"></span>เติมเงิน/ราคา</div>
+        <div class="rarr">→</div><div><span class="rteam">Marketing / Monetization</span></div><div class="rarr">→</div>
+        <div class="rdec">ปรับราคา/อัตราดรอป · เปิดรอบคืนเงิน</div>
+      </div>
+      <div class="rrow">
+        <div class="rtopic"><span class="rdot" style="background:#8b6fd6"></span>สมดุล/ความเป็นธรรม</div>
+        <div class="rarr">→</div><div><span class="rteam">Game Design</span></div><div class="rarr">→</div>
+        <div class="rdec">ปรับ balance ในแพตช์ถัดไป</div>
+      </div>
+      <div class="rrow">
+        <div class="rtopic"><span class="rdot" style="background:var(--pos)"></span>บริการ/ทีมงาน</div>
+        <div class="rarr">→</div><div><span class="rteam">Community / CS</span></div><div class="rarr">→</div>
+        <div class="rdec">ปรับ tone การแถลง · เพิ่มกำลังคนตอบ</div>
+      </div>
+      <div class="rrow">
+        <div class="rtopic"><span class="rdot" style="background:var(--muted)"></span>คอนเทนต์/อีเวนต์</div>
+        <div class="rarr">→</div><div><span class="rteam">Content / Event</span></div><div class="rarr">→</div>
+        <div class="rdec">ปรับกติกาหรือระยะเวลากิจกรรม</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>ทีม</th><th>ได้อะไรจาก Crisis Radar</th><th>ตัดสินใจอะไรได้เร็วขึ้น</th></tr></thead>
+      <tbody>
+        <tr><td><b>Community / Social</b></td>
+            <td>เลิกไล่ส่องเอง — เห็นว่าต้องเข้าไปตอบตรงไหนก่อน เรียงตาม reach</td>
+            <td>ตอบคอมเมนต์ไหนก่อน · ควรออกแถลงหรือยัง</td></tr>
+        <tr><td><b>Dev / QA</b></td>
+            <td>รู้ว่าบั๊กไหนกระทบผู้เล่นจริงมากที่สุด ไม่ใช่บั๊กที่เสียงดังที่สุด</td>
+            <td>จัดลำดับ hotfix · ตัดสินใจ rollback</td></tr>
+        <tr><td><b>Marketing</b></td>
+            <td>วัดผลแคมเปญจากเสียงจริง ไม่ใช่แค่ยอดกด · จับแคมเปญที่พังได้ในชั่วโมงแรก</td>
+            <td>หยุดแคมเปญ · ตั้งงบชดเชย · ปรับราคา</td></tr>
+        <tr><td><b>Game Design</b></td>
+            <td>คำบ่นเรื่อง balance สะสมเป็นตัวเลข ไม่ใช่ความรู้สึก</td>
+            <td>ปรับ balance รอบไหน แก้อะไรก่อน</td></tr>
+        <tr><td><b>หัวหน้าทีม / ผู้บริหาร</b></td>
+            <td>เห็นสถานะทุกเกมในเครือหน้าเดียว</td>
+            <td>ต้องออกแถลงระดับบริษัทไหม · ทุ่มคนไปเกมไหน</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note"><b>ทำไมข้อนี้สำคัญกับเกณฑ์ "compact ใช้ยาว":</b> เพิ่มเกมใหม่ = เพิ่ม config เพจ + brand
+    ไม่ต้องเขียนโค้ดใหม่ และตารางส่งต่อชุดเดิมใช้ได้ทุกเกมในเครือ — pipeline เดียวดูแลทั้งพอร์ต</div>
+</section>
+
+<div class="foot">Crisis Radar · ภาคผนวกประกอบเอกสารส่ง 7 หัวข้อ · ตัวเลขจากการรัน pipeline จริง (sample fixture 41 คอมเมนต์)</div>
+
+</div>

@@ -1,0 +1,23 @@
+# Render Blueprint — deploy Crisis Radar เป็น Web Service
+#
+# วิธีใช้: push repo ขึ้น GitHub → Render Dashboard > New > Blueprint > เลือก repo
+# Render จะอ่านไฟล์นี้แล้วตั้งค่าให้เอง เหลือแค่กรอก secret 2 ตัวข้างล่าง
+services:
+  - type: web
+    name: crisis-radar
+    runtime: python
+    plan: free
+    region: singapore # ใกล้ไทยสุด
+    buildCommand: "pip install -r requirements.txt" # จริง ๆ ไม่ลงอะไรเลย (stdlib ล้วน) — ใส่ไว้ให้ Render ตรวจเป็น Python service
+    startCommand: "python backend/server.py"
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.2"
+      - key: HOST
+        value: "0.0.0.0" # ต้องเป็น 0.0.0.0 ไม่งั้น Render เข้าไม่ถึง (PORT ทาง Render ใส่ให้เอง)
+      # --- 2 ตัวนี้ต้องกรอกเองใน Dashboard (sync: false = ไม่เก็บลง git) ---
+      - key: APIFY_TOKEN
+        sync: false
+      - key: RUN_PASSCODE # รหัสกันคนกดโหมด Facebook จริงจนเครดิต Apify หมด
+        sync: false

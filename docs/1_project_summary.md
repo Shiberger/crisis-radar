@@ -31,7 +31,7 @@ reach (คอมเมนต์ที่คนแห่ไป like/reply เย�
 | compact ใช้ยาว | **1 tool ใช้ซ้ำได้ทุกเกมในเครือ** (multi-tenant) = เข้าเงื่อนไข incentive รายเดือน |
 
 ## ผลลัพธ์เดโม่ (ตัวเลขจริงจากการรัน)
-- คอมเมนต์ 34 → จับสถานะ **🔴 CRISIS** ได้ถูก, spike ที่ 14:00 (severity 1232 vs baseline 8)
+- คอมเมนต์ 41 → จับสถานะ **🔴 CRISIS** ได้ถูก, spike ที่ 14:00 (severity 1232 vs baseline 8)
 - ระบุประเด็นหลักอัตโนมัติ: bug/technical (14), billing/price (8), service/support (4)
-- Sentiment accuracy **96%** (hybrid) — ชั้น LLM ช่วยเคสประชด 3/3
-- Test **9/9 passed**
+- Sentiment accuracy **97%** (hybrid) — ชั้น LLM ช่วยเคสประชด 3/3
+- Test **13/13 passed** (pipeline) + **10/10** (web e2e)

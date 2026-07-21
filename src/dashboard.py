@@ -36,8 +36,16 @@ def render_html(rep: CrisisReport, classified: list[Classified]) -> str:
     kpi_html = "".join(f'<div class="kpi"><div class="v">{v}</div><div class="l">{k}</div></div>' for k, v in kpis)
 
     sent_html = "".join(_bar(_SENT[k][1], sm.get(k, 0), total, _SENT[k][0]) for k in ("negative", "neutral", "positive"))
-    tmax = max((n for _, n in rep.topic_breakdown), default=1)
-    topic_html = "".join(_bar(t, n, tmax, "#2a78d6") for t, n in rep.topic_breakdown) or '<div class="muted">ไม่มีประเด็นเชิงลบ</div>'
+    trow = ""
+    for t in rep.topic_trends:
+        flag = '<span class="up">📈 มาแรง</span>' if t.is_emerging else ""
+        trow += (f'<tr><td>{html.escape(t.label)}{flag}</td><td class="rch">{t.negative}</td>'
+                 f'<td class="rch">{t.share:.0f}%</td><td class="rch">{t.severity:.0f}</td>'
+                 f'<td class="when">{t.peak}</td><td class="own">{html.escape(t.owner)}</td></tr>')
+    topic_html = (
+        '<table><thead><tr><th>ประเด็น</th><th>ลบ</th><th>สัดส่วน</th><th>severity</th>'
+        '<th>หนักสุด</th><th>ส่งต่อทีม</th></tr></thead><tbody>' + trow + "</tbody></table>"
+    ) if rep.topic_trends else '<div class="muted">ไม่มีประเด็นเชิงลบ</div>'
 
     timeline = "".join(
         f'<div class="col"><div class="bar {"sp" if s.is_spike else ""}" style="height:{s.severity/max_sev*100:.0f}%" '
@@ -88,15 +96,16 @@ table{{width:100%;border-collapse:collapse;font-size:13px}} th,td{{text-align:le
 th{{font-size:11px;text-transform:uppercase;color:#898781}} td.when,td.rch{{white-space:nowrap;color:#52514e}} td.rch{{text-align:right;font-variant-numeric:tabular-nums}}
 .tag{{font-weight:600;white-space:nowrap}} .topic{{display:inline-block;font-size:11px;color:#52514e;background:#f9f9f7;border:1px solid rgba(11,11,11,.1);border-radius:5px;padding:1px 7px;margin:1px}}
 .tbl{{overflow-x:auto}}
+.up{{display:inline-block;font-size:10px;font-weight:650;color:#d03b3b;background:rgba(208,59,59,.1);
+  border-radius:5px;padding:1px 6px;margin-left:6px;white-space:nowrap}}
+td.own{{color:#52514e;white-space:nowrap}}
 </style></head><body><div class="wrap">
 <h1>Crisis Radar — {html.escape(rep.brand.title())}</h1>
 <div class="sub">Facebook · <span class="pill">{th} ({rep.status})</span></div>
 <div class="kpis">{kpi_html}</div>
 <div class="card"><h2>การแจ้งเตือน</h2>{alerts}</div>
-<div class="grid" style="margin-bottom:14px">
 <div class="card"><h2>อารมณ์คอมเมนต์</h2>{sent_html}</div>
-<div class="card"><h2>ประเด็นเชิงลบ</h2>{topic_html}</div>
-</div>
+<div class="card"><h2>ประเด็นเชิงลบ · ใครต้องรับเรื่อง</h2><div class="tbl">{topic_html}</div></div>
 <div class="card"><h2>ไทม์ไลน์ความรุนแรง (แดง = พุ่งผิดปกติ)</h2><div class="tl">{timeline}</div></div>
 <div class="card"><h2>คอมเมนต์เชิงลบ reach สูงสุด</h2><div class="tbl">
 <table><thead><tr><th>เวลา</th><th>ผู้คอมเมนต์</th><th>คอมเมนต์</th><th>อารมณ์</th><th>ประเด็น</th><th>reach</th><th></th></tr></thead>

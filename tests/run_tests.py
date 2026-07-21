@@ -111,6 +111,28 @@ kept, dropped = filter_noise(noise, page_id="thehof.talesrunner", exclude_author
 check("T7 กรอง admin/โฆษณา (IDRLAB/เพจ) ออก เหลือแต่ผู้เล่น", len(kept) == 1 and dropped == 2,
       f"kept={len(kept)} dropped={dropped}")
 
+# ---- T8: category rewards/redeem จับถูก + ไม่หลงคำว่า 'โค้ด' ที่แปลว่า program code ----
+topic_cases = [c for c in cases if "topic" in c]
+t8_ok = 0
+t8_miss: list[str] = []
+for c in topic_cases:
+    want = c["topic"]
+    tags = lexicon.tag_topics(c["text"])
+    ok = (want[1:] not in tags) if want.startswith("!") else (want in tags)
+    t8_ok += ok
+    if not ok:
+        t8_miss.append(c["text"][:30])
+check("T8 category rewards/redeem ถูกต้อง (รวมเคสหลอก 'เขียนโค้ด')",
+      t8_ok == len(topic_cases), f"{t8_ok}/{len(topic_cases)}" + (f" · พลาด: {t8_miss}" if t8_miss else ""))
+
+# ---- T9: per-topic trend — ดราม่าเล็กต้องไม่ถูกกลบ + route ให้ทีมถูก ----
+rewards = next((t for t in rep.topic_trends if t.topic == "rewards/redeem"), None)
+check("T9 จับประเด็น 'ของรางวัล/โค้ด' ที่มาทีหลังได้ (ไม่ถูก spike ใหญ่กลบ)",
+      rewards is not None and rewards.is_emerging,
+      f"emerging={getattr(rewards, 'is_emerging', None)} · severity={getattr(rewards, 'severity', 0)}")
+check("T9b alert ระบุทีมที่ต้องรับเรื่อง", bool(rewards) and "Marketing" in rewards.owner,
+      getattr(rewards, "owner", "-"))
+
 # ---- output ----
 print("=" * 64)
 print("CRISIS RADAR — TEST RESULTS")

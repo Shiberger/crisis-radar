@@ -119,6 +119,14 @@ td.post{color:var(--muted);font-size:12px;max-width:150px;overflow:hidden;text-o
 .topic{display:inline-block;font-size:11px;color:var(--ink2);background:var(--plane);border:1px solid var(--border);
   border-radius:5px;padding:1px 7px;margin:1px 3px 1px 0;white-space:nowrap}
 .ai{font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:0 4px;margin-left:5px}
+/* ตารางประเด็น + เจ้าของเรื่อง */
+.tbl{overflow-x:auto}
+.tbl th.rch{text-align:right}
+.tbl tbody td{padding:9px 12px}
+.tbl tr.em{background:color-mix(in srgb,var(--neg) 6%,transparent)}
+.up{display:inline-block;font-size:10px;font-weight:650;color:var(--neg);
+  background:color-mix(in srgb,var(--neg) 12%,transparent);border-radius:5px;padding:1px 6px;margin-left:6px;white-space:nowrap}
+td.own{color:var(--ink2);white-space:nowrap}
 .ext{color:var(--muted)}
 .count{color:var(--muted);font-size:12px;margin:10px 2px 0}
 .hidden{display:none}
@@ -164,9 +172,9 @@ td.post{color:var(--muted);font-size:12px;max-width:150px;overflow:hidden;text-o
   <div id="results" class="hidden">
     <div class="kpis mb" id="kpis"></div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px" class="mb" id="analysisGrid">
-      <div class="card"><h2>อารมณ์คอมเมนต์</h2><div id="sentiment"></div></div>
-      <div class="card"><h2>ประเด็นที่ถูกพูดถึง (เชิงลบ)</h2><div id="topics"></div></div>
+    <div class="mb" id="analysisGrid">
+      <div class="card mb"><h2>อารมณ์คอมเมนต์</h2><div id="sentiment"></div></div>
+      <div class="card"><h2>ประเด็นเชิงลบ · ใครต้องรับเรื่อง</h2><div class="tbl" id="topics"></div></div>
     </div>
 
     <div class="card mb"><h2>ไทม์ไลน์ความรุนแรง (แดง = พุ่งผิดปกติ)</h2><div class="tl" id="timeline"></div></div>
@@ -207,6 +215,7 @@ const STAT={NORMAL:['var(--pos)','ปกติ'],WATCH:['var(--warn)','เฝ้
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let SRC='sample', DATA=null, FILT={sent:'all',topic:'',q:'',sort:'reach'};
+const TLabel=t=>(DATA&&DATA.topic_labels&&DATA.topic_labels[t])||t;   // ชื่อประเด็นภาษาไทย
 
 // source toggle
 $('#srcSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;
@@ -217,12 +226,29 @@ $('#srcSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;
     :'โหมดตัวอย่าง: ใช้ข้อมูลจำลองเพื่อดูการทำงาน';};
 $('#fldComments').style.display='none';
 
+// ตอน deploy จะตั้งรหัสไว้กันคนกดยิง Apify เล่น — เช็กจาก /api/health ตอนโหลดหน้า
+let NEED_PASS=false;
+fetch('/api/health').then(r=>r.json()).then(h=>{NEED_PASS=!!h.passcode_required;}).catch(()=>{});
+
 $('#runBtn').onclick=async()=>{
+  const headers={'Content-Type':'application/json'};
+  if(SRC==='facebook'&&NEED_PASS){
+    let pass=sessionStorage.getItem('runPass');
+    if(!pass){pass=prompt('โหมด Facebook จริงต้องใส่รหัสผ่าน:');if(!pass)return;}
+    headers['X-Run-Passcode']=pass;
+  }
   $('#runBtn').disabled=true;$('#results').classList.add('hidden');
   $('#prog').classList.remove('hidden');$('#log').textContent='';
   $('#progTitle').innerHTML='<span class="spin"></span>กำลังทำงาน';
   const body={source:SRC,only:'page',max_comments:+$('#maxc').value};
-  const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const r=await fetch('/api/run',{method:'POST',headers,body:JSON.stringify(body)});
+  if(r.status===401){
+    sessionStorage.removeItem('runPass');
+    $('#progTitle').textContent='เกิดข้อผิดพลาด';
+    $('#log').textContent='รหัสผ่านไม่ถูกต้อง — กดอีกครั้งเพื่อลองใหม่';
+    $('#runBtn').disabled=false;return;
+  }
+  if(headers['X-Run-Passcode'])sessionStorage.setItem('runPass',headers['X-Run-Passcode']);
   poll((await r.json()).job_id);
 };
 async function poll(id){
@@ -260,8 +286,14 @@ function render(r){
     + `<div class="row" style="color:var(--muted);font-size:12px;margin-top:8px">
        <span class="k">ส่งต่อ LLM</span><span class="track" style="background:none"></span><span class="n">${escP}%</span></div>`;
 
-  const tb=r.topic_breakdown||[],tmax=Math.max(1,...tb.map(x=>x[1]));
-  $('#topics').innerHTML=tb.length?tb.map(([t,n])=>bar(t,n,tmax,'var(--accent)',false)).join('')
+  const tt=r.topic_trends||[];
+  $('#topics').innerHTML=tt.length?`<table><thead><tr><th>ประเด็น</th><th class="rch">ลบ</th>
+    <th class="rch">สัดส่วน</th><th class="rch">severity</th><th>หนักสุด</th><th>ส่งต่อทีม</th></tr></thead><tbody>`
+    +tt.map(t=>`<tr class="${t.is_emerging?'em':''}">
+      <td>${esc(t.label)}${t.is_emerging?'<span class="up">📈 มาแรง</span>':''}</td>
+      <td class="rch">${t.negative}</td><td class="rch">${t.share}%</td>
+      <td class="rch tnum">${t.severity}</td><td class="when">${esc(t.peak)}</td>
+      <td class="own">${esc(t.owner)}</td></tr>`).join('')+'</tbody></table>'
     :'<div style="color:var(--muted);font-size:13px">ไม่มีประเด็นเชิงลบ</div>';
 
   const sev=Math.max(1,...r.buckets.map(b=>b.severity));
@@ -272,9 +304,11 @@ function render(r){
   $('#alerts').innerHTML=(r.alerts&&r.alerts.length)?r.alerts.map(a=>`<div class="alert">${esc(a)}</div>`).join('')
     :'<div class="alert" style="border-left-color:var(--pos)">ไม่มีสัญญาณผิดปกติ</div>';
 
-  // topic filter options
+  // topic filter: ดึงจากคอมเมนต์ "ทุกอารมณ์" ไม่ใช่เฉพาะเชิงลบ — ไม่งั้นกรองประเด็นที่ยังไม่เป็นดราม่าไม่ได้
+  const all={};(r.comments||[]).forEach(c=>(c.topics||[]).forEach(t=>all[t]=(all[t]||0)+1));
   $('#topicFilter').innerHTML='<option value="">ทุกประเด็น</option>'+
-    tb.map(([t])=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+    Object.entries(all).sort((a,b)=>b[1]-a[1])
+      .map(([t,n])=>`<option value="${esc(t)}">${esc(TLabel(t))} (${n})</option>`).join('');
   renderChips();renderTable();
   $('#results').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -299,7 +333,7 @@ function renderTable(){
     const s=SENT[c.sentiment],d=c.created_at.replace('T',' ').slice(0,16);
     const who=c.profile_url?`<a href="${esc(c.profile_url)}" target="_blank" rel="noopener">${esc(c.author)}</a>`:esc(c.author);
     const link=c.comment_url?`<a class="ext" href="${esc(c.comment_url)}" target="_blank" rel="noopener" title="เปิดคอมเมนต์">↗</a>`:'';
-    const topics=(c.topics||[]).map(t=>`<span class="topic">${esc(t)}</span>`).join('')||'<span style="color:var(--muted)">—</span>';
+    const topics=(c.topics||[]).map(t=>`<span class="topic" title="${esc(t)}">${esc(TLabel(t))}</span>`).join('')||'<span style="color:var(--muted)">—</span>';
     return `<tr class="s-${c.sentiment}">
       <td class="when">${d}</td>
       <td class="who" title="${esc(c.author)}">${who}</td>

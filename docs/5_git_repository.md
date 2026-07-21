@@ -15,7 +15,7 @@ crisis_radar/
 ├── backend/                    # 🖥️ web app (stdlib) — team กดปุ่มใช้
 │   ├── server.py               # http server + API
 │   ├── jobs.py                 # background job runner
-│   ├── selftest.py             # ทดสอบ web e2e (9 test)
+│   ├── selftest.py             # ทดสอบ web e2e (10 test)
 │   └── static/index.html       # หน้าเว็บ (ปุ่มเดียว)
 ├── data/
 │   └── sample_talesrunner_fb_comments.json   # synthetic fixture (ชื่อสมมติ)
@@ -34,7 +34,7 @@ crisis_radar/
 │       └── detector.py         # spike detection + report
 ├── tests/
 │   ├── labeled_test_set.json
-│   └── run_tests.py            # 9 test, รัน offline
+│   └── run_tests.py            # 13 test, รัน offline
 ├── output/                     # ผลลัพธ์ (gitignore ไฟล์ generated)
 └── docs/                       # เอกสารส่ง 7 หัวข้อ
 ```

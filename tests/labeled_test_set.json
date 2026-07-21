@@ -24,6 +24,12 @@
     {"text": "อยากได้ตัวละครใหม่ ๆ บ้าง", "gold": "neutral"},
     {"text": "มีใครเล่นเซิร์ฟ 2 บ้างครับ", "gold": "neutral"},
     {"text": "โหลดช้านิดนึงแต่พอเข้าได้ก็โอเค", "gold": "neutral", "hard": "mixed"},
-    {"text": "ใจเย็น ๆ เดี๋ยวแอดมินก็แก้", "gold": "neutral"}
+    {"text": "ใจเย็น ๆ เดี๋ยวแอดมินก็แก้", "gold": "neutral"},
+    {"text": "กรอกโค้ดแล้วขึ้นว่าโค้ดหมดอายุ ทั้งที่กิจกรรมยังไม่จบ", "gold": "negative", "topic": "rewards/redeem"},
+    {"text": "แลกโค้ดสำเร็จแล้วแต่ของไม่เข้าคลังเลย", "gold": "negative", "topic": "rewards/redeem"},
+    {"text": "ดูโฆษณาครบแล้วไม่ได้ของ เสียเวลา", "gold": "negative", "topic": "rewards/redeem"},
+    {"text": "เช็คอินครบ 7 วันแล้วไม่ได้รางวัล", "gold": "negative", "topic": "rewards/redeem"},
+    {"text": "มีโค้ดแจกไหมครับรอบนี้", "gold": "neutral", "topic": "rewards/redeem"},
+    {"text": "เขียนโค้ดตัว uninstall พลาดเองแท้ ๆ", "gold": "negative", "topic": "!rewards/redeem"}
   ]
 }

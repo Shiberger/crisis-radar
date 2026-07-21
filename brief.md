@@ -25,7 +25,7 @@
 - [ ] Pantip / Google Play / YouTube (เฟสถัดไป)
 
 ## 5. Success Criteria
-- Pipeline ครบวงจร + test ผ่าน (✅ 9/9) — **ทำแล้ว**
+- Pipeline ครบวงจร + test ผ่าน (✅ 13/13) — **ทำแล้ว**
 - จับ crisis จาก sample ได้ถูก (✅ CRISIS + spike) — **ทำแล้ว**
 - ต่อ Facebook API จริง + รัน pilot 15 วัน วัด Impact — **ขั้นถัดไป**
 
@@ -38,6 +38,6 @@
 - labeled set เล็ก (24) = smoke-test ไม่ใช่ benchmark → production ต้องมี labeled holdout จริง
 
 ## 8. ผลสรุป (Bottom Line)
-- **ตัวเลขที่เจอ:** sample 34 คอมเมนต์ → 🔴 CRISIS, spike 14:00 (severity 1232 vs baseline 8); accuracy 96%; test 9/9
+- **ตัวเลขที่เจอ:** sample 41 คอมเมนต์ → 🔴 CRISIS, spike 14:00 (severity 1232 vs baseline 8); accuracy 97%; test 13/13
 - **ความหมาย:** pipeline ทำงานจริงครบวงจร พิสูจน์คอนเซปต์ crisis early-warning ได้
 - **Next Action:** ขอ FB Graph API access → รัน pilot Talesrunner 15 วัน → ขยายเกมอื่น (multi-tenant)

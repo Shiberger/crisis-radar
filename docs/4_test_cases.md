@@ -2,19 +2,23 @@
 
 รันทั้งหมด offline:  `python3 tests/run_tests.py`  (ไม่ต้องเน็ต, ผลด้านล่างคือผลจริงจากการรัน)
 
-## สรุปผล: ✅ 9 / 9 passed
+## สรุปผล: ✅ 13 / 13 passed
 
 | # | Test Case | สิ่งที่ตรวจ | ผลจริง | สถานะ |
 |---|---|---|---|---|
-| T1 | Sentiment accuracy | hybrid classify บน labeled set 24 เคส ≥ 80% | **96%** (23/24) | ✅ PASS |
-| T2 | ชั้น LLM ยกระดับผล | hybrid ต้อง ≥ lexicon-only | 92% → **96%** (+4 จุด) | ✅ PASS |
+| T1 | Sentiment accuracy | hybrid classify บน labeled set 30 เคส ≥ 80% | **97%** (29/30) | ✅ PASS |
+| T2 | ชั้น LLM ยกระดับผล | hybrid ต้อง ≥ lexicon-only | 93% → **97%** (+3 จุด) | ✅ PASS |
 | T2b | เคสประชด (sarcasm) | hybrid จับถูก ≥ ครึ่ง | **3/3** | ✅ PASS |
 | T3 | Crisis detection | sample จริงต้องได้สถานะ CRISIS | status = CRISIS | ✅ PASS |
 | T3b | Spike detection | เจอช่วงพุ่งผิดปกติ ≥ 1 | 1 ช่วง (14:00) | ✅ PASS |
 | T3c | Alert | สร้าง alert ≥ 1 | 2 alert | ✅ PASS |
 | T4 | Calm scenario | ข้อมูลปกติต้อง **ไม่** alert (กัน false alarm) | status = NORMAL, 0 spike | ✅ PASS |
 | T5 | PII masking | ชื่อจริงต้องไม่หลุดใน output | 'Somchai R' → 'user_6515f5' | ✅ PASS |
-| T6 | Connector interface | source คืน field ครบ | 34 comments ครบ field | ✅ PASS |
+| T6 | Connector interface | source คืน field ครบ | 41 comments ครบ field | ✅ PASS |
+| T7 | กรอง noise | คอมเมนต์เพจ/แอดมิน/โฆษณา (IDRLAB) ต้องถูกตัด | kept 1, dropped 2 | ✅ PASS |
+| T8 | Category rewards/redeem | จับ "โค้ด/ของรางวัล" ถูก **และไม่หลงคำว่า "เขียนโค้ด"** (program code) | **6/6** | ✅ PASS |
+| T9 | Per-topic detection | ดราม่าเล็กต้องไม่ถูก spike ใหญ่กลบ | rewards emerging=True (severity 536) | ✅ PASS |
+| T9b | Alert routing | alert ต้องระบุทีมเจ้าของเรื่อง | "Marketing (แคมเปญ/โค้ด) + CS" | ✅ PASS |
 
 ## รายละเอียดที่สำคัญ
 
@@ -22,7 +26,7 @@
 - Confusion (gold → hybrid): positive 6/6 ถูก, negative 13/13 ถูก, neutral 4/5 ถูก (1 เคส mixed เอนไปลบ)
 - **จุดขายของ hybrid:** เคสประชดอย่าง *"ดีจริง ๆ นะคะที่ล่มตอนคนกำลังจะเล่น ขอบคุณมากค่า"* —
   lexicon อ่านผิดเป็นกลาง/บวก แต่ชั้น LLM เห็นบริบท "ล่ม" + น้ำเสียงประชด → แก้เป็น **ลบ** ถูกต้อง
-- ต้นทุน LLM คุมได้: เดโม่ส่งต่อ LLM แค่ **8/34 เคส (24%)** เฉพาะที่ไม่มั่นใจ
+- ต้นทุน LLM คุมได้: เดโม่ส่งต่อ LLM แค่ **9/41 เคส (22%)** เฉพาะที่ไม่มั่นใจ
 
 > ⚠️ ข้อจำกัดที่ระบุตรง ๆ: labeled set นี้เป็น curated set เล็ก (24) — เป็น smoke-test พิสูจน์ว่า
 > logic ทำงานถูก ไม่ใช่ benchmark generalization. Production ต้องมี labeled holdout ชุดใหญ่จากคอมเมนต์จริง
@@ -37,9 +41,37 @@ Timeline ที่ระบบตรวจได้จาก sample:
 | 12:00 | 4 | 2 | 12 | 5 | |
 | 13:00 | 3 | 2 | 10 | 7 | |
 | 14:00 | 19 | 18 | **1232** | 8 | 🚨 |
+| 15:00 | 7 | 6 | 403 | 253 | |
 
 ระบบจับ spike ที่ 14:00 (หลังปล่อยแพตช์) ได้ถูก พร้อมระบุประเด็น: bug/technical(12), billing/price(6), service/support(4)
 และจับคอมเมนต์ลบไวรัล reach 203 เรื่องกาชาแพงได้
+
+### T9 — ทำไมต้องมี per-topic detection (บทเรียนจากแถวสุดท้าย)
+ดูแถว 15:00: ดราม่า **"โค้ดจากแคมเปญโฆษณาใช้ไม่ได้"** severity 403 — สูงกว่าช่วงเช้าทั้งหมดรวมกัน
+แต่ **ไม่ทริกเกอร์ spike รวม** เพราะ baseline ถูกดันขึ้นเป็น 253 จากเหตุเซิร์ฟล่มเมื่อชั่วโมงก่อน
+
+> นี่คือจุดบอดของการนับคอมเมนต์ลบกองเดียว: **วิกฤตใหญ่กลบวิกฤตเล็กที่ตามมา** ทั้งที่คนละทีมต้องแก้
+
+Crisis Radar จึงคิด severity **แยกรายประเด็น** เทียบ baseline ของประเด็นตัวเอง → ยิง alert ได้ว่า
+
+```
+📈 ประเด็น 'ของรางวัล/โค้ด' กำลังมาแรง (7 คอมเมนต์ลบ · severity 536) · ส่งต่อ: Marketing (แคมเปญ/โค้ด) + CS
+```
+
+| ประเด็น | ลบ | สัดส่วน | severity | หนักสุด | มาแรง | ส่งต่อทีม |
+|---|---|---|---|---|---|---|
+| บั๊ก/เทคนิค | 15 | 52% | 822 | 14:00 | | Dev / QA |
+| เติมเงิน/ราคา | 9 | 31% | 644 | 14:00 | | Marketing / Monetization |
+| ของรางวัล/โค้ด | 7 | 24% | 536 | 15:00 | 📈 | Marketing (แคมเปญ/โค้ด) + CS |
+| คอนเทนต์/อีเวนต์ | 6 | 21% | 392 | 14:00 | | Content / Event |
+| สมดุล/ความเป็นธรรม | 2 | 7% | 271 | 14:00 | | Game Design |
+| บริการ/ทีมงาน | 4 | 14% | 211 | 14:00 | | Community / CS |
+
+### T8 — กับดักที่เจอจากข้อมูลจริง
+ในคอมเมนต์จริงของเพจ คำว่า **"โค้ด/โค้ต" ส่วนใหญ่หมายถึง program code** ไม่ใช่ item code
+(*"อันนี้ผิดที่โค้ตตัว uninstall เต็มๆ"*, *"เขียนโค้ดพลาด"*) — ถ้า match คำเดี่ยวจะตีเป็นประเด็นของรางวัลผิดหมด
+→ lexicon จึง match **เป็นวลี** (`กรอกโค้ด`, `โค้ดหมดอายุ`, `ไอเทมโค้ด`) และมี test เคสหลอกคุมไว้
+วัดบนคอมเมนต์จริง 629 รายการ: tag ประเด็นนี้ 2 รายการ **ถูกทั้งคู่** (ไม่มี false positive)
 
 ### T4 — กัน false alarm
 ป้อนคอมเมนต์บวกล้วน 20 อัน → ระบบให้ NORMAL, 0 spike (ไม่เตือนมั่ว) — พิสูจน์ว่า threshold ไม่ไวเกิน

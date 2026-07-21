@@ -20,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from src.classify import lexicon                       # noqa: E402
 from src.classify.pipeline import HybridClassifier    # noqa: E402
 from src.crisis import detector                        # noqa: E402
 from src.sources.sample import SampleFacebookSource   # noqa: E402
@@ -132,6 +133,7 @@ def _run(job_id: str, params: dict) -> None:
         result["max_reach"] = max(reaches) if reaches else 0
         result["generated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
         result["source"] = source
+        result["topic_labels"] = lexicon.TOPIC_LABELS   # ให้หน้าเว็บแสดงชื่อประเด็นเป็นไทย
 
         _update(job_id, status="done", result=result)
         _log(job_id, f"เสร็จ — สถานะ {rep.status} · alert {len(rep.alerts)} รายการ")

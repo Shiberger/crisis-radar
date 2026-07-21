@@ -18,8 +18,8 @@ python3 backend/server.py         # แล้วเปิด http://127.0.0.1:80
 ## รันแบบ CLI (สำหรับ dev)
 ```bash
 python3 run_demo.py        # → output/crisis_report.md, classified.json, dashboard.html
-python3 tests/run_tests.py # → 9 test, ผลจริง
-python3 backend/selftest.py # → ทดสอบ web backend end-to-end (9 test)
+python3 tests/run_tests.py # → 13 test, ผลจริง
+python3 backend/selftest.py # → ทดสอบ web backend end-to-end (10 test)
 ```
 
 ## ดึง Facebook จริง (ผ่าน Apify — ไม่ต้องลง package)
@@ -43,7 +43,23 @@ sources/  → classify/           → crisis/       → dashboard.py
 | Source | `SampleFacebookSource` (fixture) | Meta Graph API / Apify (ต้องได้ page admin) |
 | AI | Thai lexicon + offline-heuristic LLM | Wisesight/WangchanBERTa + Claude Haiku |
 | Dashboard | static HTML | React (reuse stack Warz) + API |
-| Orchestration | รันมือ | n8n schedule → alert เข้า LINE |
+| Orchestration | รันมือ | n8n schedule → alert เข้า Discord (แยก channel ตามทีม) |
+
+## Deploy ขึ้นเว็บ (Render — สำหรับ demo ให้ทีมกดเอง)
+
+repo นี้มี [render.yaml](render.yaml) ให้แล้ว ทำตามนี้:
+
+1. push ขึ้น GitHub
+2. [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint** → เลือก repo นี้
+3. กรอก 2 ค่าตอน deploy:
+   - `APIFY_TOKEN` — token จาก Apify (ถ้าจะใช้โหมด Facebook จริง)
+   - `RUN_PASSCODE` — รหัสอะไรก็ได้ที่ตั้งเอง **กันคนที่ได้ลิงก์กดดึง Facebook จนเครดิต Apify หมด**
+4. รอ build เสร็จ → ได้ URL `https://crisis-radar-xxxx.onrender.com`
+
+โหมด **ตัวอย่าง** เปิดให้ทุกคนกดได้ทันที · โหมด **Facebook จริง** จะถามรหัสก่อน
+
+> Render free tier จะ sleep หลังไม่มีคนใช้ 15 นาที → เปิดครั้งถัดไปรอโหลด ~1 นาที
+> และ job ที่ค้างอยู่ตอน sleep จะหาย (state เก็บใน memory) — พอสำหรับ demo
 
 ## เอกสารส่ง (ดู `docs/`)
 1. [Project Summary](docs/1_project_summary.md)
@@ -53,5 +69,8 @@ sources/  → classify/           → crisis/       → dashboard.py
 5. [Git Repository](docs/5_git_repository.md)
 6. [Owner](docs/6_owner.md)
 7. [Security Information](docs/7_security.md)
+
+**ประกอบการนำเสนอ:** [presentation.html](docs/presentation.html) (เดคหลัก 7 หัวข้อ) ·
+[presentation_appendix.html](docs/presentation_appendix.html) — baseline ความมั่นใจของ AI, ตัวอย่าง alert บน Discord (n8n), เส้นทางส่งต่อทีม
 
 > ⚠️ ข้อมูลในเดโม่เป็น **synthetic fixture** (ชื่อสมมติ) เพื่อพิสูจน์ pipeline ก่อนได้ API จริง
