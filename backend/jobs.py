@@ -14,7 +14,6 @@ import os
 import sys
 import threading
 import uuid
-from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -24,6 +23,7 @@ from src.classify import lexicon                       # noqa: E402
 from src.classify.pipeline import HybridClassifier    # noqa: E402
 from src.crisis import detector                        # noqa: E402
 from src.sources.sample import SampleFacebookSource   # noqa: E402
+from src.timeutil import now_ict                       # noqa: E402
 
 DEFAULT_FIXTURE = ROOT / "data" / "sample_talesrunner_fb_comments.json"
 TARGETS_FILE = ROOT / "data" / "targets.json"
@@ -39,7 +39,7 @@ def _update(job_id: str, **kw) -> None:
 
 def _log(job_id: str, msg: str) -> None:
     with _LOCK:
-        JOBS[job_id]["logs"].append(f"{datetime.now():%H:%M:%S}  {msg}")
+        JOBS[job_id]["logs"].append(f"{now_ict():%H:%M:%S}  {msg}")
 
 
 def get_job(job_id: str) -> dict | None:
@@ -180,7 +180,7 @@ def _run(job_id: str, params: dict) -> None:
         result["unique_authors"] = len({c.comment.author for c in classified})
         result["avg_reach"] = round(sum(reaches) / len(reaches), 1) if reaches else 0
         result["max_reach"] = max(reaches) if reaches else 0
-        result["generated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+        result["generated_at"] = now_ict().strftime("%Y-%m-%d %H:%M") + " น."
         result["source"] = source
         result["topic_labels"] = lexicon.TOPIC_LABELS   # ให้หน้าเว็บแสดงชื่อประเด็นเป็นไทย
 

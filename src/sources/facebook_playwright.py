@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from datetime import datetime
+from ..timeutil import now_ict
 
 
 def _cid(text: str, i: int) -> str:
@@ -85,7 +85,7 @@ def scrape_page_comments(
                 "post_id": post_id,
                 "author": (txt.split("\n")[0].strip() or "unknown")[:60],
                 "text": body,
-                "created_at": datetime.now().isoformat(),
+                "created_at": now_ict().isoformat(),
                 "reach": 0,   # Playwright ดึง like count ยาก — ตั้ง 0 (Apify ได้ครบกว่า)
             })
         browser.close()

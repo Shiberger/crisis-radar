@@ -12,6 +12,7 @@ from typing import Optional
 
 from ..models import Comment
 from ..security import scrub_pii_in_text
+from ..timeutil import ICT
 
 
 class SampleFacebookSource:
@@ -27,6 +28,8 @@ class SampleFacebookSource:
         out: list[Comment] = []
         for c in raw["comments"]:
             ts = datetime.fromisoformat(c["created_at"])
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=ICT)   # fixture เขียนเป็นเวลาไทยอยู่แล้ว แค่ไม่ได้ระบุ tz
             if since and ts < since:
                 continue
             out.append(

@@ -24,6 +24,8 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from ..timeutil import now_ict, to_ict
+
 POSTS_ACTOR = "apify/facebook-posts-scraper"
 COMMENTS_ACTOR = "apify/facebook-comments-scraper"
 
@@ -55,19 +57,23 @@ def _pick(item: dict, *keys, default=None):
 
 
 def _parse_date(val: Any) -> str:
-    """คืน ISO string. รับ ISO/epoch/รูปแบบทั่วไป, ไม่รู้จัก → เวลาปัจจุบัน."""
+    """คืน ISO string **เวลาไทย (ICT)**. รับ ISO/epoch/รูปแบบทั่วไป, ไม่รู้จัก → เวลาปัจจุบัน.
+
+    Apify/Facebook ส่งเวลามาเป็น UTC → ต้องแปลงก่อน ไม่งั้นกราฟ timeline เพี้ยน 7 ชม.
+    """
     if val is None:
-        return datetime.now().isoformat()
+        return now_ict().isoformat()
     if isinstance(val, (int, float)):
-        return datetime.fromtimestamp(val, tz=timezone.utc).isoformat()
+        return to_ict(datetime.fromtimestamp(val, tz=timezone.utc)).isoformat()
     s = str(val)
     for fmt in (None, "%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
         try:
-            return (datetime.fromisoformat(s.replace("Z", "+00:00")) if fmt is None
-                    else datetime.strptime(s, fmt)).isoformat()
+            dt = (datetime.fromisoformat(s.replace("Z", "+00:00")) if fmt is None
+                  else datetime.strptime(s, fmt))
+            return to_ict(dt).isoformat()
         except (ValueError, TypeError):
             continue
-    return datetime.now().isoformat()
+    return now_ict().isoformat()
 
 
 def _comment_id(item: dict, post_id: str) -> str:
