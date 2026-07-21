@@ -3,296 +3,675 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Crisis Radar — Social Listening Console</title>
+<title>Crisis Radar — เฝ้าระวังดราม่าบนโซเชียล</title>
 <style>
+/* ───────────────────────── design tokens ─────────────────────────
+   โทน: warm neutral + สีบอกสถานะชัด ๆ 3 สี (เขียว/เหลือง/แดง)
+   เป้าหมาย: คนไม่ถนัดคอมพิวเตอร์เปิดมาแล้วรู้ทันทีว่า "ตอนนี้สถานการณ์เป็นยังไง"   */
 :root{
   color-scheme: light;
-  --plane:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
-  --grid:#e1e0d9; --base:#c3c2b7; --border:rgba(11,11,11,.10);
-  --pos:#0ca30c; --neu:#898781; --neg:#d03b3b; --warn:#fab219; --serious:#ec835a;
-  --accent:#2a78d6;
-  --radius:10px;
+  --plane:#f6f5f2; --surface:#fff; --inset:#f1f0eb; --ink:#171715; --ink2:#55544d;
+  --muted:#8a887f; --border:#e5e3db; --border2:#d4d1c7;
+  --pos:#0f8a4a; --neu:#9c9a91; --neg:#d33b34; --warn:#dd9b09; --accent:#2563eb;
+  --shadow:0 1px 2px rgba(20,20,15,.05), 0 8px 24px -16px rgba(20,20,15,.28);
+  --r:14px; --r-sm:9px;
 }
 @media (prefers-color-scheme: dark){
   :root:where(:not([data-theme="light"])){
     color-scheme: dark;
-    --plane:#0d0d0d; --surface:#1a1a19; --ink:#fff; --ink2:#c3c2b7; --muted:#898781;
-    --grid:#2c2c2a; --base:#383835; --border:rgba(255,255,255,.10); --accent:#3987e5;
+    --plane:#121211; --surface:#1c1c1a; --inset:#252422; --ink:#f6f5f1; --ink2:#c4c2b9;
+    --muted:#8d8b82; --border:#302f2b; --border2:#3d3b36;
+    --pos:#2fb56a; --neg:#f0655c; --warn:#f0b429; --accent:#5b8dfb;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
   }
 }
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --plane:#121211; --surface:#1c1c1a; --inset:#252422; --ink:#f6f5f1; --ink2:#c4c2b9;
+  --muted:#8d8b82; --border:#302f2b; --border2:#3d3b36;
+  --pos:#2fb56a; --neg:#f0655c; --warn:#f0b429; --accent:#5b8dfb;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+}
+
 *{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--plane);color:var(--ink);
-  font-family:system-ui,-apple-system,"Segoe UI","Noto Sans Thai",sans-serif;font-size:14px;line-height:1.5}
-.wrap{max-width:1180px;margin:0 auto;padding:20px}
-a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  font-family:"Noto Sans Thai","IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)} a:hover{text-decoration:underline}
+button{font:inherit;color:inherit}
+:where(button,select,input,textarea,[tabindex]):focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
 .tnum{font-variant-numeric:tabular-nums}
+.hidden{display:none !important}
+h2{font-size:16.5px;font-weight:680;letter-spacing:-.01em;margin:0}
+.sub{color:var(--muted);font-size:13px;margin-top:2px;line-height:1.5}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
 
-/* header */
-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:16px}
-header h1{font-size:18px;margin:0;font-weight:650;letter-spacing:-.01em}
-header .sub{color:var(--muted);font-size:12px;margin-top:2px}
-.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
-  padding:5px 11px;border-radius:999px;border:1px solid var(--border)}
-.pill .dot{width:8px;height:8px;border-radius:50%}
-.gen{color:var(--muted);font-size:11px;margin-top:6px;text-align:right}
+/* ───────────────────────── layout ───────────────────────── */
+.wrap{max-width:1160px;margin:0 auto;padding:0 20px 72px}
+.topbar{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--plane) 88%,transparent);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--border);margin-bottom:26px}
+.topbar .in{max-width:1160px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:14px}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.logo{width:34px;height:34px;flex:none;border-radius:10px;background:var(--ink);color:var(--plane);
+  display:grid;place-items:center}
+.brand b{display:block;font-size:16px;font-weight:700;letter-spacing:-.02em;line-height:1.2}
+.brand span{display:block;font-size:12px;color:var(--muted);line-height:1.3}
+.spacer{flex:1}
+.iconbtn{background:var(--surface);border:1px solid var(--border);border-radius:9px;width:36px;height:36px;
+  display:grid;place-items:center;cursor:pointer;color:var(--ink2)}
+.iconbtn:hover{border-color:var(--border2);color:var(--ink)}
+.livepill{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:640;padding:6px 13px;
+  border-radius:999px;border:1.5px solid var(--border);background:var(--surface);white-space:nowrap}
+.livepill .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.livepill.on .dot{animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
-/* card */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
-.card h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 12px;font-weight:650}
-.mb{margin-bottom:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px 22px;
+  box-shadow:var(--shadow);margin-bottom:18px}
+.card > header{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.card > header .spacer{min-width:12px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:stretch}
+@media(max-width:880px){.grid2{grid-template-columns:1fr}}
 
-/* controls */
-.controls{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
-.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.seg button{background:var(--surface);border:0;padding:9px 14px;font-size:13px;cursor:pointer;color:var(--ink2)}
-.seg button.on{background:var(--accent);color:#fff;font-weight:600}
-.fld{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted)}
-.fld input,.fld select{background:var(--surface);border:1px solid var(--border);color:var(--ink);
-  border-radius:8px;padding:8px 10px;font-size:13px}
-.run{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 20px;font-size:14px;
-  font-weight:650;cursor:pointer} .run:disabled{opacity:.5;cursor:not-allowed}
-.hint{color:var(--muted);font-size:11px;flex-basis:100%}
+/* ───────────────────────── step / setup ───────────────────────── */
+.stepnum{width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--plane);
+  display:grid;place-items:center;font-size:13.5px;font-weight:700;flex:none}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media(max-width:640px){.modes{grid-template-columns:1fr}}
+.mode{text-align:left;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;
+  padding:14px 16px;cursor:pointer;display:flex;gap:12px;align-items:flex-start;transition:.15s}
+.mode:hover{border-color:var(--border2);background:var(--inset)}
+.mode.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+.mode .tick{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border2);flex:none;margin-top:2px;
+  display:grid;place-items:center;font-size:12px;color:transparent}
+.mode.on .tick{border-color:var(--accent);background:var(--accent);color:#fff}
+#fbBox{border-left:3px solid var(--accent);background:var(--inset);border-radius:0 12px 12px 0;
+  padding:14px 16px;margin-bottom:16px}
+#fbBox .sublabel{font-size:12.5px;font-weight:660;color:var(--ink2);margin-bottom:9px;display:block}
+#fbBox .modes{margin-bottom:14px}
+.mode b{display:block;font-size:14.5px;font-weight:660}
+.mode small{display:block;color:var(--muted);font-size:12.5px;line-height:1.5;margin-top:2px}
 
-/* progress */
-.log{background:var(--plane);border:1px solid var(--border);border-radius:8px;padding:10px 12px;
-  font-family:ui-monospace,SFMono-Regular,monospace;font-size:11.5px;max-height:150px;overflow:auto;
-  white-space:pre-wrap;color:var(--ink2)}
-.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--grid);border-top-color:var(--accent);
-  border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px;margin-right:6px}
+.fields{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:15px 16px}
+.fld{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--ink2);font-weight:600}
+.fld .tip{font-weight:400;color:var(--muted);font-size:11.5px}
+.fld input,.fld select,.fld textarea{background:var(--surface);border:1px solid var(--border2);color:var(--ink);
+  border-radius:9px;padding:9px 11px;font-size:14px;font-family:inherit}
+.fld input[type=number]{width:92px}
+.runrow{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.run{background:var(--accent);color:#fff;border:0;border-radius:11px;padding:13px 26px;font-size:15.5px;
+  font-weight:680;cursor:pointer;display:inline-flex;align-items:center;gap:9px;box-shadow:0 2px 10px -4px var(--accent)}
+.run:hover{filter:brightness(1.07)} .run:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.ghost{background:var(--surface);border:1px solid var(--border2);border-radius:9px;padding:9px 16px;
+  font-size:13.5px;font-weight:620;cursor:pointer;color:var(--ink2)}
+.ghost:hover{color:var(--ink);border-color:var(--muted)}
+.note{color:var(--muted);font-size:12.5px;flex-basis:100%;line-height:1.55}
+.warnbox{border:1px solid color-mix(in srgb,var(--warn) 45%,var(--border));
+  background:color-mix(in srgb,var(--warn) 9%,transparent);border-radius:10px;padding:11px 14px;
+  font-size:13px;color:var(--ink2);margin-bottom:14px}
+.errline{color:var(--neg);font-size:12.5px;font-weight:600;margin-top:6px}
+
+.summary-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--r);padding:12px 18px;margin-bottom:18px;box-shadow:var(--shadow)}
+.summary-bar .txt{font-size:13.5px;color:var(--ink2)}
+.summary-bar b{color:var(--ink);font-weight:660}
+
+/* ───────────────────────── progress stepper ───────────────────────── */
+.steps{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
+.pstep{display:flex;align-items:center;gap:12px;padding:9px 2px;font-size:14px;color:var(--muted)}
+.pstep .ic{width:22px;height:22px;border-radius:50%;border:2px solid var(--border2);flex:none;
+  display:grid;place-items:center;font-size:12px}
+.pstep.done{color:var(--ink2)} .pstep.done .ic{border-color:var(--pos);background:var(--pos);color:#fff}
+.pstep.now{color:var(--ink);font-weight:640}
+.pstep.now .ic{border-color:var(--accent);border-right-color:transparent;animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
+details.tech{margin-top:8px} details.tech summary{cursor:pointer;font-size:12.5px;color:var(--muted)}
+.log{background:var(--inset);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-top:8px;
+  font-family:ui-monospace,SFMono-Regular,monospace;font-size:11.5px;max-height:170px;overflow:auto;
+  white-space:pre-wrap;color:var(--ink2)}
 
-/* kpi */
-.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
-@media(max-width:860px){.kpis{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:520px){.kpis{grid-template-columns:repeat(2,1fr)}}
-.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px 14px}
-.kpi .v{font-size:23px;font-weight:680;letter-spacing:-.02em;line-height:1.1}
-.kpi .l{font-size:11px;color:var(--muted);margin-top:3px}
+/* ───────────────────────── welcome / empty ───────────────────────── */
+.welcome{text-align:center;padding:34px 24px}
+.welcome h3{font-size:18px;margin:0 0 6px;font-weight:680}
+.welcome p{color:var(--ink2);max-width:560px;margin:0 auto 20px;font-size:14px}
+.wcards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:760px;margin:0 auto;text-align:left}
+@media(max-width:700px){.wcards{grid-template-columns:1fr}}
+.wcard{background:var(--inset);border-radius:11px;padding:14px 16px}
+.wcard b{display:block;font-size:14px;font-weight:660;margin-bottom:2px}
+.wcard small{color:var(--muted);font-size:12.5px;line-height:1.55}
 
-/* bars */
-.row{display:flex;align-items:center;gap:10px;margin:7px 0;font-size:13px}
-.row .k{width:132px;color:var(--ink2);display:flex;align-items:center;gap:7px}
-.row .k .sw{width:9px;height:9px;border-radius:2px;flex:none}
-.track{flex:1;background:var(--grid);border-radius:4px;height:10px;overflow:hidden}
-.track .fill{display:block;height:100%;border-radius:4px}
-.row .n{width:70px;text-align:right;color:var(--ink2)}
+/* ───────────────────────── verdict hero ───────────────────────── */
+.verdict{border-radius:var(--r);border:1.5px solid var(--vc);padding:22px 24px;margin-bottom:18px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--vc) 13%,var(--surface)),var(--surface));
+  box-shadow:var(--shadow);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center}
+@media(max-width:820px){.verdict{grid-template-columns:1fr;gap:16px}}
+.vhead{display:flex;align-items:center;gap:11px;margin-bottom:8px}
+.vdot{width:15px;height:15px;border-radius:50%;background:var(--vc);flex:none;
+  box-shadow:0 0 0 5px color-mix(in srgb,var(--vc) 22%,transparent)}
+.vhead b{font-size:21px;font-weight:730;letter-spacing:-.02em;color:var(--vc)}
+.vsum{font-size:16.5px;line-height:1.6;font-weight:560;max-width:66ch}
+.vact{margin-top:12px;font-size:14px;color:var(--ink2);display:flex;gap:9px;align-items:flex-start;
+  background:color-mix(in srgb,var(--vc) 8%,transparent);border-radius:10px;padding:10px 14px;max-width:70ch}
+.vact b{color:var(--ink);font-weight:660}
+.vfacts{display:flex;flex-direction:column;gap:11px;padding-left:24px;border-left:1px solid var(--border);min-width:190px}
+@media(max-width:820px){.vfacts{padding-left:0;border-left:0;border-top:1px solid var(--border);padding-top:14px;
+  flex-direction:row;flex-wrap:wrap;gap:22px}}
+.vfact .l{font-size:12px;color:var(--muted)}
+.vfact .v{font-size:15.5px;font-weight:680;letter-spacing:-.01em}
 
-/* timeline */
-.tl{display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:6px;overflow-x:auto}
-.tl .col{flex:1;min-width:26px;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
-.tl .bar{width:100%;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
-.tl .bar.sp{background:var(--neg)}
-.tl .x{font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap}
+/* ───────────────────────── kpi ───────────────────────── */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+@media(max-width:860px){.kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:460px){.kpis{grid-template-columns:1fr}}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;
+  box-shadow:var(--shadow)}
+.kpi .l{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.kpi .v{font-size:29px;font-weight:700;letter-spacing:-.03em;line-height:1.2;margin:4px 0 2px}
+.kpi .v small{font-size:15px;font-weight:600;color:var(--ink2);letter-spacing:0}
+.kpi .d{font-size:12.5px;color:var(--ink2);line-height:1.5}
+.q{width:15px;height:15px;border-radius:50%;border:1px solid var(--border2);color:var(--muted);
+  font-size:10px;display:inline-grid;place-items:center;cursor:help;flex:none}
 
-/* alerts */
-.alert{border:1px solid var(--border);border-left:3px solid var(--neg);background:var(--plane);
-  border-radius:8px;padding:9px 12px;font-size:13px;margin:7px 0}
+/* ───────────────────────── alerts / actions ───────────────────────── */
+.alert{display:flex;gap:13px;align-items:flex-start;border:1px solid var(--border);border-left:4px solid var(--ac);
+  background:var(--surface);border-radius:11px;padding:13px 16px;margin-bottom:10px}
+.alert .ai{width:30px;height:30px;border-radius:9px;flex:none;display:grid;place-items:center;font-size:15px;
+  background:color-mix(in srgb,var(--ac) 14%,transparent)}
+.alert .body{flex:1;min-width:0}
+.alert .t{font-size:14.5px;font-weight:660;line-height:1.5}
+.alert .d{font-size:13px;color:var(--ink2);margin-top:3px;line-height:1.55}
+.alert .foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:9px}
+.owner{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:640;padding:3px 11px;
+  border-radius:999px;background:var(--inset);border:1px solid var(--border);color:var(--ink2);white-space:nowrap}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font-size:12.5px;font-weight:640;cursor:pointer}
+.linkbtn:hover{text-decoration:underline}
+.calm{display:flex;gap:11px;align-items:center;border:1px solid var(--border);border-left:4px solid var(--pos);
+  border-radius:11px;padding:14px 16px;font-size:14px;color:var(--ink2)}
 
-/* explorer toolbar */
-.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
-.chip{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:6px 12px;
-  font-size:12.5px;cursor:pointer;color:var(--ink2);display:inline-flex;gap:6px;align-items:center}
-.chip.on{border-color:var(--ink);color:var(--ink);font-weight:600}
-.chip .c{color:var(--muted);font-variant-numeric:tabular-nums}
-.tools input[type=search],.tools select{background:var(--surface);border:1px solid var(--border);
-  color:var(--ink);border-radius:8px;padding:8px 11px;font-size:13px}
-.tools input[type=search]{flex:1;min-width:180px}
+/* ───────────────────────── sentiment ───────────────────────── */
+.stack{display:flex;height:34px;border-radius:9px;overflow:hidden;margin-bottom:14px;background:var(--inset)}
+.stack i{display:block;height:100%;transition:.25s}
+.slist{display:flex;flex-direction:column;gap:2px}
+.srow{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:9px;border:0;background:none;
+  width:100%;text-align:left;cursor:pointer;font-size:14px}
+.srow:hover{background:var(--inset)}
+.srow.on{background:var(--inset);box-shadow:inset 0 0 0 1.5px var(--border2)}
+.srow .sw{width:11px;height:11px;border-radius:3px;flex:none}
+.srow .nm{flex:1;color:var(--ink2)}
+.srow .pc{font-weight:680;font-variant-numeric:tabular-nums}
+.srow .ct{color:var(--muted);font-size:12.5px;width:76px;text-align:right;font-variant-numeric:tabular-nums}
+.foot-note{margin-top:14px;padding-top:13px;border-top:1px solid var(--border);
+  font-size:12.5px;color:var(--muted);line-height:1.55}
+
+/* ───────────────────────── topics ───────────────────────── */
+.trow{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;align-items:center;width:100%;
+  text-align:left;background:none;border:0;border-radius:10px;padding:10px;cursor:pointer}
+.trow:hover{background:var(--inset)}
+.trow.on{background:var(--inset);box-shadow:inset 0 0 0 1.5px var(--border2)}
+.trow .rk{font-size:12.5px;color:var(--muted);font-weight:680;text-align:center}
+.trow .nm{font-size:14.5px;font-weight:640;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.trow .meta{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+.tbar{display:block;height:7px;border-radius:4px;background:var(--inset);margin-top:6px;overflow:hidden;max-width:340px}
+.tbar i{display:block;height:100%;border-radius:4px;background:var(--neg)}
+.trow .rt{text-align:right;white-space:nowrap}
+.trow .rt .n{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.trow .rt .u{font-size:11.5px;color:var(--muted);display:block;margin-top:-3px}
+.hot{font-size:11px;font-weight:680;color:var(--neg);background:color-mix(in srgb,var(--neg) 13%,transparent);
+  border-radius:6px;padding:1px 7px;white-space:nowrap}
+.empty{padding:26px;text-align:center;color:var(--muted);font-size:13.5px}
+
+/* ───────────────────────── timeline ───────────────────────── */
+.seg{display:inline-flex;border:1px solid var(--border2);border-radius:9px;overflow:hidden;background:var(--surface)}
+.seg button{background:none;border:0;padding:7px 13px;font-size:12.5px;cursor:pointer;color:var(--ink2);font-weight:600}
+.seg button.on{background:var(--ink);color:var(--plane)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:12px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:11px;height:11px;border-radius:3px;display:block}
+.chart{position:relative;padding:4px 0 0 46px}
+.yax{position:absolute;left:0;top:26px;height:190px;width:40px;font-size:11px;color:var(--muted);
+  display:flex;flex-direction:column;justify-content:space-between;text-align:right;font-variant-numeric:tabular-nums}
+/* plot + xax อยู่ใน .scroll เดียวกัน — เลื่อนพร้อมกัน ป้ายเวลาจะได้ไม่หลุดจากแท่ง
+   padding-top เผื่อที่ให้ป้าย "🚨 พุ่ง" ที่ลอยเหนือแท่งสูงสุด (overflow-x:auto ตัดแนวตั้งด้วย) */
+.scroll{overflow-x:auto;padding:22px 0 2px}
+.plot{position:relative;height:190px;display:flex;align-items:flex-end;gap:5px;
+  border-bottom:1.5px solid var(--border2);min-width:100%}
+.avgline{position:absolute;left:0;right:0;border-top:1.5px dashed color-mix(in srgb,var(--accent) 65%,transparent);
+  pointer-events:none;z-index:2}
+.avgline b{position:absolute;left:0;top:-9px;font-size:10.5px;font-weight:600;color:var(--accent);
+  background:var(--surface);padding:0 5px 0 0;border-radius:4px;white-space:nowrap}
+.col{flex:1;min-width:22px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;
+  align-items:stretch;cursor:pointer;position:relative;background:none;border:0;padding:0}
+.col:hover .stk{filter:brightness(1.12)}
+.col.on .stk{outline:2px solid var(--ink);outline-offset:1px}
+.stk{display:flex;flex-direction:column;justify-content:flex-end;border-radius:5px 5px 0 0;overflow:hidden;
+  min-height:3px;transition:height .3s}
+.stk .neg{background:var(--neg)} .stk .rest{background:var(--border2)}
+.col.spike .stk .neg{background:var(--neg);box-shadow:0 0 0 1.5px var(--neg)}
+.spikeflag{position:absolute;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:10.5px;font-weight:700;
+  color:#fff;background:var(--neg);border-radius:6px;padding:1px 7px;z-index:3}
+.xax{display:flex;gap:5px;padding-top:7px;min-width:100%}
+.xax div{flex:1;min-width:22px;text-align:center;font-size:10.5px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums}
+.xax div b{display:block;font-size:10px;color:var(--ink2);font-weight:640}
+#tip{position:fixed;z-index:60;background:var(--ink);color:var(--plane);border-radius:9px;padding:9px 12px;
+  font-size:12.5px;line-height:1.6;pointer-events:none;opacity:0;transition:opacity .12s;max-width:260px;
+  box-shadow:0 8px 30px -8px rgba(0,0,0,.5)}
+#tip b{font-weight:700}
+#tip.show{opacity:1}
+
+/* ───────────────────────── explorer ───────────────────────── */
+.activebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:color-mix(in srgb,var(--accent) 8%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 25%,var(--border));border-radius:10px;padding:9px 13px;margin-bottom:13px;font-size:13px}
+.fchip{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border2);
+  border-radius:999px;padding:3px 6px 3px 12px;font-size:12.5px;font-weight:600}
+.fchip button{background:none;border:0;cursor:pointer;color:var(--muted);width:18px;height:18px;border-radius:50%;
+  display:grid;place-items:center;font-size:13px;line-height:1}
+.fchip button:hover{background:var(--inset);color:var(--ink)}
+.tools{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:13px}
+.chip{border:1px solid var(--border2);background:var(--surface);border-radius:999px;padding:7px 14px;
+  font-size:13px;cursor:pointer;color:var(--ink2);display:inline-flex;gap:7px;align-items:center;font-weight:600}
+.chip:hover{border-color:var(--muted)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--plane)}
+.chip .c{opacity:.65;font-variant-numeric:tabular-nums;font-weight:600}
+.tools input[type=search],.tools select{background:var(--surface);border:1px solid var(--border2);
+  color:var(--ink);border-radius:9px;padding:9px 12px;font-size:13.5px;font-family:inherit}
+.tools input[type=search]{flex:1;min-width:190px}
 .grow{flex:1}
-
-/* table */
-.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius)}
-table{width:100%;border-collapse:collapse;font-size:13px}
-thead th{position:sticky;top:0;background:var(--surface);text-align:left;padding:10px 12px;
-  font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:650;
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r-sm)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+thead th{position:sticky;top:0;background:var(--surface);text-align:left;padding:10px 13px;z-index:2;
+  font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:680;
   border-bottom:1px solid var(--border);white-space:nowrap}
-tbody td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:top}
-tbody tr:hover{background:var(--plane)}
+tbody td{padding:12px 13px;border-bottom:1px solid var(--border);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
 tbody tr{border-left:3px solid transparent}
+tbody tr:hover{background:var(--inset)}
 tr.s-negative{border-left-color:var(--neg)} tr.s-positive{border-left-color:var(--pos)}
-td.when{color:var(--muted);white-space:nowrap;font-size:12px}
+td.when{color:var(--muted);white-space:nowrap;font-size:12.5px}
+td.when b{display:block;color:var(--ink2);font-weight:600}
 td.who{white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis}
-td.txt{min-width:280px;max-width:460px}
-td.rch{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-td.post{color:var(--muted);font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+td.txt{min-width:290px;max-width:470px;line-height:1.6}
+td.txt.clamp .t{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+td.txt .more{background:none;border:0;padding:0;color:var(--accent);font-size:12px;cursor:pointer;font-weight:600}
+mark{background:color-mix(in srgb,var(--warn) 45%,transparent);color:inherit;border-radius:3px;padding:0 2px}
+td.rch{white-space:nowrap;width:104px}
+td.rch .tnum{display:block;font-weight:640}
+.rbar{display:block;height:5px;border-radius:3px;background:var(--inset);margin-top:4px;overflow:hidden}
+.rbar i{display:block;height:100%;background:var(--muted);border-radius:3px}
+td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:640;padding:3px 10px;
+  border-radius:999px;white-space:nowrap}
 .tag .dot{width:7px;height:7px;border-radius:50%}
-.topic{display:inline-block;font-size:11px;color:var(--ink2);background:var(--plane);border:1px solid var(--border);
-  border-radius:5px;padding:1px 7px;margin:1px 3px 1px 0;white-space:nowrap}
-.ai{font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:0 4px;margin-left:5px}
-/* ตารางประเด็น + เจ้าของเรื่อง */
-.tbl{overflow-x:auto}
-.tbl th.rch{text-align:right}
-.tbl tbody td{padding:9px 12px}
-.tbl tr.em{background:color-mix(in srgb,var(--neg) 6%,transparent)}
-.up{display:inline-block;font-size:10px;font-weight:650;color:var(--neg);
-  background:color-mix(in srgb,var(--neg) 12%,transparent);border-radius:5px;padding:1px 6px;margin-left:6px;white-space:nowrap}
-td.own{color:var(--ink2);white-space:nowrap}
-.ext{color:var(--muted)}
-.count{color:var(--muted);font-size:12px;margin:10px 2px 0}
-.hidden{display:none}
-.empty{padding:26px;text-align:center;color:var(--muted)}
+.topic{display:inline-block;font-size:11.5px;color:var(--ink2);background:var(--inset);border:1px solid var(--border);
+  border-radius:6px;padding:2px 8px;margin:1px 3px 1px 0;white-space:nowrap;cursor:pointer}
+.topic:hover{border-color:var(--muted);color:var(--ink)}
+.aibadge{font-size:10.5px;color:var(--muted);border:1px solid var(--border2);border-radius:5px;
+  padding:0 5px;margin-left:6px;white-space:nowrap;cursor:help}
+.count{color:var(--muted);font-size:13px;margin-top:13px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+/* ───────────────────────── how it works ───────────────────────── */
+.how{background:none;border:1px dashed var(--border2);box-shadow:none}
+.how ol{margin:0;padding-left:22px;color:var(--ink2);font-size:13.5px}
+.how li{margin-bottom:7px} .how li b{color:var(--ink);font-weight:640}
+
+/* ───────────────────────── print ───────────────────────── */
+@media print{
+  .topbar,#setup,#setupSummary,#prog,.tools,.activebar,.seg,.iconbtn,.linkbtn{display:none !important}
+  body{background:#fff;font-size:11px} .card{box-shadow:none;break-inside:avoid}
+  .wrap{padding:0}
+}
 </style>
 </head>
 <body>
+<div id="tip" role="status"></div>
+
+<div class="topbar">
+  <div class="in">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="9" opacity=".35"/><circle cx="12" cy="12" r="4.5" opacity=".6"/>
+          <path d="M12 12 19 6.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
+      <span class="brand-txt"><b>Crisis Radar</b><span>เฝ้าระวังดราม่าบนโซเชียล</span></span>
+    </div>
+    <div class="spacer"></div>
+    <span class="livepill" id="livePill"><span class="dot"></span><span id="liveText">ยังไม่ได้ตรวจ</span></span>
+    <button class="iconbtn" id="printBtn" title="พิมพ์ / บันทึกเป็น PDF" aria-label="พิมพ์รายงาน">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v7H8z"/></svg>
+    </button>
+    <button class="iconbtn" id="themeBtn" title="สลับโหมดสว่าง/มืด" aria-label="สลับธีม">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 13a9 9 0 11-10-10 7 7 0 0010 10z"/></svg>
+    </button>
+  </div>
+</div>
+
 <div class="wrap">
-  <header>
-    <div>
-      <h1>Crisis Radar</h1>
-      <div class="sub">Social Listening &amp; Crisis Early-Warning · TalesRunner · Facebook</div>
-    </div>
-    <div style="text-align:right">
-      <span class="pill" id="statusPill"><span class="dot" style="background:var(--muted)"></span><span id="statusText">ยังไม่ได้ดึงข้อมูล</span></span>
-      <div class="gen" id="genAt"></div>
-    </div>
-  </header>
 
-  <!-- controls -->
-  <div class="card mb">
-    <h2>แหล่งข้อมูล</h2>
-    <div class="controls">
-      <div class="seg" id="srcSeg">
-        <button data-src="sample" class="on">ข้อมูลตัวอย่าง</button>
-        <button data-src="facebook">Facebook จริง</button>
+  <!-- ═══ STEP 1: setup ═══ -->
+  <section class="card" id="setup">
+    <header>
+      <span class="stepnum">1</span>
+      <div><h2>เลือกข้อมูลที่ต้องการตรวจ</h2>
+        <div class="sub">ระบบจะอ่านคอมเมนต์ทั้งหมด แล้วบอกว่ามีดราม่ากำลังก่อตัวอยู่ไหม</div></div>
+    </header>
+
+    <div class="modes" id="modes">
+      <button class="mode on" data-src="sample" aria-pressed="true">
+        <span class="tick">✓</span>
+        <span><b>ข้อมูลตัวอย่าง</b><small>ลองใช้ได้ทันที ไม่ต้องตั้งค่าอะไร · เหมาะกับการดูว่าระบบทำงานยังไง</small></span>
+      </button>
+      <button class="mode" data-src="facebook" aria-pressed="false">
+        <span class="tick">✓</span>
+        <span><b>Facebook จริง</b><small>ดึงคอมเมนต์สดจากเพจที่ระบุ · ใช้เวลาสักครู่ และมีค่าใช้จ่ายตามจำนวนโพสต์</small></span>
+      </button>
+    </div>
+
+    <div id="fbBox" class="hidden">
+      <span class="sublabel">ตั้งค่าสำหรับโหมด Facebook จริง — จะให้ตรวจแค่ไหน?</span>
+      <div class="modes" id="scopes">
+        <button class="mode on" data-scope="page" aria-pressed="true">
+          <span class="tick">✓</span>
+          <span><b>ตรวจทั้งเพจ</b><small>ไล่ดูโพสต์ล่าสุดทั้งหมด · ครอบคลุมกว่า แต่ช้าและแพงกว่า</small></span>
+        </button>
+        <button class="mode" data-scope="urls" aria-pressed="false">
+          <span class="tick">✓</span>
+          <span><b>เจาะเฉพาะโพสต์</b><small>วางลิงก์โพสต์ที่สงสัย · เร็วและประหยัดกว่ามาก</small></span>
+        </button>
       </div>
-      <label class="fld" id="fldScope">ขอบเขต
-        <select id="scope" style="width:180px">
-          <option value="page">ทั้งเพจ (โพสต์ล่าสุด)</option>
-          <option value="urls">ระบุโพสต์เอง</option>
-        </select>
-      </label>
-      <label class="fld" id="fldPageUrl">URL เพจ
-        <input id="pageUrl" type="url" placeholder="https://www.facebook.com/…" style="width:280px">
-      </label>
-      <label class="fld" id="fldPosts">จำนวนโพสต์
-        <input id="maxp" type="number" value="10" min="1" max="50" style="width:100px">
-      </label>
-      <label class="fld" id="fldPostUrls" style="flex-basis:100%">URL โพสต์ (บรรทัดละ 1 ลิงก์)
-        <textarea id="postUrls" rows="3" placeholder="https://www.facebook.com/share/p/…&#10;https://www.facebook.com/share/p/…"
-                  style="width:100%;font:inherit;font-size:12px"></textarea>
-      </label>
-      <label class="fld" id="fldComments">คอมเมนต์/โพสต์
-        <input id="maxc" type="number" value="30" min="5" max="200" style="width:100px">
-      </label>
-      <button class="run" id="runBtn">ดึงข้อมูล &amp; วิเคราะห์</button>
-      <div class="hint" id="hint">โหมดตัวอย่าง: ใช้ข้อมูลจำลองเพื่อดูการทำงาน · โหมด Facebook จริง: ดึงสดผ่าน Apify (ตั้ง APIFY_TOKEN แล้ว)</div>
+
+      <div class="fields">
+        <label class="fld" id="fldPageUrl">ลิงก์เพจ Facebook
+          <input id="pageUrl" type="url" placeholder="https://www.facebook.com/…" style="width:300px">
+        </label>
+        <label class="fld" id="fldPosts">ดูย้อนหลังกี่โพสต์
+          <input id="maxp" type="number" value="10" min="1" max="50">
+          <span class="tip">ยิ่งเยอะ ยิ่งใช้เวลานาน</span>
+        </label>
+        <label class="fld" id="fldPostUrls" style="flex-basis:100%">ลิงก์โพสต์ (วางบรรทัดละ 1 ลิงก์)
+          <textarea id="postUrls" rows="3" placeholder="https://www.facebook.com/share/p/…" style="width:100%;font-size:13px"></textarea>
+        </label>
+        <label class="fld" id="fldComments">อ่านคอมเมนต์ต่อโพสต์
+          <input id="maxc" type="number" value="30" min="5" max="200">
+          <span class="tip">สูงสุด 200</span>
+        </label>
+        <label class="fld hidden" id="fldPass">รหัสผ่านสำหรับโหมดจริง
+          <input id="passInput" type="password" placeholder="กรอกรหัสที่ได้รับ" style="width:190px">
+          <span class="tip">ผู้ดูแลตั้งไว้กันคนกดเล่น</span>
+        </label>
+      </div>
     </div>
+
+    <div class="runrow">
+      <button class="run" id="runBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        เริ่มตรวจ
+      </button>
+      <div class="note" id="hint"></div>
+    </div>
+    <div class="errline hidden" id="setupErr"></div>
+  </section>
+
+  <!-- summary bar (แทน setup หลังตรวจเสร็จ) -->
+  <div class="summary-bar hidden" id="setupSummary">
+    <span class="livepill" id="sumPill" style="border-color:var(--border)"><span class="dot"></span><span id="sumStatus"></span></span>
+    <span class="txt" id="sumText"></span>
+    <span class="grow"></span>
+    <button class="ghost" id="editBtn">เปลี่ยนข้อมูลที่ตรวจ</button>
+    <button class="ghost" id="rerunBtn" style="border-color:var(--accent);color:var(--accent)">↻ ตรวจใหม่อีกครั้ง</button>
   </div>
 
-  <!-- progress -->
-  <div class="card mb hidden" id="prog">
-    <h2 id="progTitle">กำลังทำงาน</h2>
-    <div class="log" id="log"></div>
-  </div>
+  <!-- ═══ progress ═══ -->
+  <section class="card hidden" id="prog">
+    <header><span class="stepnum">2</span><div><h2 id="progTitle">กำลังตรวจ…</h2>
+      <div class="sub" id="progSub">ปล่อยหน้านี้ทิ้งไว้ได้เลย ระบบจะแสดงผลให้เองเมื่อเสร็จ</div></div></header>
+    <div class="steps" id="steps"></div>
+    <details class="tech"><summary>ดูรายละเอียดเชิงเทคนิค</summary><div class="log" id="log"></div></details>
+  </section>
 
-  <!-- results -->
+  <!-- ═══ welcome ═══ -->
+  <section class="card welcome" id="welcome">
+    <h3>ยังไม่มีผลตรวจ</h3>
+    <p>กดปุ่ม <b>เริ่มตรวจ</b> ด้านบน ระบบจะอ่านคอมเมนต์ให้ทั้งหมดภายในไม่กี่นาที แล้วสรุปให้ว่า:</p>
+    <div class="wcards">
+      <div class="wcard"><b>🚦 ตอนนี้สถานการณ์เป็นยังไง</b><small>ปกติ / ควรเฝ้าระวัง / วิกฤตต้องรีบจัดการ</small></div>
+      <div class="wcard"><b>🔥 คนกำลังบ่นเรื่องอะไร</b><small>จัดกลุ่มให้อัตโนมัติ พร้อมบอกว่าทีมไหนควรรับเรื่อง</small></div>
+      <div class="wcard"><b>⏰ ดราม่าเริ่มตอนไหน</b><small>เห็นชั่วโมงที่คอมเมนต์ลบพุ่งผิดปกติ กดดูคอมเมนต์จริงได้ทันที</small></div>
+    </div>
+  </section>
+
+  <!-- ═══ RESULTS ═══ -->
   <div id="results" class="hidden">
-    <div class="kpis mb" id="kpis"></div>
+    <section class="verdict" id="verdict"></section>
+    <div class="kpis" id="kpis"></div>
 
-    <div class="mb" id="analysisGrid">
-      <div class="card mb"><h2>อารมณ์คอมเมนต์</h2><div id="sentiment"></div></div>
-      <div class="card"><h2>ประเด็นเชิงลบ · ใครต้องรับเรื่อง</h2><div class="tbl" id="topics"></div></div>
+    <section class="card">
+      <header><div><h2>สิ่งที่ควรจัดการ</h2>
+        <div class="sub">เรียงจากเรื่องที่ควรรีบดูที่สุด · กด “ดูคอมเมนต์” เพื่อไปอ่านต้นเรื่องจริง</div></div></header>
+      <div id="alerts"></div>
+    </section>
+
+    <div class="grid2">
+      <section class="card">
+        <header><div><h2>อารมณ์ของคอมเมนต์</h2>
+          <div class="sub">กดที่แถวเพื่อดูเฉพาะกลุ่มนั้น</div></div></header>
+        <div id="sentiment"></div>
+      </section>
+
+      <section class="card">
+        <header><div><h2>เรื่องที่คนบ่น</h2>
+          <div class="sub">เรียงตามความแรง · พร้อมทีมที่ควรรับเรื่องไปแก้</div></div></header>
+        <div id="topics"></div>
+      </section>
     </div>
 
-    <div class="card mb"><h2>ไทม์ไลน์ความรุนแรง (แดง = พุ่งผิดปกติ)</h2><div class="tl" id="timeline"></div></div>
+    <section class="card" id="tlCard">
+      <header>
+        <div><h2>ดราม่าเกิดตอนไหน</h2>
+          <div class="sub" id="tlSub"></div></div>
+        <span class="grow"></span>
+        <div class="seg" id="tlMode">
+          <button data-m="count" class="on">จำนวนคอมเมนต์</button>
+          <button data-m="sev">ความแรง (ถ่วงยอดไลก์)</button>
+        </div>
+      </header>
+      <div class="legend" id="tlLegend"></div>
+      <div class="chart">
+        <div class="yax" id="yax"></div>
+        <div class="scroll">
+          <div class="plot" id="plot"></div>
+          <div class="xax" id="xax"></div>
+        </div>
+      </div>
+      <div class="foot-note" id="tlFoot"></div>
+    </section>
 
-    <div class="card mb" id="alertCard"><h2>การแจ้งเตือน</h2><div id="alerts"></div></div>
-
-    <!-- comment explorer -->
-    <div class="card">
-      <h2>รายการคอมเมนต์ (ค้นหา / กรอง / เรียงได้)</h2>
+    <section class="card" id="explorer">
+      <header><div><h2>อ่านคอมเมนต์จริง</h2>
+        <div class="sub">ค้นหา กรอง และเรียงลำดับได้ · คลิกชื่อประเด็นเพื่อกรองเฉพาะเรื่องนั้น</div></div></header>
+      <div class="activebar hidden" id="activeBar"></div>
       <div class="tools">
-        <div id="sentChips"></div>
-        <div class="grow"></div>
-        <select id="topicFilter"><option value="">ทุกประเด็น</option></select>
-        <select id="sortBy">
-          <option value="reach">เรียงตาม reach มากสุด</option>
+        <div id="sentChips" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+        <span class="grow"></span>
+        <select id="topicFilter" aria-label="กรองตามประเด็น"><option value="">ทุกประเด็น</option></select>
+        <select id="sortBy" aria-label="เรียงลำดับ">
+          <option value="reach">คนเห็นเยอะสุดก่อน</option>
           <option value="new">ใหม่สุดก่อน</option>
           <option value="old">เก่าสุดก่อน</option>
         </select>
-        <input type="search" id="search" placeholder="ค้นหาข้อความ / ชื่อผู้คอมเมนต์…">
+        <input type="search" id="search" placeholder="ค้นหาข้อความ หรือ ชื่อคน…">
       </div>
       <div class="tbl-wrap">
         <table>
           <thead><tr>
-            <th>เวลา</th><th>ผู้คอมเมนต์</th><th>คอมเมนต์</th><th>อารมณ์</th><th>ประเด็น</th>
-            <th style="text-align:right">Reach</th><th>โพสต์</th><th></th>
+            <th>เวลา</th><th>ผู้คอมเมนต์</th><th>ข้อความ</th><th>อารมณ์</th><th>ประเด็น</th>
+            <th>ไลก์+ตอบกลับ</th><th>อยู่ใต้โพสต์</th><th aria-label="ลิงก์"></th>
           </tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
       <div class="count" id="count"></div>
-    </div>
+    </section>
+
+    <section class="card how">
+      <header><div><h2>ระบบตัดสินยังไง</h2></div></header>
+      <ol>
+        <li><b>อ่านทุกคอมเมนต์</b> แล้วจัดว่าเป็นบวก/กลาง/ลบ พร้อมจับว่าพูดถึงเรื่องอะไร (บั๊ก ราคา ของรางวัล ฯลฯ) — คอมเมนต์ที่กำกวมหรือประชด จะถูกส่งให้ AI อ่านซ้ำอีกชั้น</li>
+        <li><b>เทียบกับ “ปกติของเพจนี้”</b> ไม่ได้ดูแค่ว่าคอมเมนต์ลบเยอะไหม แต่ดูว่าชั่วโมงนี้ลบพุ่งกว่าชั่วโมงก่อน ๆ กี่เท่า และคอมเมนต์นั้นมีคนไลก์/ตอบกลับมากแค่ไหน</li>
+        <li><b>เตือนเมื่อผิดปกติจริง</b> ทั้งกรณีพุ่งทั้งเพจ กรณีเรื่องใดเรื่องหนึ่งมาแรงขึ้นมาใหม่ และกรณีคอมเมนต์ลบเดี่ยว ๆ ที่คนแห่มากดไลก์ — พร้อมบอกว่าทีมไหนควรรับเรื่อง</li>
+      </ol>
+      <div class="foot-note" id="methodFoot"></div>
+    </section>
   </div>
 </div>
 
 <script>
-const SENT={positive:{c:'var(--pos)',t:'บวก'},neutral:{c:'var(--neu)',t:'กลาง'},negative:{c:'var(--neg)',t:'ลบ'}};
-const STAT={NORMAL:['var(--pos)','ปกติ'],WATCH:['var(--warn)','เฝ้าระวัง'],CRISIS:['var(--neg)','วิกฤต']};
-const $=s=>document.querySelector(s);
+/* ═══════════════════════════ helpers ═══════════════════════════ */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let SRC='sample', DATA=null, FILT={sent:'all',topic:'',q:'',sort:'reach'};
-const TLabel=t=>(DATA&&DATA.topic_labels&&DATA.topic_labels[t])||t;   // ชื่อประเด็นภาษาไทย
+const nf=n=>Number(n||0).toLocaleString('th-TH');
+const SENT={positive:{c:'var(--pos)',t:'บวก'},neutral:{c:'var(--neu)',t:'กลาง'},negative:{c:'var(--neg)',t:'ลบ'}};
+const STAT={
+  NORMAL :{c:'var(--pos)', t:'ปกติ',      head:'ปกติดี — ยังไม่มีอะไรต้องรีบ'},
+  WATCH  :{c:'var(--warn)',t:'เฝ้าระวัง', head:'ควรเฝ้าระวัง'},
+  CRISIS :{c:'var(--neg)', t:'วิกฤต',    head:'วิกฤต — ต้องรีบจัดการ'},
+};
+const MON=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
-// source toggle
-$('#srcSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;
-  [...$('#srcSeg').children].forEach(x=>x.classList.remove('on'));b.classList.add('on');SRC=b.dataset.src;
-  syncFields();};
+// เวลาในระบบเป็นเวลาไทยอยู่แล้ว (+07:00) → แกะจาก string ตรง ๆ
+// ห้ามใช้ new Date() แปลง เพราะจะโดน timezone ของเครื่องผู้ใช้เปลี่ยนตัวเลขชั่วโมง
+const P=iso=>{const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso||'');
+  return m?{date:`${m[1]}-${m[2]}-${m[3]}`,d:+m[3],mo:+m[2],h:m[4],mi:m[5]}:null;};
+const fmtTime=iso=>{const p=P(iso);return p?`${p.h}:${p.mi}`:'';};
+const fmtDay =iso=>{const p=P(iso);return p?`${p.d} ${MON[p.mo-1]}`:'';};
+const fmtFull=iso=>{const p=P(iso);return p?`${p.d} ${MON[p.mo-1]} ${p.h}:${p.mi} น.`:'';};
+// key ของช่วงเวลา (bucket) — ตัดนาทีลงตามขนาด bucket ที่ backend ใช้จริง
+const bkey=(iso,mins)=>{const m=/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(iso||'');
+  if(!m)return'';const mm=Math.floor(+m[3]/(mins||60))*(mins||60);
+  return `${m[1]}T${m[2]}:${String(mm).padStart(2,'0')}`;};
 
-// โชว์เฉพาะช่องที่โหมดนั้นใช้จริง — กันสับสนว่าช่องไหนมีผล
-function syncFields(){
-  const fb=SRC==='facebook', page=$('#scope').value==='page';
-  $('#fldScope').style.display=fb?'flex':'none';
-  $('#fldComments').style.display=fb?'flex':'none';
-  $('#fldPageUrl').style.display=(fb&&page)?'flex':'none';
-  $('#fldPosts').style.display=(fb&&page)?'flex':'none';
-  $('#fldPostUrls').style.display=(fb&&!page)?'flex':'none';
-  $('#hint').textContent=!fb
-    ?'โหมดตัวอย่าง: ใช้ข้อมูลจำลองเพื่อดูการทำงาน'
-    :page
-      ?`กวาดทั้งเพจ: ดึงโพสต์ล่าสุด ${$('#maxp').value} โพสต์ แล้วเก็บคอมเมนต์ทุกโพสต์ · ครอบคลุมกว่า แต่ใช้เวลาหลายนาทีและกิน Apify credit ตามจำนวนโพสต์`
-      :'เจาะเฉพาะโพสต์ที่วางลิงก์ไว้ · เร็วและถูกกว่ามาก เหมาะกับตอนรู้อยู่แล้วว่าดราม่าอยู่โพสต์ไหน';
+/* ═══════════════════════════ theme ═══════════════════════════ */
+const savedTheme=localStorage.getItem('cr-theme');
+if(savedTheme)document.documentElement.dataset.theme=savedTheme;
+$('#themeBtn').onclick=()=>{
+  const cur=document.documentElement.dataset.theme
+    ||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  const next=cur==='dark'?'light':'dark';
+  document.documentElement.dataset.theme=next;localStorage.setItem('cr-theme',next);
+  if(DATA)renderTimeline();   // chart ใช้สีจาก CSS var — วาดใหม่ให้ตรงธีม
+};
+$('#printBtn').onclick=()=>window.print();
+
+/* ═══════════════════════════ state ═══════════════════════════ */
+let SRC='sample', SCOPE='page', DATA=null, NEED_PASS=false, TLMODE='count';
+let FILT={sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50};
+
+/* ═══════════════════════════ setup form ═══════════════════════════ */
+function pick(container,attr,val){
+  $$(container+' .mode').forEach(b=>{const on=b.dataset[attr]===val;
+    b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
 }
-$('#scope').onchange=syncFields;
+$('#modes').onclick=e=>{const b=e.target.closest('.mode');if(!b)return;
+  SRC=b.dataset.src;pick('#modes','src',SRC);syncFields();};
+$('#scopes').onclick=e=>{const b=e.target.closest('.mode');if(!b)return;
+  SCOPE=b.dataset.scope;pick('#scopes','scope',SCOPE);syncFields();};
+
+function syncFields(){
+  const fb=SRC==='facebook', page=SCOPE==='page';
+  $('#fbBox').classList.toggle('hidden',!fb);
+  $('#fldPageUrl').classList.toggle('hidden',!page);
+  $('#fldPosts').classList.toggle('hidden',!page);
+  $('#fldPostUrls').classList.toggle('hidden',page);
+  $('#fldPass').classList.toggle('hidden',!(fb&&NEED_PASS));
+  $('#hint').innerHTML = !fb
+    ? 'ใช้ชุดข้อมูลจำลอง 41 คอมเมนต์ · ไม่ต่อเน็ต ไม่มีค่าใช้จ่าย เห็นผลใน 2–3 วินาที'
+    : page
+      ? `จะไล่ดูโพสต์ล่าสุด <b>${esc($('#maxp').value)}</b> โพสต์ แล้วอ่านคอมเมนต์ทุกโพสต์ · ใช้เวลาหลายนาที`
+      : 'อ่านเฉพาะโพสต์ที่วางลิงก์ไว้ · เหมาะตอนที่รู้อยู่แล้วว่าดราม่าอยู่โพสต์ไหน';
+}
 $('#maxp').oninput=syncFields;
 
-// เติมค่าตั้งต้นจาก data/targets.json ให้ กดใช้ได้เลยโดยไม่ต้องหา URL เอง
+// เติมค่าตั้งต้นจาก data/targets.json — ผู้ใช้จะได้ไม่ต้องไปหา URL เอง
 fetch('/api/targets').then(r=>r.json()).then(t=>{
   $('#pageUrl').placeholder=t.page_url||'https://www.facebook.com/…';
   if(!$('#postUrls').value)$('#postUrls').value=(t.post_urls||[]).join('\n');
 }).catch(()=>{}).finally(syncFields);
+// ตอน deploy จะตั้งรหัสไว้กันคนกดยิง Apify เล่น
+fetch('/api/health').then(r=>r.json()).then(h=>{NEED_PASS=!!h.passcode_required;syncFields();}).catch(()=>{});
 syncFields();
 
-// ตอน deploy จะตั้งรหัสไว้กันคนกดยิง Apify เล่น — เช็กจาก /api/health ตอนโหลดหน้า
-let NEED_PASS=false;
-fetch('/api/health').then(r=>r.json()).then(h=>{NEED_PASS=!!h.passcode_required;}).catch(()=>{});
+$('#editBtn').onclick=()=>{$('#setup').classList.remove('hidden');$('#setupSummary').classList.add('hidden');
+  $('#setup').scrollIntoView({behavior:'smooth',block:'center'});};
+$('#rerunBtn').onclick=()=>run();
+$('#runBtn').onclick=()=>run();
 
-$('#runBtn').onclick=async()=>{
+/* ═══════════════════════════ run + progress ═══════════════════════════ */
+const STEPS=[
+  {k:'fetch',   t:'ดึงคอมเมนต์จากแหล่งข้อมูล'},
+  {k:'classify',t:'ให้ AI อ่านและจัดอารมณ์/ประเด็น'},
+  {k:'detect',  t:'ตรวจหาช่วงที่ผิดปกติ'},
+  {k:'done',    t:'สรุปผลและจัดหน้ารายงาน'},
+];
+function drawSteps(active){
+  $('#steps').innerHTML=STEPS.map((s,i)=>{
+    const cls=i<active?'done':i===active?'now':'';
+    const ic=i<active?'✓':i===active?'':'';
+    return `<div class="pstep ${cls}"><span class="ic">${ic}</span>${s.t}</div>`;}).join('');
+}
+function stepFromLogs(logs){
+  const s=logs.join('\n');
+  if(s.includes('ตรวจจับ crisis'))return 3;
+  if(s.includes('จัด sentiment'))return 2;
+  if(/ได้ \d+ คอมเมนต์/.test(s))return 1;
+  return 0;
+}
+
+async function run(){
   const headers={'Content-Type':'application/json'};
+  $('#setupErr').classList.add('hidden');
   if(SRC==='facebook'&&NEED_PASS){
-    let pass=sessionStorage.getItem('runPass');
-    if(!pass){pass=prompt('โหมด Facebook จริงต้องใส่รหัสผ่าน:');if(!pass)return;}
+    const pass=$('#passInput').value.trim()||sessionStorage.getItem('runPass')||'';
+    if(!pass){
+      $('#setup').classList.remove('hidden');$('#setupSummary').classList.add('hidden');
+      $('#setupErr').textContent='โหมด Facebook จริงต้องกรอกรหัสผ่านก่อน';
+      $('#setupErr').classList.remove('hidden');$('#passInput').focus();return;
+    }
     headers['X-Run-Passcode']=pass;
   }
-  $('#runBtn').disabled=true;$('#results').classList.add('hidden');
+  $('#runBtn').disabled=$('#rerunBtn').disabled=true;
+  $('#welcome').classList.add('hidden');$('#results').classList.add('hidden');
   $('#prog').classList.remove('hidden');$('#log').textContent='';
-  $('#progTitle').innerHTML='<span class="spin"></span>กำลังทำงาน';
-  const body={source:SRC,only:'page',scope:$('#scope').value,
+  $('#progTitle').textContent='กำลังตรวจ…';drawSteps(0);
+  setLive('กำลังตรวจ…','var(--accent)',true);
+  $('#prog').scrollIntoView({behavior:'smooth',block:'center'});
+
+  const body={source:SRC,only:'page',scope:SCOPE,
               page_url:$('#pageUrl').value.trim(),
               post_urls:$('#postUrls').value.split('\n').map(s=>s.trim()).filter(Boolean),
               max_posts:+$('#maxp').value,max_comments:+$('#maxc').value};
-  const r=await fetch('/api/run',{method:'POST',headers,body:JSON.stringify(body)});
+  let r;
+  try{r=await fetch('/api/run',{method:'POST',headers,body:JSON.stringify(body)});}
+  catch(e){return fail('ต่อเซิร์ฟเวอร์ไม่ได้ — ลองเช็กอินเทอร์เน็ตแล้วกดใหม่อีกครั้ง');}
   if(r.status===401){
-    sessionStorage.removeItem('runPass');
-    $('#progTitle').textContent='เกิดข้อผิดพลาด';
-    $('#log').textContent='รหัสผ่านไม่ถูกต้อง — กดอีกครั้งเพื่อลองใหม่';
-    $('#runBtn').disabled=false;return;
+    sessionStorage.removeItem('runPass');$('#passInput').value='';
+    $('#prog').classList.add('hidden');$('#setup').classList.remove('hidden');
+    $('#setupSummary').classList.add('hidden');
+    $('#setupErr').textContent='รหัสผ่านไม่ถูกต้อง — ลองใหม่อีกครั้ง';
+    $('#setupErr').classList.remove('hidden');
+    $('#runBtn').disabled=$('#rerunBtn').disabled=false;setLive('ยังไม่ได้ตรวจ','var(--muted)');return;
   }
   if(headers['X-Run-Passcode'])sessionStorage.setItem('runPass',headers['X-Run-Passcode']);
   poll((await r.json()).job_id);
-};
-function stopPoll(msg){
-  $('#progTitle').textContent='เกิดข้อผิดพลาด';$('#runBtn').disabled=false;
-  $('#log').textContent+='\n\n'+msg;$('#log').scrollTop=1e9;
+}
+function fail(msg){
+  $('#progTitle').textContent='ตรวจไม่สำเร็จ';
+  $('#progSub').textContent=msg;
+  $('#steps').innerHTML=`<div class="pstep" style="color:var(--neg)"><span class="ic" style="border-color:var(--neg)">!</span>${esc(msg)}</div>`;
+  $('#runBtn').disabled=$('#rerunBtn').disabled=false;
+  setLive('ตรวจไม่สำเร็จ','var(--neg)');
 }
 // miss = จำนวนครั้งที่ต่อเซิร์ฟเวอร์ไม่ติดติดกัน (เผื่อเน็ตสะดุดชั่วคราว)
 async function poll(id,miss=0){
@@ -300,107 +679,381 @@ async function poll(id,miss=0){
   try{res=await fetch('/api/jobs/'+id);j=await res.json();}
   catch(e){
     if(miss<10)return setTimeout(()=>poll(id,miss+1),2000);
-    return stopPoll('ต่อเซิร์ฟเวอร์ไม่ได้ — กด "ดึงข้อมูล & วิเคราะห์" ใหม่อีกครั้ง');
+    return fail('ต่อเซิร์ฟเวอร์ไม่ได้ — กด “ตรวจใหม่อีกครั้ง” เพื่อลองใหม่');
   }
   // job หายจากหน่วยความจำ = เซิร์ฟเวอร์รีสตาร์ทระหว่างทาง (deploy ใหม่ / free tier หลับ)
-  // ถ้าไม่ดักตรงนี้ status จะเป็น undefined แล้ววน poll ค้างไม่รู้จบ
-  if(res.status===404)return stopPoll('งานหายไป — เซิร์ฟเวอร์รีสตาร์ทระหว่างทำงาน กดดึงข้อมูลใหม่อีกครั้งได้เลย');
-  if(j.logs&&j.logs.length){$('#log').textContent=j.logs.join('\n');$('#log').scrollTop=1e9;}
-  if(j.status==='done'){$('#progTitle').textContent='เสร็จแล้ว';$('#runBtn').disabled=false;render(j.result);}
-  else if(j.status==='error'){stopPoll(j.error||'ไม่ทราบสาเหตุ');}
+  if(res.status===404)return fail('งานหายไประหว่างทาง (เซิร์ฟเวอร์รีสตาร์ท) — กดตรวจใหม่ได้เลย');
+  if(j.logs&&j.logs.length){$('#log').textContent=j.logs.join('\n');$('#log').scrollTop=1e9;drawSteps(stepFromLogs(j.logs));}
+  if(j.status==='done'){
+    drawSteps(4);$('#prog').classList.add('hidden');
+    $('#runBtn').disabled=$('#rerunBtn').disabled=false;render(j.result);
+  }
+  else if(j.status==='error')fail(j.error||'ไม่ทราบสาเหตุ — ลองใหม่อีกครั้ง');
   else setTimeout(()=>poll(id),1000);
 }
-
-function setStatus(s){const[c,t]=STAT[s];$('#statusPill').innerHTML=
-  `<span class="dot" style="background:${c}"></span>${t} (${s})`;$('#statusPill').style.borderColor=c;}
-
-function bar(k,v,max,color,sw){
-  const p=max?v/max*100:0;
-  return `<div class="row"><span class="k">${sw?`<span class="sw" style="background:${color}"></span>`:''}${esc(k)}</span>
-    <span class="track"><span class="fill" style="width:${p.toFixed(1)}%;background:${color}"></span></span>
-    <span class="n">${v}</span></div>`;
+function setLive(text,color,pulse){
+  $('#liveText').textContent=text;
+  $('#livePill').style.borderColor=color;
+  $('#livePill').querySelector('.dot').style.background=color;
+  $('#livePill').classList.toggle('on',!!pulse);
 }
 
+/* ═══════════════════════════ render ═══════════════════════════ */
+const TLabel=t=>(DATA&&DATA.topic_labels&&DATA.topic_labels[t])||t;
+
 function render(r){
-  DATA=r;FILT={sent:'all',topic:'',q:'',sort:'reach'};
-  $('#results').classList.remove('hidden');setStatus(r.status);
-  $('#genAt').textContent='อัปเดต '+(r.generated_at||'')+' · '+(r.source==='facebook'?'Facebook จริง':'ตัวอย่าง');
+  DATA=r;FILT={sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50};
+  $('#search').value='';$('#topicFilter').value='';$('#sortBy').value='reach';
+  $('#results').classList.remove('hidden');$('#welcome').classList.add('hidden');
+  $('#setup').classList.add('hidden');$('#setupSummary').classList.remove('hidden');
 
+  const st=STAT[r.status]||STAT.NORMAL;
+  setLive(st.t,st.c);
+  $('#sumPill').style.borderColor=st.c;
+  $('#sumPill').querySelector('.dot').style.background=st.c;
+  $('#sumStatus').textContent=st.t;
+  $('#sumText').innerHTML=`ตรวจ <b>${nf(r.total)}</b> คอมเมนต์จาก`
+    +` <b>${r.source==='facebook'?'Facebook จริง':'ข้อมูลตัวอย่าง'}</b> · อัปเดตล่าสุด ${esc(r.generated_at||'')}`;
+
+  renderVerdict(r);renderKpis(r);renderAlerts(r);renderSentiment(r);renderTopics(r);
+  renderTimeline();renderTopicFilter(r);renderChips();renderTable();
+  $('#methodFoot').textContent=
+    `เกณฑ์ที่ใช้ตอนนี้: เตือนเมื่อความแรงของชั่วโมงนั้นเกินค่าปกติ ${r.thresholds?.spike_factor??2.5} เท่า `
+   +`(และมีน้ำหนักอย่างน้อย ${r.thresholds?.min_severity??30}) · คอมเมนต์ลบที่มีไลก์+ตอบกลับตั้งแต่ `
+   +`${r.thresholds?.viral_reach??150} ขึ้นไป ถือว่ากระจายวงกว้าง`;
+  $('#verdict').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function windowText(r){
+  const cs=(r.comments||[]).map(c=>c.created_at).filter(Boolean).sort();
+  if(!cs.length)return '—';
+  const a=P(cs[0]),b=P(cs[cs.length-1]);
+  if(!a||!b)return '—';
+  return a.date===b.date ? `${fmtDay(cs[0])} ${a.h}:${a.mi}–${b.h}:${b.mi} น.`
+                         : `${fmtDay(cs[0])} – ${fmtDay(cs[cs.length-1])}`;
+}
+
+function renderVerdict(r){
+  const st=STAT[r.status]||STAT.NORMAL;
   const sm=r.sentiment_mix||{},tot=r.total||1;
-  const negP=Math.round((sm.negative||0)/tot*100),escP=Math.round((r.escalated_count||0)/tot*100);
-  const kpi=[['คอมเมนต์ทั้งหมด',r.total],['เชิงลบ',`${negP}%`],['จำนวนลบ',sm.negative||0],
-    ['ผู้คอมเมนต์',r.unique_authors??'–'],['reach เฉลี่ย',r.avg_reach??'–'],['reach สูงสุด',r.max_reach??'–']];
-  $('#kpis').innerHTML=kpi.map(([l,v])=>`<div class="kpi"><div class="v tnum">${v}</div><div class="l">${l}</div></div>`).join('');
+  const negP=Math.round((sm.negative||0)/tot*100);
+  const spike=(r.buckets||[]).find(b=>b.is_spike);
+  const emerging=(r.topic_trends||[]).filter(t=>t.is_emerging);
+  const viral=(r.alert_items||[]).filter(a=>a.kind==='viral');
+  const top=(r.topic_trends||[])[0];
 
-  $('#sentiment').innerHTML=['negative','neutral','positive'].map(k=>
-    bar(SENT[k].t,sm[k]||0,tot,SENT[k].c,true)).join('')
-    + `<div class="row" style="color:var(--muted);font-size:12px;margin-top:8px">
-       <span class="k">ส่งต่อ LLM</span><span class="track" style="background:none"></span><span class="n">${escP}%</span></div>`;
+  let sum,act;
+  if(spike){
+    const times=spike.baseline?Math.round(spike.severity/spike.baseline):0;
+    const lead=(r.alert_items||[]).find(a=>a.kind==='spike');
+    sum=`คอมเมนต์ลบ<b>พุ่งผิดปกติ</b>ช่วง <b>${esc(spike.start)} น.</b> — ชั่วโมงนั้นมีคอมเมนต์ลบ `
+       +`${spike.negative} จาก ${spike.total} คอมเมนต์`
+       +(times>1?` แรงกว่าช่วงปกติราว ${nf(times)} เท่า`:'')
+       +(top?` · เรื่องที่คนบ่นมากสุดคือ “${esc(top.label)}”`:'');
+    act=`แจ้ง <b>${esc(lead?.owner||top?.owner||'ทีมที่เกี่ยวข้อง')}</b> ให้ตรวจสอบทันที `
+       +`· เตรียมข้อความชี้แจงในเพจ · กลับมาตรวจซ้ำอีกครั้งใน 1 ชั่วโมง`;
+  }else if(emerging.length){
+    const e=emerging[0];
+    sum=`ยังไม่ถึงขั้นวิกฤต แต่เรื่อง <b>“${esc(e.label)}”</b> ถูกพูดถึงในแง่ลบมากขึ้นในช่วงล่าสุด `
+       +`(${e.negative} คอมเมนต์ · ${Math.round(e.share)}% ของคอมเมนต์ลบทั้งหมด)`;
+    act=`ให้ <b>${esc(e.owner)}</b> รับทราบไว้ก่อน · ตรวจซ้ำอีกครั้งใน 1–2 ชั่วโมงเพื่อดูว่าโตต่อไหม`;
+  }else if(viral.length){
+    sum=`มีคอมเมนต์เชิงลบที่<b>คนเห็นเยอะผิดปกติ</b> ${viral.length} รายการ แม้ภาพรวมยังไม่พุ่ง`;
+    act=`เข้าไปตอบคอมเมนต์นั้นก่อนที่คนจะแชร์ต่อ · ดูรายการด้านล่าง`;
+  }else if(negP>40){
+    sum=`คอมเมนต์ส่วนใหญ่เป็นเชิงลบ (<b>${negP}%</b>) แม้ยังไม่มีช่วงเวลาไหนที่พุ่งผิดปกติ`;
+    act=`ยังไม่ต้องประกาศอะไร แต่ควรดูว่าเป็นความไม่พอใจสะสมเรื่องอะไร (ดูตาราง “เรื่องที่คนบ่น”)`;
+  }else{
+    sum=`ไม่พบช่วงเวลาที่คอมเมนต์ลบพุ่งผิดปกติ · อารมณ์โดยรวมของคอมเมนต์อยู่ในเกณฑ์ปกติ (ลบ ${negP}%)`;
+    act=`ยังไม่ต้องทำอะไรเป็นพิเศษ · ตรวจซ้ำอีกครั้งในอีก 2–3 ชั่วโมงก็พอ`;
+  }
 
+  $('#verdict').style.setProperty('--vc',st.c);
+  $('#verdict').innerHTML=`
+    <div>
+      <div class="vhead"><span class="vdot"></span><b>${esc(st.head)}</b></div>
+      <div class="vsum">${sum}</div>
+      <div class="vact"><span>👉</span><div><b>ควรทำอะไรต่อ:</b> ${act}</div></div>
+    </div>
+    <div class="vfacts">
+      <div class="vfact"><div class="l">ช่วงเวลาของข้อมูล</div><div class="v">${esc(windowText(r))}</div></div>
+      <div class="vfact"><div class="l">คอมเมนต์ที่อ่าน</div><div class="v tnum">${nf(r.total)} รายการ</div></div>
+      <div class="vfact"><div class="l">จากผู้ใช้</div><div class="v tnum">${r.unique_authors!=null?nf(r.unique_authors)+' คน':'–'}</div></div>
+    </div>`;
+}
+
+function renderKpis(r){
+  const sm=r.sentiment_mix||{},tot=r.total||1;
+  const negP=Math.round((sm.negative||0)/tot*100);
+  const worstB=(r.buckets||[]).slice().sort((a,b)=>b.severity-a.severity)[0];
+  const cs=(r.comments||[]).filter(c=>c.sentiment==='negative').sort((a,b)=>b.reach-a.reach);
+  const loud=cs[0];
+  const tiles=[
+    {l:'คอมเมนต์ที่อ่านทั้งหมด',q:'จำนวนคอมเมนต์ทั้งหมดที่ระบบดึงมาวิเคราะห์ในรอบนี้',
+     v:nf(r.total),d:`ในช่วง ${windowText(r)}`},
+    {l:'สัดส่วนคอมเมนต์เชิงลบ',q:'ยิ่งสูงยิ่งแปลว่าคนพูดถึงในแง่ลบเยอะ · เกิน 40% ถือว่าน่าเป็นห่วง',
+     v:`${negP}<small>%</small>`,d:`${nf(sm.negative||0)} จาก ${nf(r.total)} คอมเมนต์`,
+     color:negP>=40?'var(--neg)':negP>=25?'var(--warn)':''},
+    // ไม่มีคอมเมนต์ลบเลย = ไม่มี "ชั่วโมงที่หนักสุด" จริง ๆ — โชว์เวลาไปก็ทำให้เข้าใจผิด
+    {l:'ชั่วโมงที่หนักสุด',q:'ชั่วโมงที่คอมเมนต์ลบสร้างแรงกระแทกมากที่สุด (นับรวมยอดไลก์+ตอบกลับ)',
+     v:(worstB&&worstB.negative)?esc(worstB.start):'–',
+     d:(worstB&&worstB.negative)
+       ?`คอมเมนต์ลบ ${worstB.negative} จาก ${worstB.total} รายการ${worstB.is_spike?' · พุ่งผิดปกติ':''}`
+       :'ยังไม่มีคอมเมนต์เชิงลบเลย',
+     color:worstB&&worstB.is_spike?'var(--neg)':''},
+    {l:'คอมเมนต์ลบที่คนเห็นมากสุด',q:'คอมเมนต์เชิงลบที่มีไลก์+ตอบกลับสูงสุด — ยิ่งสูงยิ่งกระจายไกล',
+     v:loud?nf(loud.reach):'–',d:loud?`โดย ${esc(loud.author)}`:'ไม่มีคอมเมนต์เชิงลบ',
+     color:loud&&loud.reach>=(r.thresholds?.viral_reach??150)?'var(--neg)':''},
+  ];
+  $('#kpis').innerHTML=tiles.map(t=>`<div class="kpi">
+    <div class="l">${esc(t.l)}<span class="q" title="${esc(t.q)}">?</span></div>
+    <div class="v tnum" ${t.color?`style="color:${t.color}"`:''}>${t.v}</div>
+    <div class="d">${t.d}</div></div>`).join('');
+}
+
+function renderAlerts(r){
+  const items=r.alert_items||[];
+  const ICON={spike:['🚨','var(--neg)'],emerging:['📈','var(--warn)'],viral:['🔥','var(--warn)']};
+  if(!items.length){
+    $('#alerts').innerHTML=`<div class="calm"><span style="font-size:18px">✅</span>
+      <div><b>ยังไม่พบสัญญาณผิดปกติ</b><br><span style="color:var(--muted);font-size:13px">
+      ไม่มีช่วงเวลาที่คอมเมนต์ลบพุ่ง ไม่มีประเด็นใหม่มาแรง และไม่มีคอมเมนต์ลบที่กระจายวงกว้าง</span></div></div>`;
+    return;
+  }
+  const order={spike:0,emerging:1,viral:2};
+  $('#alerts').innerHTML=items.slice().sort((a,b)=>(order[a.kind]??9)-(order[b.kind]??9)).map((a,i)=>{
+    const [ic,col]=ICON[a.kind]||['•','var(--muted)'];
+    return `<div class="alert" style="--ac:${col}">
+      <span class="ai">${ic}</span>
+      <div class="body">
+        <div class="t">${esc(a.title)}</div>
+        <div class="d">${esc(a.detail)}</div>
+        <div class="foot">
+          ${a.owner?`<span class="owner">ส่งต่อ: ${esc(a.owner)}</span>`:''}
+          <button class="linkbtn" data-alert="${i}">ดูคอมเมนต์ที่เกี่ยวข้อง →</button>
+        </div>
+      </div></div>`;
+  }).join('');
+  const sorted=items.slice().sort((a,b)=>(order[a.kind]??9)-(order[b.kind]??9));
+  $('#alerts').querySelectorAll('[data-alert]').forEach(btn=>btn.onclick=()=>{
+    const a=sorted[+btn.dataset.alert];
+    FILT.sent='negative';FILT.topic=a.topic||'';FILT.bucket=a.kind==='spike'?(a.bucket_iso||''):'';
+    FILT.q='';FILT.sort='reach';FILT.limit=50;
+    $('#search').value='';$('#topicFilter').value=FILT.topic;$('#sortBy').value='reach';
+    renderChips();renderTable();renderTimeline();
+    $('#explorer').scrollIntoView({behavior:'smooth',block:'start'});
+  });
+}
+
+function renderSentiment(r){
+  const sm=r.sentiment_mix||{},tot=r.total||1;
+  const keys=['negative','neutral','positive'];
+  const stack=keys.map(k=>`<i style="width:${((sm[k]||0)/tot*100).toFixed(1)}%;background:${SENT[k].c}"
+     title="${SENT[k].t} ${sm[k]||0}"></i>`).join('');
+  const rows=keys.map(k=>{
+    const n=sm[k]||0,p=Math.round(n/tot*100);
+    return `<button class="srow ${FILT.sent===k?'on':''}" data-s="${k}">
+      <span class="sw" style="background:${SENT[k].c}"></span>
+      <span class="nm">${SENT[k].t}</span>
+      <span class="pc" style="color:${SENT[k].c}">${p}%</span>
+      <span class="ct">${nf(n)} รายการ</span></button>`;}).join('');
+  $('#sentiment').innerHTML=`<div class="stack">${stack}</div><div class="slist">${rows}</div>
+    <div class="foot-note">🤖 มี <b>${nf(r.escalated_count||0)}</b> คอมเมนต์ที่กำกวมหรือเข้าข่ายประชด
+      ถูกส่งให้ AI อีกชั้นอ่านซ้ำเพื่อความแม่นยำ (${Math.round((r.escalated_count||0)/tot*100)}% ของทั้งหมด)</div>`;
+  $('#sentiment').querySelectorAll('.srow').forEach(b=>b.onclick=()=>{
+    FILT.sent=FILT.sent===b.dataset.s?'all':b.dataset.s;FILT.limit=50;
+    renderSentiment(DATA);renderChips();renderTable();
+    $('#explorer').scrollIntoView({behavior:'smooth',block:'start'});});
+}
+
+function renderTopics(r){
   const tt=r.topic_trends||[];
-  $('#topics').innerHTML=tt.length?`<table><thead><tr><th>ประเด็น</th><th class="rch">ลบ</th>
-    <th class="rch">สัดส่วน</th><th class="rch">severity</th><th>หนักสุด</th><th>ส่งต่อทีม</th></tr></thead><tbody>`
-    +tt.map(t=>`<tr class="${t.is_emerging?'em':''}">
-      <td>${esc(t.label)}${t.is_emerging?'<span class="up">📈 มาแรง</span>':''}</td>
-      <td class="rch">${t.negative}</td><td class="rch">${t.share}%</td>
-      <td class="rch tnum">${t.severity}</td><td class="when">${esc(t.peak)}</td>
-      <td class="own">${esc(t.owner)}</td></tr>`).join('')+'</tbody></table>'
-    :'<div style="color:var(--muted);font-size:13px">ไม่มีประเด็นเชิงลบ</div>';
+  if(!tt.length){$('#topics').innerHTML='<div class="empty">ไม่พบคอมเมนต์เชิงลบ — ยังไม่มีเรื่องที่ต้องแก้ 🎉</div>';return;}
+  // แท่งวัดด้วย "ความแรง" (severity) ให้ตรงกับลำดับที่เรียง — ถ้าวัดด้วยจำนวน
+  // จะเห็นแท่งสั้นอยู่เหนือแท่งยาว (เรื่องคนบ่นน้อยแต่คนไลก์เยอะ) แล้วงงว่าเรียงจากอะไร
+  const max=Math.max(...tt.map(t=>t.severity),1);
+  $('#topics').innerHTML=tt.map((t,i)=>`
+    <button class="trow ${FILT.topic===t.topic?'on':''}" data-t="${esc(t.topic)}"
+      title="ความแรง ${nf(Math.round(t.severity))} = จำนวนคอมเมนต์ลบ ถ่วงด้วยยอดไลก์+ตอบกลับ">
+      <span class="rk">${i+1}</span>
+      <span>
+        <span class="nm">${esc(t.label)}${t.is_emerging?'<span class="hot">📈 กำลังมาแรง</span>':''}</span>
+        <span class="meta">${Math.round(t.share)}% ของคอมเมนต์ลบ · หนักสุด ${esc(t.peak)} น. · ทีม ${esc(t.owner)}</span>
+        <span class="tbar"><i style="width:${(t.severity/max*100).toFixed(0)}%"></i></span>
+      </span>
+      <span class="rt"><span class="n">${nf(t.negative)}</span><span class="u">คอมเมนต์ลบ</span></span>
+    </button>`).join('');
+  $('#topics').querySelectorAll('.trow').forEach(b=>b.onclick=()=>{
+    FILT.topic=FILT.topic===b.dataset.t?'':b.dataset.t;FILT.limit=50;
+    $('#topicFilter').value=FILT.topic;
+    renderTopics(DATA);renderTable();
+    $('#explorer').scrollIntoView({behavior:'smooth',block:'start'});});
+}
 
-  const sev=Math.max(1,...r.buckets.map(b=>b.severity));
-  $('#timeline').innerHTML=r.buckets.map(b=>`<div class="col">
-    <div class="bar ${b.is_spike?'sp':''}" style="height:${(b.severity/sev*100).toFixed(0)}%"
-      title="${b.start} · ลบ ${b.negative} · severity ${b.severity}"></div><div class="x">${b.start}</div></div>`).join('');
+/* ─── timeline ─── */
+$('#tlMode').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  TLMODE=b.dataset.m;$$('#tlMode button').forEach(x=>x.classList.toggle('on',x===b));renderTimeline();};
 
-  $('#alerts').innerHTML=(r.alerts&&r.alerts.length)?r.alerts.map(a=>`<div class="alert">${esc(a)}</div>`).join('')
-    :'<div class="alert" style="border-left-color:var(--pos)">ไม่มีสัญญาณผิดปกติ</div>';
+function renderTimeline(){
+  const r=DATA,bs=r.buckets||[],mins=r.bucket_minutes||60;
+  const isSev=TLMODE==='sev';
+  // ทั้งแกน Y / ความสูงแท่ง / เส้นค่าเฉลี่ย ต้องอยู่ "หน่วยเดียวกัน" ไม่งั้นกราฟโกหก
+  //   โหมดจำนวน : หน่วย = จำนวนคอมเมนต์ · แท่ง = คอมเมนต์ทั้งหมด (ส่วนแดงล่าง = ลบ) · เส้น = ค่าเฉลี่ยคอมเมนต์ลบ
+  //   โหมดความแรง: หน่วย = ความแรง · แท่ง = severity ทั้งแท่ง · เส้น = ค่าเฉลี่ย severity
+  const bar=b=>isSev?b.severity:b.total;
+  const axisMax=Math.max(1,...bs.map(bar));
+  const avgOf=b=>isSev?b.severity:b.negative;
+  const avg=bs.length?bs.reduce((s,b)=>s+avgOf(b),0)/bs.length:0;
+  const avgLabel=isSev?'ความแรงเฉลี่ย':'ค่าเฉลี่ยคอมเมนต์ลบ';
 
-  // topic filter: ดึงจากคอมเมนต์ "ทุกอารมณ์" ไม่ใช่เฉพาะเชิงลบ — ไม่งั้นกรองประเด็นที่ยังไม่เป็นดราม่าไม่ได้
+  $('#tlSub').textContent=isSev
+    ? 'ความสูง = ความแรงของคอมเมนต์ลบ (จำนวน ถ่วงด้วยยอดไลก์+ตอบกลับ) — ยอดที่พุ่งสูงคือช่วงที่ต้องรีบดู'
+    : 'ความสูง = จำนวนคอมเมนต์ในชั่วโมงนั้น · ส่วนสีแดงด้านล่างคือคอมเมนต์เชิงลบ';
+  $('#tlLegend').innerHTML=
+    `<span><i style="background:var(--neg)"></i>คอมเมนต์เชิงลบ</span>`
+   +(isSev?'':`<span><i style="background:var(--border2)"></i>คอมเมนต์อื่น ๆ (บวก/กลาง)</span>`)
+   +`<span><i style="background:transparent;border-top:2px dashed var(--accent);height:0;width:16px;border-radius:0"></i>${avgLabel}</span>`
+   +`<span>🚨 = ช่วงที่ระบบตัดสินว่าผิดปกติ</span>`;
+
+  $('#yax').innerHTML=[axisMax,axisMax/2,0].map(v=>`<div>${nf(Math.round(v))}</div>`).join('');
+
+  let prevDate='';
+  $('#plot').innerHTML=bs.map((b,i)=>{
+    const h=bar(b)/axisMax*100;
+    const negFrac=isSev?100:(b.total?b.negative/b.total*100:0);
+    const key=bkey(b.start_iso||'',mins);
+    const on=FILT.bucket&&bkey(FILT.bucket,mins)===key;
+    return `<button class="col ${b.is_spike?'spike':''} ${on?'on':''}" data-i="${i}"
+      aria-label="ช่วง ${esc(b.start)} คอมเมนต์ทั้งหมด ${b.total} เชิงลบ ${b.negative}">
+      ${b.is_spike?`<span class="spikeflag" style="bottom:calc(${h.toFixed(1)}% + 6px)">🚨 พุ่ง</span>`:''}
+      <span class="stk" style="height:${Math.max(h,1.2).toFixed(1)}%">
+        <span class="rest" style="flex:${(100-negFrac).toFixed(1)}"></span>
+        <span class="neg" style="flex:${negFrac.toFixed(1)}"></span>
+      </span></button>`;}).join('')
+    +(avg>0?`<span class="avgline" style="bottom:${(avg/axisMax*100).toFixed(1)}%"><b>${avgLabel} ${nf(Math.round(avg))}</b></span>`:'');
+
+  $('#xax').innerHTML=bs.map(b=>{
+    const d=fmtDay(b.start_iso||''),show=d!==prevDate;prevDate=d;
+    return `<div>${esc(b.start)}${show&&d?`<b>${esc(d)}</b>`:''}</div>`;}).join('');
+
+  const spikes=bs.filter(b=>b.is_spike).length;
+  $('#tlFoot').innerHTML=spikes
+    ? `พบช่วงที่ผิดปกติ <b>${spikes}</b> ช่วง · กดที่แท่งกราฟเพื่อดูคอมเมนต์ของช่วงเวลานั้น`
+    : `ไม่พบช่วงเวลาที่พุ่งผิดปกติ · กดที่แท่งกราฟเพื่อดูคอมเมนต์ของช่วงเวลานั้น`;
+
+  const tip=$('#tip');
+  $('#plot').querySelectorAll('.col').forEach(col=>{
+    const b=bs[+col.dataset.i];
+    const times=b.baseline?` (แรงกว่าค่าปกติตอนนั้น ${(b.severity/b.baseline).toFixed(1)} เท่า)`:'';
+    col.onmousemove=ev=>{
+      tip.innerHTML=`<b>${esc(fmtDay(b.start_iso||''))} ${esc(b.start)} น.</b><br>`
+        +`คอมเมนต์ทั้งหมด ${nf(b.total)} · เชิงลบ <b style="color:#ff8a80">${nf(b.negative)}</b><br>`
+        +`ความแรง ${nf(Math.round(b.severity))}${b.is_spike?times:''}`
+        +(b.is_spike?'<br>🚨 ระบบตัดสินว่าผิดปกติ':'');
+      tip.classList.add('show');
+      const x=Math.min(ev.clientX+14,innerWidth-tip.offsetWidth-10);
+      tip.style.left=x+'px';tip.style.top=(ev.clientY-tip.offsetHeight-12)+'px';};
+    col.onmouseleave=()=>tip.classList.remove('show');
+    col.onclick=()=>{
+      const key=b.start_iso||'';
+      FILT.bucket=(FILT.bucket&&bkey(FILT.bucket,mins)===bkey(key,mins))?'':key;
+      FILT.limit=50;renderTimeline();renderTable();
+      $('#explorer').scrollIntoView({behavior:'smooth',block:'start'});};
+  });
+}
+
+/* ─── explorer ─── */
+function renderTopicFilter(r){
+  // ดึงจากคอมเมนต์ "ทุกอารมณ์" ไม่ใช่เฉพาะเชิงลบ — ไม่งั้นกรองประเด็นที่ยังไม่เป็นดราม่าไม่ได้
   const all={};(r.comments||[]).forEach(c=>(c.topics||[]).forEach(t=>all[t]=(all[t]||0)+1));
   $('#topicFilter').innerHTML='<option value="">ทุกประเด็น</option>'+
     Object.entries(all).sort((a,b)=>b[1]-a[1])
       .map(([t,n])=>`<option value="${esc(t)}">${esc(TLabel(t))} (${n})</option>`).join('');
-  renderChips();renderTable();
-  $('#results').scrollIntoView({behavior:'smooth',block:'start'});
 }
-
 function renderChips(){
   const cs=DATA.comments,cnt=s=>s==='all'?cs.length:cs.filter(c=>c.sentiment===s).length;
-  const defs=[['all','ทั้งหมด'],['negative','ลบ'],['neutral','กลาง'],['positive','บวก']];
+  const defs=[['all','ทั้งหมด'],['negative','เชิงลบ'],['neutral','กลาง ๆ'],['positive','เชิงบวก']];
   $('#sentChips').innerHTML=defs.map(([k,l])=>
-    `<span class="chip ${FILT.sent===k?'on':''}" data-s="${k}">${l}<span class="c">${cnt(k)}</span></span>`).join(' ');
-  $('#sentChips').querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{FILT.sent=ch.dataset.s;renderChips();renderTable();});
+    `<button class="chip ${FILT.sent===k?'on':''}" data-s="${k}">${l}<span class="c">${nf(cnt(k))}</span></button>`).join('');
+  $('#sentChips').querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
+    FILT.sent=ch.dataset.s;FILT.limit=50;renderChips();renderSentiment(DATA);renderTable();});
 }
-
+function renderActiveBar(shown,total){
+  const parts=[];
+  if(FILT.sent!=='all')parts.push(['sent',`อารมณ์: ${SENT[FILT.sent].t}`]);
+  if(FILT.topic)parts.push(['topic',`เรื่อง: ${TLabel(FILT.topic)}`]);
+  if(FILT.bucket)parts.push(['bucket',`ช่วงเวลา: ${fmtFull(FILT.bucket)}`]);
+  if(FILT.q)parts.push(['q',`ค้นหา: “${FILT.q}”`]);
+  const bar=$('#activeBar');
+  if(!parts.length){bar.classList.add('hidden');return;}
+  bar.classList.remove('hidden');
+  bar.innerHTML=`<span style="color:var(--ink2)">กำลังดู <b>${nf(total)}</b> คอมเมนต์ที่ตรงกับ:</span>`
+    +parts.map(([k,l])=>`<span class="fchip">${esc(l)}<button data-clr="${k}" title="เอาตัวกรองนี้ออก">✕</button></span>`).join('')
+    +`<span class="grow"></span><button class="linkbtn" data-clr="all">ล้างตัวกรองทั้งหมด</button>`;
+  bar.querySelectorAll('[data-clr]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.clr;
+    if(k==='all')FILT={...FILT,sent:'all',topic:'',bucket:'',q:''};
+    else if(k==='sent')FILT.sent='all';else if(k==='q')FILT.q='';else FILT[k]='';
+    $('#search').value=FILT.q;$('#topicFilter').value=FILT.topic;
+    renderChips();renderSentiment(DATA);renderTopics(DATA);renderTimeline();renderTable();});
+}
+function hl(text,q){
+  const e=esc(text);if(!q)return e;
+  const qq=esc(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return e.replace(new RegExp(qq,'gi'),m=>`<mark>${m}</mark>`);
+}
 function renderTable(){
+  const mins=DATA.bucket_minutes||60;
   let cs=DATA.comments.slice();
   if(FILT.sent!=='all')cs=cs.filter(c=>c.sentiment===FILT.sent);
   if(FILT.topic)cs=cs.filter(c=>(c.topics||[]).includes(FILT.topic));
-  if(FILT.q){const q=FILT.q.toLowerCase();cs=cs.filter(c=>(c.text||'').toLowerCase().includes(q)||(c.author||'').toLowerCase().includes(q));}
+  if(FILT.bucket){const k=bkey(FILT.bucket,mins);cs=cs.filter(c=>bkey(c.created_at,mins)===k);}
+  if(FILT.q){const q=FILT.q.toLowerCase();
+    cs=cs.filter(c=>(c.text||'').toLowerCase().includes(q)||(c.author||'').toLowerCase().includes(q));}
   cs.sort((a,b)=>FILT.sort==='reach'?b.reach-a.reach:
     FILT.sort==='new'?b.created_at.localeCompare(a.created_at):a.created_at.localeCompare(b.created_at));
 
-  $('#rows').innerHTML=cs.slice(0,300).map(c=>{
-    const s=SENT[c.sentiment],d=c.created_at.replace('T',' ').slice(0,16);
-    const who=c.profile_url?`<a href="${esc(c.profile_url)}" target="_blank" rel="noopener">${esc(c.author)}</a>`:esc(c.author);
-    const link=c.comment_url?`<a class="ext" href="${esc(c.comment_url)}" target="_blank" rel="noopener" title="เปิดคอมเมนต์">↗</a>`:'';
-    const topics=(c.topics||[]).map(t=>`<span class="topic" title="${esc(t)}">${esc(TLabel(t))}</span>`).join('')||'<span style="color:var(--muted)">—</span>';
+  const maxReach=Math.max(1,...DATA.comments.map(c=>c.reach));
+  const shown=cs.slice(0,FILT.limit);
+  $('#rows').innerHTML=shown.map(c=>{
+    const s=SENT[c.sentiment];
+    const who=c.profile_url?`<a href="${esc(c.profile_url)}" target="_blank" rel="noopener">${hl(c.author,FILT.q)}</a>`:hl(c.author,FILT.q);
+    const link=c.comment_url?`<a href="${esc(c.comment_url)}" target="_blank" rel="noopener" title="เปิดคอมเมนต์จริงบน Facebook" style="color:var(--muted)">↗</a>`:'';
+    const topics=(c.topics||[]).map(t=>`<span class="topic" data-t="${esc(t)}" title="กดเพื่อกรองเฉพาะเรื่องนี้">${esc(TLabel(t))}</span>`).join('')
+      ||'<span style="color:var(--muted)">—</span>';
+    const long=(c.text||'').length>150;
     return `<tr class="s-${c.sentiment}">
-      <td class="when">${d}</td>
+      <td class="when"><b>${esc(fmtTime(c.created_at))}</b>${esc(fmtDay(c.created_at))}</td>
       <td class="who" title="${esc(c.author)}">${who}</td>
-      <td class="txt">${esc(c.text)}${c.escalated_to_llm?'<span class="ai">AI</span>':''}</td>
-      <td><span class="tag" style="color:${s.c};background:color-mix(in srgb,${s.c} 12%,transparent)"><span class="dot" style="background:${s.c}"></span>${s.t}</span></td>
+      <td class="txt ${long?'clamp':''}"><span class="t">${hl(c.text,FILT.q)}</span>${
+        c.escalated_to_llm?'<span class="aibadge" title="คอมเมนต์นี้กำกวม/อาจเป็นการประชด จึงส่งให้ AI อ่านซ้ำอีกชั้น">AI อ่านซ้ำ</span>':''}${
+        long?'<br><button class="more">อ่านต่อ</button>':''}</td>
+      <td><span class="tag" style="color:${s.c};background:color-mix(in srgb,${s.c} 13%,transparent)"><span class="dot" style="background:${s.c}"></span>${s.t}</span></td>
       <td>${topics}</td>
-      <td class="rch">${c.reach}</td>
+      <td class="rch"><span class="tnum">${nf(c.reach)}</span><span class="rbar"><i style="width:${(c.reach/maxReach*100).toFixed(0)}%;background:${c.sentiment==='negative'?'var(--neg)':'var(--muted)'}"></i></span></td>
       <td class="post" title="${esc(c.post_title||'')}">${esc(c.post_title||'—')}</td>
-      <td>${link}</td></tr>`;
-  }).join('')||'<tr><td colspan="8" class="empty">ไม่พบคอมเมนต์ตามเงื่อนไข</td></tr>';
-  $('#count').textContent=`แสดง ${Math.min(cs.length,300)} จาก ${cs.length} คอมเมนต์`+(cs.length>300?' (จำกัด 300 แถวแรก)':'');
+      <td>${link}</td></tr>`;}).join('')
+    ||`<tr><td colspan="8" class="empty">ไม่พบคอมเมนต์ที่ตรงกับเงื่อนไข<br>
+        <button class="linkbtn" onclick="document.querySelector('[data-clr=all]')?.click()">ล้างตัวกรองทั้งหมด</button></td></tr>`;
+
+  $('#rows').querySelectorAll('.more').forEach(b=>b.onclick=()=>{
+    const td=b.closest('td');td.classList.toggle('clamp');
+    b.textContent=td.classList.contains('clamp')?'อ่านต่อ':'ย่อ';});
+  $('#rows').querySelectorAll('.topic[data-t]').forEach(t=>t.onclick=()=>{
+    FILT.topic=t.dataset.t;FILT.limit=50;$('#topicFilter').value=FILT.topic;
+    renderTopics(DATA);renderTable();});
+
+  const more=cs.length-shown.length;
+  $('#count').innerHTML=`<span>แสดง <b>${nf(shown.length)}</b> จาก ${nf(cs.length)} คอมเมนต์</span>`
+    +(more>0?`<button class="ghost" id="moreBtn">แสดงเพิ่มอีก ${nf(Math.min(more,100))} รายการ</button>`:'');
+  if(more>0)$('#moreBtn').onclick=()=>{FILT.limit+=100;renderTable();};
+  renderActiveBar(shown.length,cs.length);
 }
 
-$('#topicFilter').onchange=e=>{FILT.topic=e.target.value;renderTable();};
+$('#topicFilter').onchange=e=>{FILT.topic=e.target.value;FILT.limit=50;renderTopics(DATA);renderTable();};
 $('#sortBy').onchange=e=>{FILT.sort=e.target.value;renderTable();};
-$('#search').oninput=e=>{FILT.q=e.target.value;renderTable();};
+let qt;$('#search').oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{
+  FILT.q=e.target.value.trim();FILT.limit=50;renderTable();},180);};
 </script>
 </body>
 </html>

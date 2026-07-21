@@ -48,7 +48,10 @@ def main() -> int:
 
     # 2) หน้าเว็บ index โหลดได้
     html = urllib.request.urlopen(BASE + "/", timeout=10).read().decode()
-    check("หน้าเว็บ index โหลดได้ + มีปุ่ม", "ดึงข้อมูล" in html and "runBtn" in html)
+    # เช็ค id ของ element ที่ JS ผูกไว้ ไม่เช็คข้อความบนปุ่ม — ข้อความปรับถ้อยคำได้เรื่อย ๆ
+    check("หน้าเว็บ index โหลดได้ + มี element หลักครบ",
+          all(f'id="{i}"' in html for i in ("runBtn", "results", "verdict", "kpis", "alerts",
+                                            "plot", "rows", "prog")))
 
     # 3) กดปุ่ม (โหมด demo) → poll จนเสร็จ
     job_id = post("/api/run", {"source": "sample"})["job_id"]
