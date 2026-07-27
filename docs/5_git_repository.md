@@ -15,8 +15,9 @@ crisis_radar/
 ├── backend/                    # 🖥️ web app (stdlib) — team กดปุ่มใช้
 │   ├── server.py               # http server + API
 │   ├── jobs.py                 # background job runner
-│   ├── selftest.py             # ทดสอบ web e2e (10 test)
-│   └── static/index.html       # หน้าเว็บ (ปุ่มเดียว)
+│   ├── monitor.py              # เฝ้าเพจอัตโนมัติ + เก็บ snapshot ล่าสุด
+│   ├── selftest.py             # ทดสอบ web + monitor + override + archive e2e (31 test)
+│   └── static/index.html       # หน้าเว็บ (จอสถานะ + แก้ label ที่ AI ทายพลาด)
 ├── data/
 │   └── sample_talesrunner_fb_comments.json   # synthetic fixture (ชื่อสมมติ)
 ├── src/
@@ -29,12 +30,14 @@ crisis_radar/
 │   ├── classify/
 │   │   ├── lexicon.py          # Thai sentiment ชั้น 1
 │   │   ├── llm.py              # LLM escalation ชั้น 2
+│   │   ├── overrides.py        # คำตัดสินของคนที่ทับผล AI (แก้เคสที่ AI อ่านผิด)
+│   ├── archive.py          # คลัง 'อ่านแล้ว' — ออกจากหน้า Monitor + ไม่ classify ซ้ำ
 │   │   └── pipeline.py         # hybrid routing
 │   └── crisis/
 │       └── detector.py         # spike detection + report
 ├── tests/
 │   ├── labeled_test_set.json
-│   └── run_tests.py            # 13 test, รัน offline
+│   └── run_tests.py            # 23 test, รัน offline
 ├── output/                     # ผลลัพธ์ (gitignore ไฟล์ generated)
 └── docs/                       # เอกสารส่ง 7 หัวข้อ
 ```

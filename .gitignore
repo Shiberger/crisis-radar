@@ -9,6 +9,17 @@ data/facebook_live_*.json
 data/dataset*.json
 data/*.csv
 
+# state ของตัวเฝ้าเพจอัตโนมัติ (ผลตรวจล่าสุด — มีคอมเมนต์จริงอยู่ข้างใน)
+data/monitor_latest.json
+data/monitor_history.json
+
+# label ที่ทีมแก้เอง — key เป็น comment_id ของ Facebook (ระบุตัวตนย้อนได้) จึงไม่ขึ้น git
+# ถ้า deploy จริงควร mount disk ถาวรให้ไฟล์นี้ ไม่งั้นที่ทีมแก้ไว้จะหายตอน restart
+data/overrides.json
+
+# คลังคอมเมนต์ที่ทีมกด "อ่านแล้ว" — เก็บตัวคอมเมนต์จริงไว้ข้างใน (มี PII)
+data/archive.json
+
 # python
 __pycache__/
 *.pyc

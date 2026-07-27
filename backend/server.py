@@ -26,7 +26,10 @@ sys.path.insert(0, str(HERE))
 from src.env import load_dotenv  # noqa: E402
 load_dotenv()   # อ่าน APIFY_TOKEN / FB_COOKIES_JSON จากไฟล์ .env (ถ้ามี)
 
-import jobs  # noqa: E402  (อยู่โฟลเดอร์เดียวกัน)
+import jobs      # noqa: E402  (อยู่โฟลเดอร์เดียวกัน)
+import monitor   # noqa: E402
+
+from src.classify import archive, lexicon, overrides  # noqa: E402
 
 STATIC = HERE / "static"
 
@@ -62,6 +65,17 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/targets":
             # ค่าตั้งต้นให้ฟอร์ม (URL เพจ/โพสต์จาก data/targets.json) — ไม่มีอะไรลับ
             self._send(200, jobs.get_targets())
+        elif self.path == "/api/monitor":
+            # เปิดหน้าเว็บ = ทริกเกอร์ตรวจใหม่ถ้าผลล่าสุดเก่าเกินรอบ (monitor กรองเองว่าถึงเวลาไหม)
+            # ไม่ต้องมีรหัส: คนเปิดกี่คนก็ตรวจได้แค่รอบละครั้ง → เครดิต Apify คาดเดาได้
+            monitor.request_refresh()
+            self._send(200, monitor.snapshot())
+        elif self.path == "/api/monitor/result":
+            # ก้อนผลเต็ม — หน้าเว็บดึงเฉพาะตอน updated_ts เปลี่ยน (ไม่ดึงทุกครั้งที่ poll)
+            self._send(200, monitor.latest_result())
+        elif self.path == "/api/overrides":
+            self._send(200, {"overrides": overrides.load(),
+                             "topic_labels": lexicon.TOPIC_LABELS})
         elif self.path.startswith("/api/jobs/"):
             job = jobs.get_job(self.path.rsplit("/", 1)[-1])
             if not job:
@@ -72,19 +86,111 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._send(404, {"error": "not found"})
 
+    def _passcode_ok(self) -> bool:
+        return hmac.compare_digest(self.headers.get("X-Run-Passcode", ""), RUN_PASSCODE)
+
+    def _json_body(self) -> dict:
+        n = int(self.headers.get("Content-Length", 0) or 0)
+        try:
+            body = json.loads(self.rfile.read(n) or b"{}")
+        except json.JSONDecodeError:
+            return {}
+        return body if isinstance(body, dict) else {}
+
+    def _base_result(self, body: dict) -> tuple[str, dict]:
+        """หารายงานที่หน้าเว็บเปิดอยู่ — โหมดเฝ้าอัตโนมัติ หรืองานที่ผู้ใช้กดตรวจเอง."""
+        target = str(body.get("target") or "monitor")
+        base = (monitor.latest_result().get("result") if target == "monitor"
+                else (jobs.get_job(target) or {}).get("result"))
+        if not base:
+            raise ValueError("ไม่พบรายงานที่จะแก้ — ลองตรวจใหม่อีกครั้ง")
+        return target, base
+
+    def _store_result(self, target: str, result: dict) -> dict:
+        if target == "monitor":
+            monitor.replace_result(result)
+        else:
+            jobs.set_job_result(target, result)
+        return {"result": result}
+
+    def _apply_archive(self, body: dict) -> dict:
+        """กด 'อ่านแล้ว' → เข้าคลัง (ไม่นับในสถานะ และรอบหน้าไม่ต้องส่งเข้า AI ซ้ำ)."""
+        target, base = self._base_result(body)
+        wanted = {str(c) for c in (body.get("comment_ids") or []) if str(c).strip()}
+        if not wanted:
+            raise ValueError("ไม่ได้เลือกคอมเมนต์")
+
+        rows = [c for c in base.get("comments", []) if c.get("comment_id") in wanted]
+        if not rows:
+            raise ValueError("ไม่พบคอมเมนต์ที่เลือกในรายงานที่เปิดอยู่")
+
+        if body.get("unarchive"):
+            archive.remove(c["comment_id"] for c in rows)
+        else:
+            archive.add(rows)
+        return self._store_result(target, jobs.recompute(base))
+
+    def _apply_override(self, body: dict) -> dict:
+        """บันทึกคำตัดสินของคน แล้วคืนรายงานที่คิดใหม่ให้หน้าเว็บวาดทับได้เลย."""
+        comment_id = str(body.get("comment_id") or "").strip()
+        if not comment_id:
+            raise ValueError("ไม่มี comment_id")
+
+        target, base = self._base_result(body)
+        row = next((c for c in base.get("comments", []) if c.get("comment_id") == comment_id), None)
+        if row is None:
+            raise ValueError("ไม่พบคอมเมนต์นี้ในรายงานที่เปิดอยู่")
+
+        if body.get("clear"):
+            overrides.clear(comment_id)
+        else:
+            # "AI ทายว่าอะไร" อ่านจากรายงานฝั่ง server เอง — ไม่เชื่อค่าที่หน้าเว็บส่งมา
+            # (ถ้าแถวนี้เคยถูกแก้แล้ว ค่าของ AI จะอยู่ใน ai_* ไม่ใช่ sentiment/topics)
+            overrides.set_override(
+                comment_id,
+                sentiment=body.get("sentiment"),
+                topics=body.get("topics"),
+                note=body.get("note", ""),
+                ai_sentiment=row.get("ai_sentiment") or row.get("sentiment", ""),
+                ai_topics=(row.get("ai_topics") if row.get("overridden") else row.get("topics")) or [],
+            )
+
+        return self._store_result(target, jobs.recompute(base))
+
     def do_POST(self) -> None:
         if self.path == "/api/run":
-            n = int(self.headers.get("Content-Length", 0) or 0)
-            try:
-                body = json.loads(self.rfile.read(n) or b"{}")
-            except json.JSONDecodeError:
-                body = {}
-            if body.get("source") == "facebook" and RUN_PASSCODE:
-                given = self.headers.get("X-Run-Passcode", "")
-                if not hmac.compare_digest(given, RUN_PASSCODE):
-                    self._send(401, {"error": "รหัสผ่านไม่ถูกต้อง"})
-                    return
+            body = self._json_body()
+            if body.get("source") == "facebook" and RUN_PASSCODE and not self._passcode_ok():
+                self._send(401, {"error": "รหัสผ่านไม่ถูกต้อง"})
+                return
             self._send(200, {"job_id": jobs.start_job(body)})
+        elif self.path == "/api/override":
+            # ทีมแก้ label ที่ AI ทายพลาด → บันทึก แล้วคิดรายงานใหม่ทันทีจากคอมเมนต์ชุดเดิม
+            # (ไม่ scrape ซ้ำ ไม่เสียเครดิต) จะได้เห็นเลยว่าสถานะ crisis เปลี่ยนไหม
+            # กันด้วยรหัสเดียวกับโหมด Facebook จริง — ลิงก์สาธารณะไม่ควรแก้ label ของทีมได้
+            if RUN_PASSCODE and not self._passcode_ok():
+                self._send(401, {"error": "รหัสผ่านไม่ถูกต้อง"})
+                return
+            try:
+                self._send(200, self._apply_override(self._json_body()))
+            except (ValueError, KeyError) as e:
+                self._send(400, {"error": str(e)})
+        elif self.path == "/api/archive":
+            # กด "อ่านแล้ว" — เปลี่ยนตัวเลขบนรายงานเหมือนกัน จึงล็อกด้วยรหัสเดียวกับ override
+            if RUN_PASSCODE and not self._passcode_ok():
+                self._send(401, {"error": "รหัสผ่านไม่ถูกต้อง"})
+                return
+            try:
+                self._send(200, self._apply_archive(self._json_body()))
+            except (ValueError, KeyError) as e:
+                self._send(400, {"error": str(e)})
+        elif self.path == "/api/monitor/refresh":
+            # กด "ตรวจใหม่ตอนนี้" = ข้ามรอบ → ยิง Apify นอกคิว จึงต้องมีรหัสเหมือนโหมด Facebook จริง
+            cfg = monitor.config()
+            if cfg["source"] == "facebook" and RUN_PASSCODE and not self._passcode_ok():
+                self._send(401, {"error": "รหัสผ่านไม่ถูกต้อง"})
+                return
+            self._send(200, {"started": monitor.request_refresh(force=True)})
         else:
             self._send(404, {"error": "not found"})
 
@@ -95,6 +201,12 @@ def main() -> None:
     ap.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
     ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8000)))
     args = ap.parse_args()
+    cfg = monitor.config()
+    if cfg["enabled"]:
+        print(f"👁  เฝ้าเพจอัตโนมัติ: {cfg['page_name'] or cfg['page_url']} "
+              f"· แหล่งข้อมูล {cfg['source']} · ตรวจใหม่ทุก {cfg['interval_min']} นาที"
+              + ("" if cfg["always"] else " (ตรวจเมื่อมีคนเปิดหน้าเว็บ)"))
+    monitor.start_background()
     print(f"📡 Crisis Radar → http://{args.host}:{args.port}  (Ctrl+C เพื่อหยุด)")
     ThreadingHTTPServer((args.host, args.port), Handler).serve_forever()
 

@@ -9,6 +9,9 @@
   T4  calm scenario: ไม่มี spike → ต้องไม่ alert
   T5  PII masking: ชื่อจริงต้องไม่หลุดใน output
   T6  connector interface: sample source คืน field ครบ
+  T8  topic tagging: 'ของรางวัล/โค้ด' ต้องไม่หลงคำว่า 'โค้ด' ที่แปลว่า program code
+  T9  per-topic trend: ดราม่าเล็กไม่ถูก spike ใหญ่กลบ + route ให้ทีมถูก
+  T10 คนตัดสินทับ AI: แก้ label ที่ AI อ่านผิดแล้ว crisis ต้องคิดใหม่ตามจริง
 """
 from __future__ import annotations
 
@@ -20,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.classify import lexicon                       # noqa: E402
+from src.classify import archive, lexicon, overrides   # noqa: E402
 from src.classify.pipeline import HybridClassifier     # noqa: E402
 from src.crisis import detector                        # noqa: E402
 from src.models import Classified, Comment             # noqa: E402
@@ -132,6 +135,82 @@ check("T9 จับประเด็น 'ของรางวัล/โค้�
       f"emerging={getattr(rewards, 'is_emerging', None)} · severity={getattr(rewards, 'severity', 0)}")
 check("T9b alert ระบุทีมที่ต้องรับเรื่อง", bool(rewards) and "Marketing" in rewards.owner,
       getattr(rewards, "owner", "-"))
+
+# ---- T10: คนตัดสินทับ AI — AI อ่านมุกตลกเป็นคำบ่น ทีมต้องแก้ได้ แล้ว crisis คิดใหม่ตาม ----
+# เคสจริงจากเพจ: "รำคาญหัวเด้งสุดละ…👋" — lexicon เจอ 'รำคาญ'+'เด้ง' → ตัดสินเป็นลบ
+# ทั้งที่คนอ่านออกว่าหยอกเล่น ถ้าไม่มีทางแก้ ตัวเลขคอมเมนต์ลบจะเฟ้อและ crisis เตือนผิด
+JOKE = "รำคาญหัวเด้งสุดละไม่มีไรแก้ทางเลยนอกจากไปเล่นร้านเกมแล้วมันนั่งอยู่ข้างๆ 👋"
+joke_item = Classified(comment=_mk_comment(JOKE), sentiment="negative", confidence=0.8,
+                       topics=["bug/technical"])
+check("T10 AI ตัดสินมุกตลกนี้เป็นลบ (คือปัญหาที่ต้องมีทางแก้)",
+      clf.classify_one(_mk_comment(JOKE)).sentiment == "negative",
+      f"AI → {clf.classify_one(_mk_comment(JOKE)).sentiment}")
+
+store = {joke_item.comment.comment_id: {"sentiment": "positive", "topics": [],
+                                        "ai_sentiment": "negative", "ai_topics": ["bug/technical"]}}
+n = overrides.apply([joke_item], store)
+check("T10b override ทับ label ของ AI ได้",
+      n == 1 and joke_item.sentiment == "positive" and joke_item.topics == [] and joke_item.overridden,
+      f"{joke_item.sentiment} · topics={joke_item.topics}")
+check("T10c เก็บค่าที่ AI ทายไว้เดิมด้วย (ตรวจย้อนหลัง/เอาไปปรับ lexicon ได้)",
+      joke_item.ai_sentiment == "negative" and joke_item.ai_topics == ["bug/technical"],
+      f"{joke_item.ai_sentiment} · {joke_item.ai_topics}")
+
+# กรณีที่พลาดง่ายสุด: AI ไม่ได้จัดประเด็นไว้เลย (ลิสต์ว่าง) แล้วคนเพิ่มประเด็นเอง
+# ถ้าโค้ดเช็ก "ค่าว่าง = ไม่มีข้อมูล" ค่าเดิมของ AI จะกู้กลับไม่ได้ตอนกดคืนค่า
+blank = Classified(comment=_mk_comment("เกมเด้งอีกแล้ว"), sentiment="neutral", confidence=0.4, topics=[])
+overrides.apply([blank], {blank.comment.comment_id: {"topics": ["bug/technical"],
+                                                     "ai_sentiment": "neutral", "ai_topics": []}})
+check("T10d AI ไม่ได้จัดประเด็นไว้เลย → ยังคืนค่าเดิมได้ถูก",
+      blank.topics == ["bug/technical"] and blank.ai_topics == [],
+      f"topics={blank.topics} · ai_topics={blank.ai_topics}")
+
+# override ต้องเปลี่ยนผลตรวจ crisis จริง ไม่ใช่แค่เปลี่ยนสีในตาราง
+worst = max((c for c in classified if c.sentiment == "negative"), key=lambda c: c.comment.reach)
+calmed = [Classified.from_dict(c.to_dict()) for c in classified]
+overrides.apply(calmed, {c.comment.comment_id: {"sentiment": "neutral", "ai_sentiment": "negative"}
+                         for c in classified if c.sentiment == "negative"})
+after = detector.detect(calmed, brand="talesrunner")
+check("T10e ทีมแก้คอมเมนต์ลบทั้งหมด → crisis หายจริง (ไม่ใช่แค่หน้าจอ)",
+      rep.status == "CRISIS" and after.status == "NORMAL" and not after.alerts,
+      f"{rep.status} → {after.status} · alert {len(after.alerts)}")
+check("T10f round-trip dict ไม่ทำข้อมูลหาย (ใช้ตอนคิดรายงานใหม่โดยไม่ scrape ซ้ำ)",
+      Classified.from_dict(worst.to_dict()).to_dict() == worst.to_dict())
+
+# ---- T11: คลัง "อ่านแล้ว" — เอาออกจากหน้า Monitor + ไม่ส่งเข้า AI ซ้ำรอบหน้า ----
+# (ทดสอบด้วย store dict ตรง ๆ ไม่แตะไฟล์จริงของเครื่องที่รันเทส)
+read_ids = [c.comment.comment_id for c in classified if c.sentiment == "negative"]
+arch_store = {cid: {"at": "2026-07-27T18:00+07:00",
+                    "item": next(c.to_dict() for c in classified if c.comment.comment_id == cid)}
+              for cid in read_ids}
+
+marked = [Classified.from_dict(c.to_dict()) for c in classified]
+n_arch = archive.apply(marked, arch_store)
+unread = [c for c in marked if not c.archived]
+rep_read = detector.detect(unread, brand="talesrunner")
+check("T11 คอมเมนต์ในคลังไม่ถูกนับในสถานะ/spike",
+      n_arch == len(read_ids) and rep.status == "CRISIS" and rep_read.status == "NORMAL",
+      f"อ่านแล้ว {n_arch} → {rep.status} กลายเป็น {rep_read.status}")
+check("T11b คอมเมนต์ที่ยังไม่ได้อ่านยังอยู่ครบ (ไม่ได้ลบทิ้ง)",
+      len(marked) == len(classified) and len(unread) == len(classified) - len(read_ids),
+      f"ทั้งหมด {len(marked)} · ยังไม่อ่าน {len(unread)}")
+
+# จุดที่ประหยัด token: ตัวที่อยู่ในคลังต้องไม่ถูกส่งเข้า classifier รอบถัดไป
+raw = SampleFacebookSource(FIXTURE).fetch()
+fresh_c, known_c = archive.partition(raw, arch_store)
+check("T11c รอบ scrape ถัดไปแยกตัวที่อ่านแล้วออกก่อนเรียก AI",
+      len(known_c) == len(read_ids) and len(fresh_c) == len(raw) - len(read_ids),
+      f"ส่งเข้า AI {len(fresh_c)} · ข้าม {len(known_c)} จาก {len(raw)}")
+
+# ยอดไลก์ต้องอัปเดตตามข้อมูลสด แต่ label ต้องเป็นของเดิม (ไม่เรียก AI ใหม่)
+bumped = [c for c in known_c]
+bumped[0].reach += 999
+revived = archive.rehydrate(bumped, arch_store)
+old = arch_store[bumped[0].comment_id]["item"]
+check("T11d ใช้ label เดิม แต่ยอดไลก์เป็นข้อมูลสด",
+      revived[0].sentiment == old["sentiment"] and revived[0].topics == old["topics"]
+      and revived[0].comment.reach == old["reach"] + 999 and revived[0].archived,
+      f"{revived[0].sentiment} · reach {old['reach']} → {revived[0].comment.reach}")
 
 # ---- output ----
 print("=" * 64)

@@ -21,3 +21,14 @@ services:
         sync: false
       - key: RUN_PASSCODE # รหัสกันคนกดโหมด Facebook จริงจนเครดิต Apify หมด
         sync: false
+      # --- โหมดเฝ้าเพจอัตโนมัติ (เปิดเว็บมาเห็นสถานะเลย ไม่ต้องกดปุ่ม) ---
+      # ตรวจใหม่เมื่อมีคนเปิดหน้าเว็บและผลล่าสุดเก่าเกิน interval — อย่างมาก 1 รอบต่อ interval
+      # ไม่ตั้ง MONITOR_ALWAYS เพราะ free tier หลับหลังไม่มีคนใช้ 15 นาที (thread เบื้องหลังตายอยู่ดี)
+      - key: MONITOR_INTERVAL_MIN
+        value: "60"
+      - key: MONITOR_MAX_POSTS
+        value: "5"
+      # ปล่อยว่าง = อัตโนมัติ (Facebook จริงถ้ามี APIFY_TOKEN ไม่งั้นข้อมูลตัวอย่าง)
+      # ใส่ "sample" ถ้าอยากให้เดโม่วิ่งได้โดยไม่แตะเครดิต Apify เลย
+      - key: MONITOR_SOURCE
+        sync: false

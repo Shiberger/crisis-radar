@@ -316,9 +316,79 @@ td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text
 .how ol{margin:0;padding-left:22px;color:var(--ink2);font-size:13.5px}
 .how li{margin-bottom:7px} .how li b{color:var(--ink);font-weight:640}
 
+/* ───────────────────────── แก้ label ที่ AI ทายพลาด ─────────────────────────
+   ป้ายอารมณ์ในตารางเป็นปุ่ม — จุดที่คนเห็นว่า "ผิด" คือจุดเดียวกับที่ควรกดแก้ได้   */
+.tagbtn{border:1px solid transparent;cursor:pointer;font:inherit}
+.tagbtn:hover{border-color:currentColor}
+.fixbadge{display:inline-block;font-size:10.5px;font-weight:640;color:var(--ink2);background:var(--inset);
+  border:1px solid var(--border2);border-radius:5px;padding:0 5px;margin-left:5px;white-space:nowrap;cursor:help}
+dialog#fixDlg{border:1px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--ink);
+  padding:0;max-width:560px;width:calc(100% - 32px);box-shadow:0 20px 60px -20px rgba(0,0,0,.55)}
+dialog#fixDlg::backdrop{background:rgba(10,10,8,.5)}
+/* [open] สำคัญ — ถ้าใส่ display:flex ที่ตัว dialog เฉย ๆ จะไปทับ display:none ตอนปิด แล้วกล่องจะโผล่ตลอด
+   จอเตี้ย: ให้เนื้อในเลื่อนเอง ปุ่มบันทึกต้องอยู่ในจอเสมอ */
+dialog#fixDlg[open]{display:flex;flex-direction:column;max-height:88vh}
+#fixDlg .bd{padding:20px 22px;overflow:auto}
+#fixDlg h3{margin:0 0 4px;font-size:16.5px;font-weight:680}
+.quote{background:var(--inset);border-left:3px solid var(--border2);border-radius:0 9px 9px 0;
+  padding:11px 14px;font-size:14px;line-height:1.65;margin:13px 0 6px;max-height:170px;overflow:auto;
+  white-space:pre-wrap;overflow-wrap:anywhere}
+.qmeta{font-size:12px;color:var(--muted)}
+#fixDlg .lbl{font-size:12.5px;font-weight:660;color:var(--ink2);display:block;margin:16px 0 8px}
+.pickrow{display:flex;gap:8px;flex-wrap:wrap}
+.pick{border:1.5px solid var(--border2);background:var(--surface);border-radius:9px;padding:8px 13px;
+  font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;font-weight:600;color:var(--ink2)}
+.pick:hover{border-color:var(--muted)}
+.pick.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--ink)}
+.pick .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.pick .ai{color:var(--muted);font-weight:400;font-size:11.5px}
+#fixNote{width:100%;background:var(--surface);border:1px solid var(--border2);color:var(--ink);
+  border-radius:9px;padding:9px 11px;font-size:13.5px;font-family:inherit}
+#fixDlg .ft{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 22px;
+  border-top:1px solid var(--border);background:var(--inset);border-radius:0 0 var(--r) var(--r)}
+#fixErr{color:var(--neg);font-size:12.5px;font-weight:600;flex-basis:100%;line-height:1.5}
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(16px);z-index:80;
+  background:var(--ink);color:var(--plane);border-radius:11px;padding:12px 18px;font-size:14px;font-weight:600;
+  opacity:0;transition:.2s;pointer-events:none;box-shadow:0 12px 40px -12px rgba(0,0,0,.6);
+  max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast button{background:none;border:0;color:var(--plane);text-decoration:underline;cursor:pointer;
+  font-weight:700;margin-left:10px;font-size:13.5px}
+
+/* ───────────────────────── คลัง 'อ่านแล้ว' ─────────────────────────
+   กด 'อ่านแล้ว' = ทีมจัดการเรื่องนี้แล้ว → ออกจากหน้า Monitor และไม่ถูกส่งเข้า AI ซ้ำรอบหน้า  */
+td.act{white-space:nowrap;width:112px}
+.act-in{display:flex;gap:6px;align-items:center}
+.readbtn{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:4px 9px;
+  font-size:12px;font-weight:640;color:var(--ink2);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.readbtn:hover{border-color:var(--pos);color:var(--pos)}
+.readbtn.undo:hover{border-color:var(--accent);color:var(--accent)}
+tr.arch{opacity:.72}
+tr.arch td.txt{color:var(--ink2)}
+#viewSeg{display:inline-flex}
+#viewSeg .tnum{opacity:.6;margin-left:5px}
+.emptybox b{display:block;font-size:15px;color:var(--ink);font-weight:660;margin-bottom:4px}
+
+/* ───────────────────────── monitor (โหมดเฝ้าอัตโนมัติ) ─────────────────────────
+   แถบผลตรวจย้อนหลัง: 1 แท่ง = 1 รอบตรวจ · สีบอกสถานะ · ความสูงบอกสัดส่วนคอมเมนต์ลบ   */
+.hist{display:flex;gap:3px;align-items:flex-end;height:22px}
+.hist i{display:block;width:6px;min-height:5px;border-radius:2px;background:var(--neu);cursor:help}
+.hist i.st-NORMAL{background:var(--pos)} .hist i.st-WATCH{background:var(--warn)} .hist i.st-CRISIS{background:var(--neg)}
+@media(max-width:820px){.hist{display:none}}
+/* ปุ่ม 2 ตัวต้องอยู่ด้วยกันเสมอ — ข้อความสรุปยาวแค่ไหนก็ห้ามดันปุ่มตกบรรทัดแยกกัน */
+.sb-actions{display:flex;align-items:center;gap:10px;margin-left:auto}
+.summary-bar .ghost{white-space:nowrap}
+.livepill small{color:var(--muted);font-weight:500}
+.staleflag{border:1px solid color-mix(in srgb,var(--warn) 45%,var(--border));
+  background:color-mix(in srgb,var(--warn) 10%,transparent);border-radius:8px;padding:3px 10px;
+  font-size:12.5px;color:var(--ink2)}
+#manualLink{background:none;border:0;color:var(--accent);font-size:13px;font-weight:620;cursor:pointer;padding:0}
+#manualLink:hover{text-decoration:underline}
+
 /* ───────────────────────── print ───────────────────────── */
 @media print{
   .topbar,#setup,#setupSummary,#prog,.tools,.activebar,.seg,.iconbtn,.linkbtn{display:none !important}
+  #toast,#fixDlg{display:none !important}
   body{background:#fff;font-size:11px} .card{box-shadow:none;break-inside:avoid}
   .wrap{padding:0}
 }
@@ -326,6 +396,30 @@ td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text
 </head>
 <body>
 <div id="tip" role="status"></div>
+<div id="toast" role="status"></div>
+
+<!-- ═══ กล่องแก้ label ที่ AI ทายพลาด ═══ -->
+<dialog id="fixDlg" aria-labelledby="fixTitle">
+  <div class="bd">
+    <h3 id="fixTitle">แก้ผลที่ AI อ่าน</h3>
+    <div class="sub">ที่แก้ไว้จะถูกใช้คิดสถานะใหม่ทันที และจำไว้ใช้ในรอบตรวจถัดไปด้วย</div>
+    <div class="quote" id="fixText"></div>
+    <div class="qmeta" id="fixMeta"></div>
+    <span class="lbl">อารมณ์ของคอมเมนต์นี้จริง ๆ คือ</span>
+    <div class="pickrow" id="fixSent"></div>
+    <span class="lbl">พูดถึงเรื่องอะไร (เลือกได้หลายอย่าง · ไม่เลือกเลยก็ได้)</span>
+    <div class="pickrow" id="fixTopics"></div>
+    <span class="lbl">เหตุผล (ไม่บังคับ — ไว้ให้คนอื่นในทีมเข้าใจว่าทำไมถึงแก้)</span>
+    <input id="fixNote" maxlength="300" placeholder="เช่น เป็นมุกตลก ไม่ได้ตำหนิเกม">
+  </div>
+  <div class="ft">
+    <button class="run" id="fixSave" style="padding:10px 22px;font-size:14.5px">บันทึก</button>
+    <button class="ghost hidden" id="fixReset">คืนค่าที่ AI ทาย</button>
+    <span class="grow"></span>
+    <button class="ghost" id="fixCancel">ยกเลิก</button>
+    <div id="fixErr" class="hidden"></div>
+  </div>
+</dialog>
 
 <div class="topbar">
   <div class="in">
@@ -352,11 +446,11 @@ td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text
 <div class="wrap">
 
   <!-- ═══ STEP 1: setup ═══ -->
-  <section class="card" id="setup">
+  <section class="card hidden" id="setup">
     <header>
       <span class="stepnum">1</span>
-      <div><h2>เลือกข้อมูลที่ต้องการตรวจ</h2>
-        <div class="sub">ระบบจะอ่านคอมเมนต์ทั้งหมด แล้วบอกว่ามีดราม่ากำลังก่อตัวอยู่ไหม</div></div>
+      <div><h2>ตรวจเอง — เลือกข้อมูลที่ต้องการตรวจ</h2>
+        <div class="sub">ปกติระบบเฝ้าเพจให้อยู่แล้วโดยอัตโนมัติ · ส่วนนี้ไว้ตรวจนอกรอบ เช่น เจาะโพสต์ที่สงสัย หรือดูข้อมูลตัวอย่าง</div></div>
     </header>
 
     <div class="modes" id="modes">
@@ -410,6 +504,7 @@ td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         เริ่มตรวจ
       </button>
+      <button class="ghost hidden" id="backToMonitor">← กลับไปหน้าเฝ้าอัตโนมัติ</button>
       <div class="note" id="hint"></div>
     </div>
     <div class="errline hidden" id="setupErr"></div>
@@ -420,8 +515,13 @@ td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text
     <span class="livepill" id="sumPill" style="border-color:var(--border)"><span class="dot"></span><span id="sumStatus"></span></span>
     <span class="txt" id="sumText"></span>
     <span class="grow"></span>
-    <button class="ghost" id="editBtn">เปลี่ยนข้อมูลที่ตรวจ</button>
-    <button class="ghost" id="rerunBtn" style="border-color:var(--accent);color:var(--accent)">↻ ตรวจใหม่อีกครั้ง</button>
+    <span class="staleflag hidden" id="staleFlag"></span>
+    <div class="sb-actions">
+      <div class="hist" id="histStrip" aria-label="ผลตรวจย้อนหลัง"></div>
+      <button class="ghost hidden" id="monBtn">← กลับไปหน้าเฝ้าอัตโนมัติ</button>
+      <button class="ghost" id="editBtn">ตรวจเอง</button>
+      <button class="ghost" id="rerunBtn" style="border-color:var(--accent);color:var(--accent)">↻ ตรวจใหม่ตอนนี้</button>
+    </div>
   </div>
 
   <!-- ═══ progress ═══ -->
@@ -434,8 +534,8 @@ td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text
 
   <!-- ═══ welcome ═══ -->
   <section class="card welcome" id="welcome">
-    <h3>ยังไม่มีผลตรวจ</h3>
-    <p>กดปุ่ม <b>เริ่มตรวจ</b> ด้านบน ระบบจะอ่านคอมเมนต์ให้ทั้งหมดภายในไม่กี่นาที แล้วสรุปให้ว่า:</p>
+    <h3 id="wTitle">กำลังโหลดสถานะล่าสุด…</h3>
+    <p id="wText">ระบบเฝ้าเพจให้อยู่ตลอด ไม่ต้องเลือกโพสต์เอง — เปิดหน้านี้เมื่อไหร่ก็เห็นว่า:</p>
     <div class="wcards">
       <div class="wcard"><b>🚦 ตอนนี้สถานการณ์เป็นยังไง</b><small>ปกติ / ควรเฝ้าระวัง / วิกฤตต้องรีบจัดการ</small></div>
       <div class="wcard"><b>🔥 คนกำลังบ่นเรื่องอะไร</b><small>จัดกลุ่มให้อัตโนมัติ พร้อมบอกว่าทีมไหนควรรับเรื่อง</small></div>
@@ -491,10 +591,19 @@ td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text
 
     <section class="card" id="explorer">
       <header><div><h2>อ่านคอมเมนต์จริง</h2>
-        <div class="sub">ค้นหา กรอง และเรียงลำดับได้ · คลิกชื่อประเด็นเพื่อกรองเฉพาะเรื่องนั้น</div></div></header>
+        <div class="sub">ค้นหา กรอง และเรียงลำดับได้ · คลิกชื่อประเด็นเพื่อกรองเฉพาะเรื่องนั้น<br>
+          <b>AI อ่านผิดได้</b> — โดยเฉพาะมุกตลก/ประชด · กดที่ <b>ป้ายอารมณ์</b> ในตารางเพื่อแก้อารมณ์และประเด็นเอง
+          แล้วระบบจะคิดสถานะให้ใหม่ทันที<br>
+          อ่าน/จัดการคอมเมนต์ไหนแล้ว กด <b>“✓ อ่านแล้ว”</b> — ย้ายเข้าคลัง ไม่ขึ้นบนหน้านี้อีก
+          และรอบตรวจถัดไปไม่ต้องส่งเข้า AI ซ้ำ</div></div></header>
       <div class="activebar hidden" id="activeBar"></div>
+      <div class="seg" id="viewSeg" style="margin-bottom:13px">
+        <button data-v="active" class="on">ยังไม่ได้อ่าน <span id="cntActive" class="tnum"></span></button>
+        <button data-v="archive">คลัง (อ่านแล้ว) <span id="cntArchive" class="tnum"></span></button>
+      </div>
       <div class="tools">
         <div id="sentChips" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+        <button class="chip hidden" id="readAllBtn"></button>
         <span class="grow"></span>
         <select id="topicFilter" aria-label="กรองตามประเด็น"><option value="">ทุกประเด็น</option></select>
         <select id="sortBy" aria-label="เรียงลำดับ">
@@ -508,7 +617,7 @@ td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text
         <table>
           <thead><tr>
             <th>เวลา</th><th>ผู้คอมเมนต์</th><th>ข้อความ</th><th>อารมณ์</th><th>ประเด็น</th>
-            <th>ไลก์+ตอบกลับ</th><th>อยู่ใต้โพสต์</th><th aria-label="ลิงก์"></th>
+            <th>ไลก์+ตอบกลับ</th><th>อยู่ใต้โพสต์</th><th>จัดการ</th>
           </tr></thead>
           <tbody id="rows"></tbody>
         </table>
@@ -522,6 +631,8 @@ td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text
         <li><b>อ่านทุกคอมเมนต์</b> แล้วจัดว่าเป็นบวก/กลาง/ลบ พร้อมจับว่าพูดถึงเรื่องอะไร (บั๊ก ราคา ของรางวัล ฯลฯ) — คอมเมนต์ที่กำกวมหรือประชด จะถูกส่งให้ AI อ่านซ้ำอีกชั้น</li>
         <li><b>เทียบกับ “ปกติของเพจนี้”</b> ไม่ได้ดูแค่ว่าคอมเมนต์ลบเยอะไหม แต่ดูว่าชั่วโมงนี้ลบพุ่งกว่าชั่วโมงก่อน ๆ กี่เท่า และคอมเมนต์นั้นมีคนไลก์/ตอบกลับมากแค่ไหน</li>
         <li><b>เตือนเมื่อผิดปกติจริง</b> ทั้งกรณีพุ่งทั้งเพจ กรณีเรื่องใดเรื่องหนึ่งมาแรงขึ้นมาใหม่ และกรณีคอมเมนต์ลบเดี่ยว ๆ ที่คนแห่มากดไลก์ — พร้อมบอกว่าทีมไหนควรรับเรื่อง</li>
+        <li><b>คนตัดสินทับ AI ได้</b> ถ้า AI อ่านผิด (เช่น มุกตลกถูกนับเป็นคำบ่น) กดแก้ที่ป้ายอารมณ์ในตารางได้เลย — ระบบจะคิดสถานะใหม่ทันที และ<b>จำไว้ใช้ในรอบตรวจถัดไป</b>ด้วย ไม่ต้องแก้ซ้ำ</li>
+        <li><b>อ่านแล้ว = จัดการแล้ว</b> คอมเมนต์ที่กด “✓ อ่านแล้ว” จะย้ายเข้าคลังและ<b>ไม่ถูกนับในสถานะอีก</b> — สถานะข้างบนจึงหมายถึง “ของที่ยังไม่ได้จัดการ” เสมอ · จำนวนในคลังแสดงคู่กันไว้ตลอด และเอากลับได้ทุกเมื่อ</li>
       </ol>
       <div class="foot-note" id="methodFoot"></div>
     </section>
@@ -539,15 +650,15 @@ const STAT={
   WATCH  :{c:'var(--warn)',t:'เฝ้าระวัง', head:'ควรเฝ้าระวัง'},
   CRISIS :{c:'var(--neg)', t:'วิกฤต',    head:'วิกฤต — ต้องรีบจัดการ'},
 };
-const MON=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const MONTHS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
 
 // เวลาในระบบเป็นเวลาไทยอยู่แล้ว (+07:00) → แกะจาก string ตรง ๆ
 // ห้ามใช้ new Date() แปลง เพราะจะโดน timezone ของเครื่องผู้ใช้เปลี่ยนตัวเลขชั่วโมง
 const P=iso=>{const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso||'');
   return m?{date:`${m[1]}-${m[2]}-${m[3]}`,d:+m[3],mo:+m[2],h:m[4],mi:m[5]}:null;};
 const fmtTime=iso=>{const p=P(iso);return p?`${p.h}:${p.mi}`:'';};
-const fmtDay =iso=>{const p=P(iso);return p?`${p.d} ${MON[p.mo-1]}`:'';};
-const fmtFull=iso=>{const p=P(iso);return p?`${p.d} ${MON[p.mo-1]} ${p.h}:${p.mi} น.`:'';};
+const fmtDay =iso=>{const p=P(iso);return p?`${p.d} ${MONTHS[p.mo-1]}`:'';};
+const fmtFull=iso=>{const p=P(iso);return p?`${p.d} ${MONTHS[p.mo-1]} ${p.h}:${p.mi} น.`:'';};
 // key ของช่วงเวลา (bucket) — ตัดนาทีลงตามขนาด bucket ที่ backend ใช้จริง
 const bkey=(iso,mins)=>{const m=/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(iso||'');
   if(!m)return'';const mm=Math.floor(+m[3]/(mins||60))*(mins||60);
@@ -567,7 +678,14 @@ $('#printBtn').onclick=()=>window.print();
 
 /* ═══════════════════════════ state ═══════════════════════════ */
 let SRC='sample', SCOPE='page', DATA=null, NEED_PASS=false, TLMODE='count';
-let FILT={sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50};
+// view: 'active' = ยังไม่ได้อ่าน (ค่าเริ่มต้น — คือสิ่งที่ทีมต้องจัดการ) · 'archive' = อ่านแล้ว
+let FILT={view:'active',sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50};
+const inView=c=>FILT.view==='archive'?!!c.archived:!c.archived;
+
+/* โหมดของหน้าเว็บ
+   'monitor' = ผลที่โชว์อยู่มาจากตัวเฝ้าเพจอัตโนมัติ (ค่าเริ่มต้น — ไม่ต้องกดอะไร)
+   'manual'  = ผู้ใช้กดตรวจเองจากฟอร์ม (ข้อมูลตัวอย่าง / เจาะโพสต์)                     */
+let MODE='monitor', MON=null, MON_TS=0, NEXT_AT=0, MANUAL_BUSY=false, JOB_ID=null;
 
 /* ═══════════════════════════ setup form ═══════════════════════════ */
 function pick(container,attr,val){
@@ -604,8 +722,13 @@ fetch('/api/health').then(r=>r.json()).then(h=>{NEED_PASS=!!h.passcode_required;
 syncFields();
 
 $('#editBtn').onclick=()=>{$('#setup').classList.remove('hidden');$('#setupSummary').classList.add('hidden');
+  $('#backToMonitor').classList.toggle('hidden',!(MON&&MON.enabled&&MON.has_result));
   $('#setup').scrollIntoView({behavior:'smooth',block:'center'});};
-$('#rerunBtn').onclick=()=>run();
+// กลับจากโหมด "ตรวจเอง" ไปหน้าเฝ้าอัตโนมัติ — MON_TS=0 บังคับให้ดึงผลล่าสุดมาวาดใหม่
+const goMonitor=()=>{$('#setup').classList.add('hidden');MODE='monitor';MON_TS=0;pollMonitor();};
+$('#backToMonitor').onclick=goMonitor;
+$('#monBtn').onclick=goMonitor;
+$('#rerunBtn').onclick=()=>refreshNow();
 $('#runBtn').onclick=()=>run();
 
 /* ═══════════════════════════ run + progress ═══════════════════════════ */
@@ -641,10 +764,12 @@ async function run(){
     }
     headers['X-Run-Passcode']=pass;
   }
+  MODE='manual';MANUAL_BUSY=true;      // หยุดไม่ให้ผลจากตัวเฝ้าอัตโนมัติมาทับจอระหว่างนี้
   $('#runBtn').disabled=$('#rerunBtn').disabled=true;
   $('#welcome').classList.add('hidden');$('#results').classList.add('hidden');
   $('#prog').classList.remove('hidden');$('#log').textContent='';
-  $('#progTitle').textContent='กำลังตรวจ…';drawSteps(0);
+  $('#progTitle').textContent='กำลังตรวจ…';
+  $('#progSub').textContent='ปล่อยหน้านี้ทิ้งไว้ได้เลย ระบบจะแสดงผลให้เองเมื่อเสร็จ';drawSteps(0);
   setLive('กำลังตรวจ…','var(--accent)',true);
   $('#prog').scrollIntoView({behavior:'smooth',block:'center'});
 
@@ -664,9 +789,11 @@ async function run(){
     $('#runBtn').disabled=$('#rerunBtn').disabled=false;setLive('ยังไม่ได้ตรวจ','var(--muted)');return;
   }
   if(headers['X-Run-Passcode'])sessionStorage.setItem('runPass',headers['X-Run-Passcode']);
-  poll((await r.json()).job_id);
+  JOB_ID=(await r.json()).job_id;   // ต้องจำไว้ — ตอนแก้ label ต้องบอก server ว่าให้คิดรายงานไหนใหม่
+  poll(JOB_ID);
 }
 function fail(msg){
+  MANUAL_BUSY=false;
   $('#progTitle').textContent='ตรวจไม่สำเร็จ';
   $('#progSub').textContent=msg;
   $('#steps').innerHTML=`<div class="pstep" style="color:var(--neg)"><span class="ic" style="border-color:var(--neg)">!</span>${esc(msg)}</div>`;
@@ -685,7 +812,7 @@ async function poll(id,miss=0){
   if(res.status===404)return fail('งานหายไประหว่างทาง (เซิร์ฟเวอร์รีสตาร์ท) — กดตรวจใหม่ได้เลย');
   if(j.logs&&j.logs.length){$('#log').textContent=j.logs.join('\n');$('#log').scrollTop=1e9;drawSteps(stepFromLogs(j.logs));}
   if(j.status==='done'){
-    drawSteps(4);$('#prog').classList.add('hidden');
+    MANUAL_BUSY=false;drawSteps(4);$('#prog').classList.add('hidden');
     $('#runBtn').disabled=$('#rerunBtn').disabled=false;render(j.result);
   }
   else if(j.status==='error')fail(j.error||'ไม่ทราบสาเหตุ — ลองใหม่อีกครั้ง');
@@ -701,27 +828,104 @@ function setLive(text,color,pulse){
 /* ═══════════════════════════ render ═══════════════════════════ */
 const TLabel=t=>(DATA&&DATA.topic_labels&&DATA.topic_labels[t])||t;
 
-function render(r){
-  DATA=r;FILT={sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50};
-  $('#search').value='';$('#topicFilter').value='';$('#sortBy').value='reach';
+/* opts.scroll=false → ไม่เลื่อนจอ (ผลมาเองโดยผู้ใช้ไม่ได้สั่ง)
+   opts.keep=true    → คงตัวกรอง/คำค้นเดิมไว้ (ใช้ตอนแก้ label แล้ววาดใหม่ คนกำลังดูแถวนั้นอยู่) */
+function render(r,opts={}){
+  const keep=!!opts.keep&&!!DATA;
+  DATA=r;
+  if(!keep){
+    FILT={view:'active',sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50};
+    $('#search').value='';$('#topicFilter').value='';$('#sortBy').value='reach';
+  }
   $('#results').classList.remove('hidden');$('#welcome').classList.add('hidden');
   $('#setup').classList.add('hidden');$('#setupSummary').classList.remove('hidden');
 
-  const st=STAT[r.status]||STAT.NORMAL;
-  setLive(st.t,st.c);
-  $('#sumPill').style.borderColor=st.c;
-  $('#sumPill').querySelector('.dot').style.background=st.c;
-  $('#sumStatus').textContent=st.t;
-  $('#sumText').innerHTML=`ตรวจ <b>${nf(r.total)}</b> คอมเมนต์จาก`
-    +` <b>${r.source==='facebook'?'Facebook จริง':'ข้อมูลตัวอย่าง'}</b> · อัปเดตล่าสุด ${esc(r.generated_at||'')}`;
-
+  paintStatus();
   renderVerdict(r);renderKpis(r);renderAlerts(r);renderSentiment(r);renderTopics(r);
   renderTimeline();renderTopicFilter(r);renderChips();renderTable();
+  if(keep){
+    // renderTopicFilter สร้าง <option> ใหม่ทั้งชุด → ค่าที่เลือกไว้หลุด ต้องใส่กลับ
+    $('#search').value=FILT.q;$('#sortBy').value=FILT.sort;$('#topicFilter').value=FILT.topic;
+    // ประเด็นที่กรองอยู่อาจหายไปเลยหลังแก้ label → อย่าให้ dropdown กับตารางพูดคนละเรื่อง
+    if($('#topicFilter').value!==FILT.topic){FILT.topic='';renderTable();}
+  }
   $('#methodFoot').textContent=
     `เกณฑ์ที่ใช้ตอนนี้: เตือนเมื่อความแรงของชั่วโมงนั้นเกินค่าปกติ ${r.thresholds?.spike_factor??2.5} เท่า `
    +`(และมีน้ำหนักอย่างน้อย ${r.thresholds?.min_severity??30}) · คอมเมนต์ลบที่มีไลก์+ตอบกลับตั้งแต่ `
-   +`${r.thresholds?.viral_reach??150} ขึ้นไป ถือว่ากระจายวงกว้าง`;
-  $('#verdict').scrollIntoView({behavior:'smooth',block:'start'});
+   +`${r.thresholds?.viral_reach??150} ขึ้นไป ถือว่ากระจายวงกว้าง`
+   +(r.override_count?` · รายงานนี้ใช้คำตัดสินที่ทีมแก้เอง ${nf(r.override_count)} คอมเมนต์ (ทับผลของ AI)`:'');
+  if(opts.scroll!==false)$('#verdict').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* แถบสถานะ (pill บนหัว + แถบสรุป) — ข้อความต่างกันตามโหมด monitor / ตรวจเอง */
+function paintStatus(){
+  if(!DATA)return;
+  const st=STAT[DATA.status]||STAT.NORMAL, mon=isMon();
+  const cd=mon?countdownText():'';
+  setLive(st.t+(cd?' · '+cd:''),st.c,mon&&MON.refreshing);
+  $('#sumPill').style.borderColor=st.c;
+  $('#sumPill').querySelector('.dot').style.background=st.c;
+  $('#sumStatus').textContent=st.t;
+  const srcTxt=DATA.source==='facebook'?'Facebook จริง':'ข้อมูลตัวอย่าง';
+  // ตัวนับถอยหลังอยู่บน pill หัวจออยู่แล้ว — ที่นี่เอาแค่ "ดูอะไรอยู่ + สดแค่ไหน" พอ ไม่งั้นแถบตกบรรทัด
+  $('#sumText').innerHTML = mon
+    ? `เฝ้า <b>${esc(MON.page_name||'เพจที่ตั้งไว้')}</b> · อ่าน <b>${nf(DATA.total)}</b> คอมเมนต์`
+      +` จาก${esc(srcTxt)} · อัปเดต ${esc(shortStamp(DATA.generated_at))}`
+    : `ตรวจ <b>${nf(DATA.total)}</b> คอมเมนต์จาก <b>${esc(srcTxt)}</b> · อัปเดตล่าสุด ${esc(DATA.generated_at||'')}`;
+  $('#rerunBtn').textContent=mon?'↻ ตรวจใหม่ตอนนี้':'↻ ตรวจใหม่อีกครั้ง';
+  $('#editBtn').textContent=mon?'ตรวจเอง':'เปลี่ยนข้อมูลที่ตรวจ';
+  // อยู่โหมดตรวจเองแต่ระบบยังเฝ้าเพจให้อยู่ → ต้องมีทางกลับที่เห็นได้ ไม่ใช่ซ่อนไว้ในฟอร์ม
+  $('#monBtn').classList.toggle('hidden',mon||!(MON&&MON.enabled));
+  renderHistory();paintStale();
+}
+
+const isMon=()=>MODE==='monitor'&&!!(MON&&MON.enabled);
+
+/* "2026-07-27 17:12 น." → "17:12 น." ถ้าเป็นวันนี้ (โหมดเฝ้าอัปเดตบ่อย วันที่ซ้ำ ๆ กินที่เปล่า ๆ) */
+function shortStamp(s){
+  const m=/^(\d{4})-(\d{2})-(\d{2})\s+(.+)$/.exec(s||'');
+  if(!m)return s||'';
+  // เวลาในระบบเป็น ICT — เลื่อนนาฬิกาเครื่องผู้ใช้ไปเป็น ICT ก่อนเทียบ "วันนี้"
+  const n=new Date(Date.now()+(new Date().getTimezoneOffset()+420)*60000);
+  const today=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+  return m[1]+'-'+m[2]+'-'+m[3]===today?m[4]:`${+m[3]} ${MONTHS[+m[2]-1]} ${m[4]}`;
+}
+
+function countdownText(){
+  if(!MON||!MON.enabled)return'';
+  if(MON.refreshing)return'กำลังตรวจรอบใหม่…';
+  if(!NEXT_AT)return'';
+  const s=Math.max(0,Math.round((NEXT_AT-Date.now())/1000));
+  if(s<=0)return'ถึงรอบตรวจแล้ว — กำลังเริ่ม';
+  return s>=5400?`ตรวจใหม่ในอีก ${Math.round(s/3600)} ชม.`
+       : s>=60 ?`ตรวจใหม่ในอีก ${Math.ceil(s/60)} นาที`
+               :`ตรวจใหม่ในอีก ${s} วินาที`;
+}
+
+/* ผลตรวจย้อนหลัง — 1 แท่ง = 1 รอบ ให้เห็นว่าเพจนี้ "ปกติมาตลอด" หรือ "เริ่มร้อนขึ้น" */
+function renderHistory(){
+  const h=(isMon()&&MON.history)||[];
+  if(h.length<2)return void($('#histStrip').innerHTML='');
+  $('#histStrip').innerHTML=h.slice(-40).map(r=>{
+    const negp=r.total?r.negative/r.total:0, t=(STAT[r.status]||STAT.NORMAL).t;
+    return `<i class="st-${esc(r.status)}" style="height:${Math.round(6+negp*15)}px"
+      title="${esc(fmtFull(r.at))} · ${esc(t)} · ลบ ${nf(r.negative)}/${nf(r.total)}"></i>`;
+  }).join('');
+}
+
+/* error จาก Apify มาเป็น JSON ก้อนโต — คนอ่านต้องการรู้แค่ "พังเพราะอะไร ต้องไปแก้ตรงไหน" */
+function shortErr(s){
+  const t=String(s||'').replace(/\s+/g,' ').trim();
+  if(/401|token-not-found|APIFY_TOKEN/i.test(t))return 'Apify ปฏิเสธ token (401) — ผู้ดูแลต้องเช็กค่า APIFY_TOKEN ที่ server';
+  if(/402|credit|quota|usage/i.test(t))return 'เครดิต Apify หมดหรือเกินโควตา — ผู้ดูแลต้องเติมเครดิตก่อน';
+  return t.length>140?t.slice(0,140)+'…':t;
+}
+
+/* ดึงรอบล่าสุดพลาด → ยังโชว์ผลรอบก่อนอยู่ ต้องบอกให้ชัดว่าข้อมูลไม่สดแล้ว */
+function paintStale(){
+  const f=$('#staleFlag'), err=isMon()&&MON.error;
+  f.classList.toggle('hidden',!err);
+  if(err){f.textContent='⚠️ ตรวจรอบล่าสุดไม่สำเร็จ — ที่เห็นคือผลรอบก่อนหน้า';f.title=shortErr(MON.error);}
 }
 
 function windowText(r){
@@ -777,9 +981,12 @@ function renderVerdict(r){
     </div>
     <div class="vfacts">
       <div class="vfact"><div class="l">ช่วงเวลาของข้อมูล</div><div class="v">${esc(windowText(r))}</div></div>
-      <div class="vfact"><div class="l">คอมเมนต์ที่อ่าน</div><div class="v tnum">${nf(r.total)} รายการ</div></div>
-      <div class="vfact"><div class="l">จากผู้ใช้</div><div class="v tnum">${r.unique_authors!=null?nf(r.unique_authors)+' คน':'–'}</div></div>
-    </div>`;
+      <div class="vfact"><div class="l">คอมเมนต์ที่ยังไม่ได้จัดการ</div><div class="v tnum">${nf(r.total)} รายการ</div></div>
+      <div class="vfact"><div class="l">จากผู้ใช้</div><div class="v tnum">${r.unique_authors!=null?nf(r.unique_authors)+' คน':'–'}</div></div>`
+      // สถานะข้างบนคิดจากเฉพาะที่ยังไม่ได้อ่าน — ถ้าซ่อนไว้เยอะต้องบอกให้เห็นคู่กัน ไม่งั้นตัวเลขหลอกตา
+      +(r.archived_count?`<div class="vfact"><div class="l">ทีมอ่านแล้ว (ไม่นับในสถานะ)</div>
+        <div class="v tnum" style="color:var(--muted)">${nf(r.archived_count)} รายการ</div></div>`:'')
+      +`</div>`;
 }
 
 function renderKpis(r){
@@ -965,13 +1172,14 @@ function renderTimeline(){
 /* ─── explorer ─── */
 function renderTopicFilter(r){
   // ดึงจากคอมเมนต์ "ทุกอารมณ์" ไม่ใช่เฉพาะเชิงลบ — ไม่งั้นกรองประเด็นที่ยังไม่เป็นดราม่าไม่ได้
-  const all={};(r.comments||[]).forEach(c=>(c.topics||[]).forEach(t=>all[t]=(all[t]||0)+1));
+  // แต่ต้องอยู่ใน view ปัจจุบัน ไม่งั้นเลือกประเด็นแล้วได้ตารางว่าง
+  const all={};(r.comments||[]).filter(inView).forEach(c=>(c.topics||[]).forEach(t=>all[t]=(all[t]||0)+1));
   $('#topicFilter').innerHTML='<option value="">ทุกประเด็น</option>'+
     Object.entries(all).sort((a,b)=>b[1]-a[1])
       .map(([t,n])=>`<option value="${esc(t)}">${esc(TLabel(t))} (${n})</option>`).join('');
 }
 function renderChips(){
-  const cs=DATA.comments,cnt=s=>s==='all'?cs.length:cs.filter(c=>c.sentiment===s).length;
+  const cs=DATA.comments.filter(inView),cnt=s=>s==='all'?cs.length:cs.filter(c=>c.sentiment===s).length;
   const defs=[['all','ทั้งหมด'],['negative','เชิงลบ'],['neutral','กลาง ๆ'],['positive','เชิงบวก']];
   $('#sentChips').innerHTML=defs.map(([k,l])=>
     `<button class="chip ${FILT.sent===k?'on':''}" data-s="${k}">${l}<span class="c">${nf(cnt(k))}</span></button>`).join('');
@@ -1002,39 +1210,59 @@ function hl(text,q){
   const qq=esc(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   return e.replace(new RegExp(qq,'gi'),m=>`<mark>${m}</mark>`);
 }
-function renderTable(){
+/* คอมเมนต์ที่ตรงกับ view + ตัวกรองทั้งหมด — ใช้ร่วมกับปุ่ม "อ่านแล้วทั้งหมด" ให้เห็นตรงกับที่เห็นบนจอ */
+function filteredComments(){
   const mins=DATA.bucket_minutes||60;
-  let cs=DATA.comments.slice();
+  let cs=DATA.comments.filter(inView);
   if(FILT.sent!=='all')cs=cs.filter(c=>c.sentiment===FILT.sent);
   if(FILT.topic)cs=cs.filter(c=>(c.topics||[]).includes(FILT.topic));
   if(FILT.bucket){const k=bkey(FILT.bucket,mins);cs=cs.filter(c=>bkey(c.created_at,mins)===k);}
   if(FILT.q){const q=FILT.q.toLowerCase();
     cs=cs.filter(c=>(c.text||'').toLowerCase().includes(q)||(c.author||'').toLowerCase().includes(q));}
+  return cs;
+}
+
+function renderTable(){
+  const arch=FILT.view==='archive';
+  const cs=filteredComments();
   cs.sort((a,b)=>FILT.sort==='reach'?b.reach-a.reach:
     FILT.sort==='new'?b.created_at.localeCompare(a.created_at):a.created_at.localeCompare(b.created_at));
+
+  $('#cntActive').textContent=nf(DATA.comments.filter(c=>!c.archived).length);
+  $('#cntArchive').textContent=nf(DATA.archived_count||0);
+  $$('#viewSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===FILT.view));
+  const bulk=$('#readAllBtn');
+  bulk.classList.toggle('hidden',arch||!cs.length);
+  bulk.textContent=`✓ อ่านแล้วทั้งหมด (${nf(cs.length)})`;
 
   const maxReach=Math.max(1,...DATA.comments.map(c=>c.reach));
   const shown=cs.slice(0,FILT.limit);
   $('#rows').innerHTML=shown.map(c=>{
-    const s=SENT[c.sentiment];
+    const s=SENT[c.sentiment], ai=SENT[c.ai_sentiment];
+    const fixed=c.overridden
+      ? `<span class="fixbadge" title="AI ทายว่า “${esc(ai?ai.t:'—')}” · ทีมแก้เป็น “${esc(s.t)}”">แก้เอง</span>` : '';
     const who=c.profile_url?`<a href="${esc(c.profile_url)}" target="_blank" rel="noopener">${hl(c.author,FILT.q)}</a>`:hl(c.author,FILT.q);
     const link=c.comment_url?`<a href="${esc(c.comment_url)}" target="_blank" rel="noopener" title="เปิดคอมเมนต์จริงบน Facebook" style="color:var(--muted)">↗</a>`:'';
     const topics=(c.topics||[]).map(t=>`<span class="topic" data-t="${esc(t)}" title="กดเพื่อกรองเฉพาะเรื่องนี้">${esc(TLabel(t))}</span>`).join('')
       ||'<span style="color:var(--muted)">—</span>';
     const long=(c.text||'').length>150;
-    return `<tr class="s-${c.sentiment}">
+    const read=c.archived
+      ? `<button class="readbtn undo" data-unread="${esc(c.comment_id)}" title="เอากลับไปหน้า “ยังไม่ได้อ่าน” — จะกลับมานับในสถานะด้วย">↩ เอากลับ</button>`
+      : `<button class="readbtn" data-read="${esc(c.comment_id)}" title="อ่าน/จัดการแล้ว — ย้ายเข้าคลัง จะไม่ขึ้นบนหน้านี้อีก และรอบตรวจหน้าไม่ต้องส่งเข้า AI ซ้ำ">✓ อ่านแล้ว</button>`;
+    return `<tr class="s-${c.sentiment}${c.archived?' arch':''}">
       <td class="when"><b>${esc(fmtTime(c.created_at))}</b>${esc(fmtDay(c.created_at))}</td>
       <td class="who" title="${esc(c.author)}">${who}</td>
       <td class="txt ${long?'clamp':''}"><span class="t">${hl(c.text,FILT.q)}</span>${
         c.escalated_to_llm?'<span class="aibadge" title="คอมเมนต์นี้กำกวม/อาจเป็นการประชด จึงส่งให้ AI อ่านซ้ำอีกชั้น">AI อ่านซ้ำ</span>':''}${
         long?'<br><button class="more">อ่านต่อ</button>':''}</td>
-      <td><span class="tag" style="color:${s.c};background:color-mix(in srgb,${s.c} 13%,transparent)"><span class="dot" style="background:${s.c}"></span>${s.t}</span></td>
+      <td><button class="tag tagbtn" data-fix="${esc(c.comment_id)}"
+        title="AI อ่านผิด? กดเพื่อแก้อารมณ์/ประเด็นของคอมเมนต์นี้เอง"
+        style="color:${s.c};background:color-mix(in srgb,${s.c} 13%,transparent)"><span class="dot" style="background:${s.c}"></span>${s.t}</button>${fixed}</td>
       <td>${topics}</td>
       <td class="rch"><span class="tnum">${nf(c.reach)}</span><span class="rbar"><i style="width:${(c.reach/maxReach*100).toFixed(0)}%;background:${c.sentiment==='negative'?'var(--neg)':'var(--muted)'}"></i></span></td>
       <td class="post" title="${esc(c.post_title||'')}">${esc(c.post_title||'—')}</td>
-      <td>${link}</td></tr>`;}).join('')
-    ||`<tr><td colspan="8" class="empty">ไม่พบคอมเมนต์ที่ตรงกับเงื่อนไข<br>
-        <button class="linkbtn" onclick="document.querySelector('[data-clr=all]')?.click()">ล้างตัวกรองทั้งหมด</button></td></tr>`;
+      <td class="act"><div class="act-in">${read}${link}</div></td></tr>`;}).join('')
+    ||`<tr><td colspan="8" class="empty emptybox">${emptyText()}</td></tr>`;
 
   $('#rows').querySelectorAll('.more').forEach(b=>b.onclick=()=>{
     const td=b.closest('td');td.classList.toggle('clamp');
@@ -1042,9 +1270,15 @@ function renderTable(){
   $('#rows').querySelectorAll('.topic[data-t]').forEach(t=>t.onclick=()=>{
     FILT.topic=t.dataset.t;FILT.limit=50;$('#topicFilter').value=FILT.topic;
     renderTopics(DATA);renderTable();});
+  $('#rows').querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>openFix(b.dataset.fix));
+  $('#rows').querySelectorAll('[data-read]').forEach(b=>b.onclick=()=>sendArchive([b.dataset.read],false));
+  $('#rows').querySelectorAll('[data-unread]').forEach(b=>b.onclick=()=>sendArchive([b.dataset.unread],true));
 
   const more=cs.length-shown.length;
-  $('#count').innerHTML=`<span>แสดง <b>${nf(shown.length)}</b> จาก ${nf(cs.length)} คอมเมนต์</span>`
+  $('#count').innerHTML=`<span>แสดง <b>${nf(shown.length)}</b> จาก ${nf(cs.length)} คอมเมนต์`
+      +(arch?' ในคลัง':'')+`</span>`
+    +(!arch&&DATA.archived_count?`<span style="color:var(--muted)">· อีก <b>${nf(DATA.archived_count)}</b> `
+      +`อยู่ในคลัง (ไม่ถูกนับในสถานะ)</span>`:'')
     +(more>0?`<button class="ghost" id="moreBtn">แสดงเพิ่มอีก ${nf(Math.min(more,100))} รายการ</button>`:'');
   if(more>0)$('#moreBtn').onclick=()=>{FILT.limit+=100;renderTable();};
   renderActiveBar(shown.length,cs.length);
@@ -1054,6 +1288,228 @@ $('#topicFilter').onchange=e=>{FILT.topic=e.target.value;FILT.limit=50;renderTop
 $('#sortBy').onchange=e=>{FILT.sort=e.target.value;renderTable();};
 let qt;$('#search').oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{
   FILT.q=e.target.value.trim();FILT.limit=50;renderTable();},180);};
+
+/* ═══════════════════════════ แก้ label ที่ AI ทายพลาด ═══════════════════════════
+   AI อ่านภาษาคนพลาดได้ตลอด (มุกตลก/ประชด/บ่นเล่น) — ถ้าปล่อยไว้ตัวเลขคอมเมนต์ลบจะเฟ้อ
+   และ crisis จะเตือนผิด → ให้คนตัดสินทับได้ แล้ว server คิดรายงานใหม่จากคอมเมนต์ชุดเดิม  */
+let FIX=null;                        // คอมเมนต์ที่กำลังแก้ + ค่าที่เลือกอยู่ในกล่อง
+let toastT;
+function toast(msg,undo){
+  const t=$('#toast');
+  t.innerHTML=esc(msg)+(undo?'<button id="toastUndo">เลิกทำ</button>':'');
+  t.style.pointerEvents=undo?'auto':'none';
+  t.classList.add('show');
+  if(undo)$('#toastUndo').onclick=()=>{t.classList.remove('show');undo();};
+  // มีปุ่มเลิกทำ → ให้เวลานานขึ้น คนต้องอ่านทันว่ากดอะไรไป
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),undo?9000:4500);
+}
+function fixErr(msg){$('#fixErr').textContent=msg;$('#fixErr').classList.remove('hidden');}
+
+function openFix(cid){
+  const c=(DATA?.comments||[]).find(x=>x.comment_id===cid);
+  if(!c)return;
+  FIX={c,sent:c.sentiment,topics:new Set(c.topics||[])};
+  $('#fixTitle').textContent=c.overridden?'แก้ที่ทีมเคยปรับไว้':'AI อ่านคอมเมนต์นี้ผิดใช่ไหม?';
+  $('#fixText').textContent=c.text||'';
+  $('#fixMeta').textContent=`${c.author||'—'} · ${fmtFull(c.created_at)} · ไลก์+ตอบกลับ ${nf(c.reach)}`;
+  $('#fixNote').value='';
+  $('#fixErr').classList.add('hidden');
+  $('#fixReset').classList.toggle('hidden',!c.overridden);
+  drawFixPickers();
+  $('#fixDlg').showModal();
+}
+
+function drawFixPickers(){
+  // ป้าย "AI ทาย" ต้องชี้ค่าเดิมของ AI เสมอ — ถ้าแถวนี้เคยถูกแก้ ค่าปัจจุบันคือของคน ไม่ใช่ของ AI
+  const aiS=FIX.c.overridden?FIX.c.ai_sentiment:FIX.c.sentiment;
+  const aiT=new Set(FIX.c.overridden?(FIX.c.ai_topics||[]):(FIX.c.topics||[]));
+  $('#fixSent').innerHTML=['positive','neutral','negative'].map(k=>
+    `<button class="pick ${FIX.sent===k?'on':''}" data-s="${k}" aria-pressed="${FIX.sent===k}">
+       <span class="dot" style="background:${SENT[k].c}"></span>${SENT[k].t}`
+    +(k===aiS?'<span class="ai">(AI ทาย)</span>':'')+`</button>`).join('');
+  const labels=(DATA&&DATA.topic_labels)||{};
+  $('#fixTopics').innerHTML=Object.keys(labels).map(k=>{
+    const on=FIX.topics.has(k);
+    return `<button class="pick ${on?'on':''}" data-t="${esc(k)}" aria-pressed="${on}">${esc(labels[k])}`
+      +(aiT.has(k)?'<span class="ai">(AI ทาย)</span>':'')+`</button>`;}).join('')
+    ||'<span style="color:var(--muted);font-size:13px">— ไม่มีรายการประเด็น</span>';
+  $$('#fixSent .pick').forEach(b=>b.onclick=()=>{FIX.sent=b.dataset.s;drawFixPickers();});
+  $$('#fixTopics .pick').forEach(b=>b.onclick=()=>{
+    FIX.topics.has(b.dataset.t)?FIX.topics.delete(b.dataset.t):FIX.topics.add(b.dataset.t);
+    drawFixPickers();});
+}
+
+async function sendFix(payload){
+  const headers={'Content-Type':'application/json'};
+  const pass=sessionStorage.getItem('runPass')||$('#passInput').value.trim()||'';
+  if(pass)headers['X-Run-Passcode']=pass;
+  payload.target=(MODE==='manual'&&JOB_ID)?JOB_ID:'monitor';
+  $('#fixSave').disabled=$('#fixReset').disabled=true;
+  let r,j;
+  try{r=await fetch('/api/override',{method:'POST',headers,body:JSON.stringify(payload)});j=await r.json();}
+  catch(e){$('#fixSave').disabled=$('#fixReset').disabled=false;
+    return fixErr('ต่อเซิร์ฟเวอร์ไม่ได้ — ลองใหม่อีกครั้ง');}
+  $('#fixSave').disabled=$('#fixReset').disabled=false;
+  if(r.status===401)return fixErr('ต้องมีรหัสผ่านก่อนถึงจะแก้ได้ (ผู้ดูแลตั้งไว้) — ปิดกล่องนี้ กด “ตรวจเอง” เพื่อกรอกรหัส แล้วค่อยกลับมาแก้');
+  if(!r.ok||!j.result)return fixErr(j.error||'บันทึกไม่สำเร็จ — ลองใหม่อีกครั้ง');
+
+  const before=DATA.status;
+  $('#fixDlg').close();
+  render(j.result,{scroll:false,keep:true});   // คงตัวกรองไว้ คนกำลังดูแถวนั้นอยู่
+  toast(before!==j.result.status
+    ? `บันทึกแล้ว · สถานะเปลี่ยนจาก “${(STAT[before]||STAT.NORMAL).t}” → “${(STAT[j.result.status]||STAT.NORMAL).t}”`
+    : 'บันทึกแล้ว · คิดตัวเลขและสถานะใหม่ให้เรียบร้อย');
+}
+
+$('#fixSave').onclick=()=>sendFix({comment_id:FIX.c.comment_id,sentiment:FIX.sent,
+                                   topics:[...FIX.topics],note:$('#fixNote').value.trim()});
+$('#fixReset').onclick=()=>sendFix({comment_id:FIX.c.comment_id,clear:true});
+$('#fixCancel').onclick=()=>$('#fixDlg').close();
+
+/* ═══════════════════════════ คลัง "อ่านแล้ว" ═══════════════════════════
+   รอบ scrape ถัดไปได้คอมเมนต์เดิมกลับมาเกือบหมด — ถ้าไม่มีที่จำว่า "อันนี้จัดการแล้ว"
+   ของใหม่ที่ต้องรีบดูจะจมอยู่ในกองเดิม · คอมเมนต์ในคลังไม่ถูกส่งเข้า AI ซ้ำด้วย (ประหยัด token) */
+async function sendArchive(ids,unarchive){
+  if(!ids.length)return;
+  const headers={'Content-Type':'application/json'};
+  const pass=sessionStorage.getItem('runPass')||$('#passInput').value.trim()||'';
+  if(pass)headers['X-Run-Passcode']=pass;
+  let r,j;
+  try{
+    r=await fetch('/api/archive',{method:'POST',headers,body:JSON.stringify({
+      comment_ids:ids,unarchive:!!unarchive,
+      target:(MODE==='manual'&&JOB_ID)?JOB_ID:'monitor'})});
+    j=await r.json();
+  }catch(e){return toast('ต่อเซิร์ฟเวอร์ไม่ได้ — ลองใหม่อีกครั้ง');}
+  if(r.status===401)
+    return toast('ต้องมีรหัสผ่านก่อนถึงจะกด “อ่านแล้ว” ได้ — กด “ตรวจเอง” เพื่อกรอกรหัส');
+  if(!r.ok||!j.result)return toast(j.error||'บันทึกไม่สำเร็จ — ลองใหม่อีกครั้ง');
+
+  const before=DATA.status;
+  render(j.result,{scroll:false,keep:true});
+  const changed=before!==j.result.status;
+  toast(unarchive
+    ? `เอากลับจากคลังแล้ว ${nf(ids.length)} รายการ`
+      +(changed?` · สถานะกลับเป็น “${(STAT[j.result.status]||STAT.NORMAL).t}”`:'')
+    : `ย้ายเข้าคลังแล้ว ${nf(ids.length)} รายการ · รอบตรวจหน้าไม่ต้องส่งเข้า AI ซ้ำ`
+      +(changed?` · สถานะเปลี่ยนเป็น “${(STAT[j.result.status]||STAT.NORMAL).t}”`:''),
+    ()=>sendArchive(ids,!unarchive));
+}
+
+function emptyText(){
+  if(FILT.view==='archive')
+    return '<b>ยังไม่มีคอมเมนต์ในคลัง</b>กด “✓ อ่านแล้ว” ที่แถวไหนก็ได้ เพื่อเก็บออกจากหน้านี้';
+  const filtered=FILT.sent!=='all'||FILT.topic||FILT.bucket||FILT.q;
+  if(filtered)
+    return 'ไม่พบคอมเมนต์ที่ตรงกับเงื่อนไข<br>'
+      +'<button class="linkbtn" onclick="document.querySelector(\'[data-clr=all]\')?.click()">ล้างตัวกรองทั้งหมด</button>';
+  return DATA.archived_count
+    ? '<b>อ่านครบแล้ว 🎉</b>ไม่มีคอมเมนต์ใหม่ที่ต้องดู — ของเก่าอยู่ในแท็บ “คลัง” ทั้งหมด'
+    : '<b>ไม่มีคอมเมนต์</b>ลองตรวจใหม่อีกครั้ง';
+}
+
+$('#viewSeg').onclick=e=>{
+  const b=e.target.closest('button');if(!b||b.dataset.v===FILT.view)return;
+  FILT.view=b.dataset.v;FILT.limit=50;FILT.bucket='';
+  renderTopicFilter(DATA);$('#topicFilter').value=FILT.topic;
+  if($('#topicFilter').value!==FILT.topic)FILT.topic='';   // ประเด็นนั้นไม่มีใน view นี้
+  renderChips();renderTable();
+};
+$('#readAllBtn').onclick=()=>sendArchive(filteredComments().map(c=>c.comment_id),false);
+
+/* ═══════════════════════════ monitor — เฝ้าเพจให้เอง ═══════════════════════════
+   หน้าเว็บไม่รอให้คนกดปุ่ม: ถาม /api/monitor เรื่อย ๆ ว่ามีผลตรวจใหม่ไหม
+   ตัวการยิงตรวจใหม่อยู่ฝั่ง server (ดู backend/monitor.py) — ที่นี่แค่ "ถามแล้ววาด"   */
+let POLL_T=0;
+const schedulePoll=ms=>{clearTimeout(POLL_T);POLL_T=setTimeout(pollMonitor,ms);};
+
+async function pollMonitor(){
+  let m;
+  try{m=await (await fetch('/api/monitor')).json();}
+  catch(e){monitorOffline();return schedulePoll(15000);}
+  MON=m;
+  if(!m.enabled){                       // ปิด monitor ไว้ (MONITOR=off) → กลับไปเป็นแบบกดเอง
+    MODE='manual';$('#setup').classList.remove('hidden');manualWelcome();return;
+  }
+  NEXT_AT=Date.now()+(m.next_in_sec||0)*1000;
+  // ผู้ใช้กดตรวจเองอยู่ → อย่าไปทับจอเขา แค่ตามสถานะไว้เฉย ๆ
+  if(MANUAL_BUSY||MODE==='manual')return schedulePoll(m.refreshing?5000:30000);
+
+  if(m.updated_ts&&m.updated_ts!==MON_TS)      await loadMonitorResult(m.updated_ts);
+  else if(!m.has_result)                       m.refreshing?showFirstRun(m):showMonitorIdle(m);
+  else                                         paintStatus();
+
+  schedulePoll(m.refreshing?3000:20000);
+}
+
+async function loadMonitorResult(ts){
+  let j;
+  try{j=await (await fetch('/api/monitor/result')).json();}catch(e){return;}
+  if(!j||!j.result)return;
+  MON_TS=j.updated_ts||ts;MODE='monitor';
+  $('#prog').classList.add('hidden');
+  // ไม่เลื่อนจอ — ผลมาเองโดยที่ผู้ใช้ไม่ได้สั่ง การเด้งจอกลางที่คนกำลังอ่านอยู่คือความรำคาญ
+  render(j.result,{scroll:false});
+}
+
+function showFirstRun(m){
+  $('#welcome').classList.add('hidden');$('#results').classList.add('hidden');
+  $('#setup').classList.add('hidden');$('#setupSummary').classList.add('hidden');
+  $('#prog').classList.remove('hidden');
+  $('#progTitle').textContent='กำลังตรวจเพจรอบแรก…';
+  $('#progSub').textContent=`${m.page_name||'เพจที่ตั้งไว้'} · หลังจากนี้ระบบจะตรวจซ้ำให้เองทุก ${m.interval_min} นาที ไม่ต้องกดอะไร`;
+  $('#log').textContent=(m.logs||[]).join('\n');$('#log').scrollTop=1e9;
+  drawSteps(stepFromLogs(m.logs||[]));
+  setLive('กำลังตรวจ…','var(--accent)',true);
+}
+
+/* ยังไม่มีผลและไม่ได้กำลังตรวจ = รอบแรกพลาด (token เสีย/เพจดึงไม่ได้) → เปิดทางให้ตรวจเอง */
+function showMonitorIdle(m){
+  $('#prog').classList.add('hidden');$('#results').classList.add('hidden');
+  $('#setupSummary').classList.add('hidden');
+  $('#welcome').classList.remove('hidden');$('#setup').classList.remove('hidden');
+  $('#wTitle').textContent=m.error?'ตรวจอัตโนมัติรอบแรกไม่สำเร็จ':'กำลังจะเริ่มตรวจ';
+  $('#wText').innerHTML=m.error
+    ? `สาเหตุ: <b>${esc(shortErr(m.error))}</b><br>ระหว่างนี้ลองโหมด <b>ข้อมูลตัวอย่าง</b> ด้านบนเพื่อดูว่าระบบทำงานยังไง`
+    : 'ระบบเฝ้าเพจให้อยู่ตลอด ไม่ต้องเลือกโพสต์เอง — เปิดหน้านี้เมื่อไหร่ก็เห็นว่า:';
+  setLive(m.error?'ตรวจไม่สำเร็จ':'กำลังจะเริ่ม',m.error?'var(--neg)':'var(--muted)');
+}
+
+function manualWelcome(){
+  if(DATA)return;
+  $('#wTitle').textContent='ยังไม่มีผลตรวจ';
+  $('#wText').innerHTML='กดปุ่ม <b>เริ่มตรวจ</b> ด้านบน ระบบจะอ่านคอมเมนต์ให้ทั้งหมดภายในไม่กี่นาที แล้วสรุปให้ว่า:';
+}
+
+function monitorOffline(){
+  if(DATA||MODE==='manual')return;
+  $('#setup').classList.remove('hidden');manualWelcome();
+}
+
+/* "ตรวจใหม่ตอนนี้" = ข้ามรอบไปยิง Apify เลย → ถ้า owner ตั้งรหัสไว้ ต้องกรอกก่อน */
+async function refreshNow(){
+  if(!isMon())return run();
+  const pass=$('#passInput').value.trim()||sessionStorage.getItem('runPass')||'';
+  const headers={'Content-Type':'application/json'};
+  if(pass)headers['X-Run-Passcode']=pass;
+  $('#rerunBtn').disabled=true;
+  let r;
+  try{r=await fetch('/api/monitor/refresh',{method:'POST',headers,body:'{}'});}
+  catch(e){$('#rerunBtn').disabled=false;return;}
+  $('#rerunBtn').disabled=false;
+  if(r.status===401){
+    sessionStorage.removeItem('runPass');$('#passInput').value='';
+    SRC='facebook';pick('#modes','src','facebook');syncFields();   // โชว์ช่องรหัสให้กรอก
+    $('#setup').classList.remove('hidden');$('#setupSummary').classList.add('hidden');
+    $('#setupErr').textContent='การตรวจนอกรอบต้องกรอกรหัสผ่านก่อน (ผู้ดูแลตั้งไว้กันเครดิต Apify หมด) — กรอกแล้วกด “ตรวจใหม่ตอนนี้” อีกครั้ง';
+    $('#setupErr').classList.remove('hidden');$('#passInput').focus();return;
+  }
+  if(pass)sessionStorage.setItem('runPass',pass);
+  schedulePoll(600);
+}
+
+pollMonitor();
+setInterval(()=>{if(isMon()&&DATA)paintStatus();},10000);   // ให้ตัวนับถอยหลังเดิน
 </script>
 </body>
 </html>
