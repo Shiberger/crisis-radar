@@ -9,7 +9,7 @@ import tempfile
 import threading
 import time
 import urllib.request
-from http.server import ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -21,10 +21,16 @@ sys.path.insert(0, str(HERE.parent))
 os.environ["MONITOR_SOURCE"] = "sample"
 os.environ["MONITOR_INTERVAL_MIN"] = "60"
 
+# ปลายทางแจ้งเตือนต้องไม่ชี้ไป n8n/Discord จริงตอนรันเทส — เดี๋ยวจะยิงเข้าห้องทีมจริง
+# (เทสจะตั้ง N8N_WEBHOOK_URL ชี้มา stub ในเครื่องเองตอนถึงหัวข้อ Discord alert)
+for _k in ("N8N_WEBHOOK_URL", "DISCORD_WEBHOOK_URL", "N8N_WEBHOOK_SECRET", "DISCORD_ROLE_MAP"):
+    os.environ.pop(_k, None)
+
 import monitor  # noqa: E402
 import server   # noqa: E402
 
-from src.classify import archive, overrides  # noqa: E402
+from src import notify                        # noqa: E402
+from src.classify import archive, overrides   # noqa: E402
 
 # เขียน state ลง temp — ห้ามทับผลตรวจจริง/คำตัดสินที่ทีมแก้ไว้บนเครื่องที่รันเทส
 _TMP = Path(tempfile.mkdtemp(prefix="crisis-radar-selftest-"))
@@ -32,11 +38,40 @@ monitor.STATE_FILE = _TMP / "monitor_latest.json"
 monitor.HISTORY_FILE = _TMP / "monitor_history.json"
 overrides.STORE = _TMP / "overrides.json"
 archive.STORE = _TMP / "archive.json"
+notify.alerts.STORE = _TMP / "alerts_sent.json"
 # monitor โหลด state เก่าตอน import ไปแล้ว — เคลียร์ให้เทสเริ่มจากศูนย์เสมอ
 monitor._STATE.update(result=None, updated_ts=0.0, updated_at="", error=None, error_ts=0.0, history=[])
 
 PORT = 8971
 BASE = f"http://127.0.0.1:{PORT}"
+
+HOOK_PORT = 8972
+HOOK_HITS: list[dict] = []
+
+
+class HookHandler(BaseHTTPRequestHandler):
+    """n8n ปลอมสำหรับเทส — เก็บ payload ที่ Crisis Radar ยิงมาไว้ตรวจ.
+
+    path '/down' = จำลองปลายทางล่ม (ตอบ 500) เพื่อเช็กว่าเราไม่ไปบันทึกว่า 'ส่งแล้ว'
+    """
+
+    def log_message(self, *_):
+        pass
+
+    def do_POST(self) -> None:
+        n = int(self.headers.get("Content-Length", 0) or 0)
+        try:
+            body = json.loads(self.rfile.read(n) or b"{}")
+        except json.JSONDecodeError:
+            body = {}
+        HOOK_HITS.append({"path": self.path, "body": body,
+                          "token": self.headers.get("X-Crisis-Radar-Token", "")})
+        code = 500 if self.path == "/down" else 200
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", "11")
+        self.end_headers()
+        self.wfile.write(b'{"ok":true}')
 
 
 def get(path):
@@ -80,7 +115,8 @@ def main() -> int:
           all(f'id="{i}"' in html for i in ("runBtn", "results", "verdict", "kpis", "alerts",
                                             "plot", "rows", "prog",
                                             "histStrip", "staleFlag", "monBtn", "wTitle",
-                                            "fixDlg", "viewSeg", "readAllBtn", "toast")))
+                                            "fixDlg", "viewSeg", "readAllBtn", "toast",
+                                            "alertDlg", "alertSend", "alertHint")))
 
     # 3) กดปุ่ม (โหมด demo) → poll จนเสร็จ
     job_id = post("/api/run", {"source": "sample"})["job_id"]
@@ -220,6 +256,112 @@ def main() -> int:
     junk = post("/api/archive", {"comment_ids": ["ไม่มีจริง"], "target": "monitor"},
                 expect_error=True)
     check("comment_id มั่ว → 400 (กันขยะลงคลัง)", junk[0] == 400)
+
+    # 8) แจ้งเตือนเข้า Discord ผ่าน n8n — ทั้งปุ่มที่คนกดเอง และตัวส่งอัตโนมัติ
+    hook = ThreadingHTTPServer(("127.0.0.1", HOOK_PORT), HookHandler)
+    threading.Thread(target=hook.serve_forever, daemon=True).start()
+    time.sleep(0.3)
+
+    base = get("/api/monitor/result")["result"]
+    # เคสหลักของปุ่มนี้: AI ให้เป็น "กลาง/บวก" แต่คนอ่านออกว่าเป็นเรื่อง
+    calm = next(c for c in base["comments"] if c["sentiment"] != "negative")
+
+    off = post("/api/alert", {"comment_id": calm["comment_id"], "target": "monitor"},
+               expect_error=True)
+    check("ยังไม่ตั้งปลายทาง → 400 พร้อมบอกว่าต้องตั้ง env ตัวไหน",
+          off[0] == 400 and "N8N_WEBHOOK_URL" in off[1].get("error", ""),
+          str(off[1].get("error"))[:60])
+
+    os.environ["N8N_WEBHOOK_URL"] = f"http://127.0.0.1:{HOOK_PORT}/hook"
+    os.environ["N8N_WEBHOOK_SECRET"] = "s3cr3t"
+    os.environ["ALERT_MAX_PER_RUN"] = "2"
+    check("health บอกหน้าเว็บว่าปุ่มแจ้ง Discord ใช้ได้แล้ว",
+          get("/api/health")["alert"] == {"configured": True, "via": "n8n", "auto": True,
+                                          "min_reach": 150},
+          json.dumps(get("/api/health")["alert"], ensure_ascii=False))
+
+    sent = post("/api/alert", {"comment_id": calm["comment_id"], "note": "คนอ่านแล้วว่าเป็นเรื่อง",
+                               "target": "monitor"})
+    hit = HOOK_HITS[-1]
+    check("กดปุ่มแจ้ง → ยิงเข้า n8n จริง พร้อม secret ใน header",
+          len(HOOK_HITS) == 1 and hit["token"] == "s3cr3t", f"{len(HOOK_HITS)} ครั้ง")
+    body = hit["body"]
+    check("payload มีข้อมูลดิบให้ n8n route ต่อได้",
+          body["trigger"] == "manual" and body["severity"] == "high"
+          and body["comment"]["comment_id"] == calm["comment_id"]
+          and body["note"] == "คนอ่านแล้วว่าเป็นเรื่อง" and bool(body["routing"]["owner"]),
+          f"{body['trigger']}/{body['severity']} · ส่งต่อ {body['routing']['owner']}")
+    check("payload มีข้อความ Discord สำเร็จรูป (n8n ยิงต่อได้เลย)",
+          bool(body["discord"]["embeds"][0]["title"])
+          and calm["text"][:20] in body["discord"]["embeds"][0]["description"]
+          and body["discord"]["embeds"][0]["color"] > 0,
+          body["discord"]["embeds"][0]["title"][:48])
+
+    row = next(c for c in sent["result"]["comments"] if c["comment_id"] == calm["comment_id"])
+    check("ส่งแล้วรายงานจำไว้ (หน้าเว็บขึ้น 'แจ้งแล้ว')",
+          bool(row["alerted_at"]) and sent["result"]["alert_sent_count"] == 1
+          and sent["alert"]["trigger"] == "manual", row["alerted_at"])
+
+    dup = post("/api/alert", {"comment_id": calm["comment_id"], "target": "monitor"},
+               expect_error=True)
+    check("กดซ้ำคอมเมนต์เดิม → 400 ไม่เด้งซ้ำใน Discord",
+          dup[0] == 400 and len(HOOK_HITS) == 1, str(dup[1].get("error"))[:50])
+    post("/api/alert", {"comment_id": calm["comment_id"], "force": True, "target": "monitor"})
+    check("แต่ถ้าคนตั้งใจกดส่งซ้ำเอง (force) ต้องส่งได้", len(HOOK_HITS) == 2)
+
+    # ปลายทางล่ม → ต้องไม่บันทึกว่าส่งแล้ว ไม่งั้นเรื่องนี้จะไม่มีใครแจ้งอีกเลย
+    os.environ["N8N_WEBHOOK_URL"] = f"http://127.0.0.1:{HOOK_PORT}/down"
+    other = next(c for c in base["comments"]
+                 if c["sentiment"] != "negative" and c["comment_id"] != calm["comment_id"])
+    dead = post("/api/alert", {"comment_id": other["comment_id"], "target": "monitor"},
+                expect_error=True)
+    check("ปลายทางล่ม → 502 และไม่ถูกทำเครื่องหมายว่าส่งแล้ว",
+          dead[0] == 502 and get("/api/monitor/result")["result"]["alert_sent_count"] == 1,
+          str(dead[1].get("error"))[:50])
+
+    # ตัวส่งอัตโนมัติ: คอมเมนต์ "ลบและแรง" ต้องเด้งเองตั้งแต่รอบตรวจ ไม่ต้องรอคนเปิดเว็บ
+    os.environ["N8N_WEBHOOK_URL"] = f"http://127.0.0.1:{HOOK_PORT}/hook"
+    HOOK_HITS.clear()
+    post("/api/monitor/refresh", {})
+    for _ in range(60):
+        if not get("/api/monitor")["refreshing"]:
+            break
+        time.sleep(0.3)
+    autos = [h["body"] for h in HOOK_HITS]
+    check("รอบตรวจใหม่แจ้งคอมเมนต์ลบแรงเข้า Discord เอง",
+          len(autos) == 2 and all(a["trigger"] == "auto" for a in autos),
+          f"{len(autos)} ข้อความ")
+    check("เรียงจากคอมเมนต์ที่คนเห็นเยอะสุดก่อน + ไม่เกินโควตาต่อรอบ",
+          autos and autos[0]["comment"]["reach"] == max(
+              c["reach"] for c in base["comments"] if c["sentiment"] == "negative"),
+          f"reach {autos[0]['comment']['reach'] if autos else '-'}")
+
+    after = get("/api/monitor/result")["result"]
+    check("คอมเมนต์ที่แจ้งไปแล้วถูกทำเครื่องหมายไว้ครบ",
+          after["alert_sent_count"] == 3,
+          f"{after['alert_sent_count']} คอมเมนต์")
+
+    HOOK_HITS.clear()
+    post("/api/monitor/refresh", {})
+    for _ in range(60):
+        if not get("/api/monitor")["refreshing"]:
+            break
+        time.sleep(0.3)
+    check("รอบถัดไปไม่แจ้งซ้ำเรื่องเดิม แต่แจ้งตัวใหม่ที่ยังไม่เคยส่ง",
+          all(h["body"]["comment"]["comment_id"] not in
+              {a["comment"]["comment_id"] for a in autos} for h in HOOK_HITS),
+          f"{len(HOOK_HITS)} ข้อความใหม่")
+
+    os.environ["ALERT_AUTO"] = "off"
+    HOOK_HITS.clear()
+    post("/api/monitor/refresh", {})
+    for _ in range(60):
+        if not get("/api/monitor")["refreshing"]:
+            break
+        time.sleep(0.3)
+    check("ปิด ALERT_AUTO → ไม่แจ้งอัตโนมัติอีก (เหลือแต่ปุ่มที่คนกด)", len(HOOK_HITS) == 0,
+          f"{len(HOOK_HITS)} ข้อความ")
+    hook.shutdown()
 
     print("-" * 50)
     print(f"สรุป: {ok} passed, {fail} failed")

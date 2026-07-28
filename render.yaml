@@ -32,3 +32,16 @@ services:
       # ใส่ "sample" ถ้าอยากให้เดโม่วิ่งได้โดยไม่แตะเครดิต Apify เลย
       - key: MONITOR_SOURCE
         sync: false
+      # --- แจ้งเตือนเข้า Discord ผ่าน n8n (ไม่ตั้ง = ปิดทั้งอัตโนมัติและปุ่มบนหน้าเว็บ) ---
+      # URL ของ Webhook node ใน n8n · workflow ตัวอย่าง: n8n/crisis_radar_discord_alert.json
+      - key: N8N_WEBHOOK_URL
+        sync: false
+      - key: N8N_WEBHOOK_SECRET # ส่งไปกับ header X-Crisis-Radar-Token ให้ n8n ตรวจก่อนรับ
+        sync: false
+      - key: ALERT_MIN_REACH # คอมเมนต์ลบที่ไลก์+ตอบกลับถึงเท่านี้ = แจ้งเองทันที
+        value: "150"
+      - key: ALERT_MAX_PER_RUN # กันข้อความท่วม Discord จนทีมปิดแจ้งเตือน
+        value: "5"
+      # ลิงก์กลับ dashboard ที่แนบไปในข้อความ — ใส่ URL จริงของ service นี้หลัง deploy รอบแรก
+      - key: PUBLIC_URL
+        sync: false

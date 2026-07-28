@@ -1,0 +1,89 @@
+{
+  "event": "crisis_radar.comment_alert",
+  "version": 1,
+  "trigger": "auto",
+  "severity": "high",
+  "reason": "คอมเมนต์เชิงลบที่คนกดไลก์/ตอบกลับ 203 ครั้ง (เกณฑ์แจ้งอัตโนมัติตอนนี้ 75)",
+  "sent_at": "2026-07-27T20:02:30+07:00",
+  "brand": "talesrunner",
+  "page": {
+    "name": "Talesrunner Thailand",
+    "url": "https://www.facebook.com/TalesrunnerTH"
+  },
+  "report": {
+    "status": "CRISIS",
+    "total": 41,
+    "negative": 28,
+    "generated_at": "",
+    "dashboard_url": "https://crisis-radar.onrender.com"
+  },
+  "comment": {
+    "comment_id": "c18",
+    "author": "Somchai R",
+    "text": "กาชาใหม่โคตรแพง อัตราดรอปก็ห่วย เปย์ไป 2000 ไม่ได้ตัว SSR เลย เอาเปรียบผู้เล่นมาก",
+    "created_at": "2026-07-15T14:08:00+07:00",
+    "reach": 203,
+    "url": "",
+    "profile_url": "",
+    "post_title": "",
+    "sentiment": "negative",
+    "ai_sentiment": "negative",
+    "overridden": false,
+    "confidence": 1.0,
+    "topics": [
+      "billing/price",
+      "balance/fairness"
+    ],
+    "topic_labels": [
+      "เติมเงิน/ราคา",
+      "สมดุล/ความเป็นธรรม"
+    ]
+  },
+  "routing": {
+    "owner": "Marketing / Monetization",
+    "topic": "billing/price",
+    "role_id": "1234567890"
+  },
+  "note": "",
+  "discord": {
+    "content": "<@&1234567890>",
+    "embeds": [
+      {
+        "title": "🚨 คอมเมนต์เชิงลบแรง — คนกดไลก์/ตอบกลับ 203 ครั้ง",
+        "description": "> กาชาใหม่โคตรแพง อัตราดรอปก็ห่วย เปย์ไป 2000 ไม่ได้ตัว SSR เลย เอาเปรียบผู้เล่นมาก\n— โดย **Somchai R**",
+        "color": 13646651,
+        "fields": [
+          {
+            "name": "อารมณ์ที่ระบบให้",
+            "value": "ลบ",
+            "inline": true
+          },
+          {
+            "name": "ไลก์+ตอบกลับ",
+            "value": "203",
+            "inline": true
+          },
+          {
+            "name": "ประเด็น",
+            "value": "เติมเงิน/ราคา · สมดุล/ความเป็นธรรม",
+            "inline": true
+          },
+          {
+            "name": "ทำไมถึงเด้ง",
+            "value": "คอมเมนต์เชิงลบที่คนกดไลก์/ตอบกลับ 203 ครั้ง (เกณฑ์แจ้งอัตโนมัติตอนนี้ 75)",
+            "inline": false
+          },
+          {
+            "name": "ลิงก์",
+            "value": "[เปิด Dashboard](https://crisis-radar.onrender.com)",
+            "inline": false
+          }
+        ],
+        "footer": {
+          "text": "Crisis Radar · Talesrunner Thailand · สถานะเพจตอนนี้: วิกฤต · ส่งต่อ: Marketing / Monetization"
+        },
+        "timestamp": "2026-07-15T14:08:00+07:00"
+      }
+    ]
+  }
+}

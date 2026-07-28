@@ -86,11 +86,34 @@ lexicon เจอคำว่า **รำคาญ** + **เด้ง** → ต�
 > สถานะจะดูดีขึ้นได้ · หน้าเว็บจึงแสดงจำนวนในคลังคู่กับสถานะเสมอ และ **สถานะหมายถึง "ของที่ยังไม่ได้จัดการ"**
 > · เก็บที่ `data/archive.json` (ตอน deploy ควร mount disk ถาวร ไม่งั้นหายตอน restart)
 
+## 🔔 แจ้งเตือนเข้า Discord (ผ่าน n8n)
+
+คนไม่ได้นั่งเฝ้าหน้าจอตลอด — เรื่องที่ต้องรีบต้องวิ่งไปหาทีมเอง มี **2 ทาง** ตั้งใจให้ครอบทั้งตอน AI ถูกและตอน AI พลาด:
+
+| ทาง | เกิดเมื่อไหร่ | ทำไมต้องมี |
+|---|---|---|
+| **ระบบส่งเอง** | คอมเมนต์ **เชิงลบ + ไลก์/ตอบกลับ ≥ `ALERT_MIN_REACH`** (เริ่มต้น 150 · ช่วงสถานะ CRISIS ลดครึ่ง) เด้งตั้งแต่รอบตรวจ | ดราม่าตอนตี 2 ไม่มีใครเปิดหน้าเว็บ แต่ต้องมีคนรู้ |
+| **คนกดปุ่ม** | ในตาราง *อ่านคอมเมนต์จริง* → **“🔔 แจ้ง Discord”** ที่แถวนั้น | เคสที่ AI อ่านเป็น **“กลาง/บวก”** แต่คนอ่านออกว่าเป็นเรื่อง (ประชด/ชวนคนไปถล่ม/บริบทที่โมเดลไม่รู้) — ระบบจะไม่มีวันแจ้งเอง คนจึงต้องดันเข้าไปได้ |
+
+ข้อความที่ส่งบอกครบใน 1 การ์ด: คอมเมนต์เต็ม · ใครพูด · ไลก์+ตอบกลับ · ประเด็น · **ทำไมถึงเด้ง** ·
+**ทีมที่ต้องรับเรื่อง** · ลิงก์ตรงไปคอมเมนต์นั้นและกลับมาที่ dashboard
+
+**กันข้อความท่วมจนทีมปิดแจ้งเตือน:** คอมเมนต์เดิมไม่ถูกส่งซ้ำ (จำที่ `data/alerts_sent.json`) ·
+auto ส่งได้มากสุด `ALERT_MAX_PER_RUN` ต่อรอบ · ของที่กด “อ่านแล้ว” ไม่ถูกแจ้ง · ส่งซ้ำได้เฉพาะตอนคนกดเอง
+
+**ตั้งค่า:** ใส่ `N8N_WEBHOOK_URL` + `N8N_WEBHOOK_SECRET` ใน `.env` แล้ว import workflow
+[`n8n/crisis_radar_discord_alert.json`](n8n/crisis_radar_discord_alert.json) — วิธีทีละขั้น + หน้าตา payload
+อยู่ใน [n8n/README.md](n8n/README.md) · ยังไม่มี n8n ตั้ง `DISCORD_WEBHOOK_URL` ยิงเข้า Discord ตรง ๆ ก็ได้
+· ไม่ตั้งอะไรเลย = ปิดฟีเจอร์นี้ทั้งหมด (ปุ่มยังอยู่ แต่บอกวิธีเปิดใช้)
+
+> ⚠️ ข้อความที่ส่งออกมีคอมเมนต์จริง + ชื่อผู้คอมเมนต์ → ใช้กับ channel ภายในทีมเท่านั้น (ดู [docs/7_security.md](docs/7_security.md) §3.2)
+> · ล็อกด้วย `RUN_PASSCODE` เหมือนการแก้ label · ตอน deploy ควร mount disk ถาวรให้ `data/alerts_sent.json` ไม่งั้นทีมจะโดนแจ้งเรื่องเดิมซ้ำหลัง restart
+
 ## รันแบบ CLI (สำหรับ dev)
 ```bash
 python3 run_demo.py        # → output/crisis_report.md, classified.json, dashboard.html
-python3 tests/run_tests.py # → 23 test, ผลจริง
-python3 backend/selftest.py # → ทดสอบ web + monitor + override + archive end-to-end (31 test)
+python3 tests/run_tests.py # → 29 test, ผลจริง
+python3 backend/selftest.py # → ทดสอบ web + monitor + override + archive + Discord alert end-to-end (45 test)
 ```
 
 ## ดึง Facebook จริง (ผ่าน Apify — ไม่ต้องลง package)
@@ -114,7 +137,7 @@ sources/  → classify/           → crisis/       → dashboard.py
 | Source | `SampleFacebookSource` (fixture) | Meta Graph API / Apify (ต้องได้ page admin) |
 | AI | Thai lexicon + offline-heuristic LLM + คนแก้ทับได้ | Wisesight/WangchanBERTa + Claude Haiku (feed override กลับไป fine-tune) |
 | Dashboard | static HTML | React (reuse stack Warz) + API |
-| Orchestration | monitor ในตัว (เฝ้าตามรอบ เก็บ snapshot ลงไฟล์) | n8n schedule → alert เข้า Discord (แยก channel ตามทีม) |
+| Orchestration | monitor ในตัว (เฝ้าตามรอบ เก็บ snapshot ลงไฟล์) + ยิง webhook เข้า n8n เมื่อมีเรื่องต้องแจ้ง | n8n เดิม + แยก channel/ping role ตามทีม, ต่อ Jira/ระบบ ticket |
 
 ## Deploy ขึ้นเว็บ (Render — สำหรับ demo ให้ทีมกดเอง)
 
@@ -142,6 +165,10 @@ repo นี้มี [render.yaml](render.yaml) ให้แล้ว ทำต�
 5. [Git Repository](docs/5_git_repository.md)
 6. [Owner](docs/6_owner.md)
 7. [Security Information](docs/7_security.md)
+
+**คู่มือติดตั้งเพิ่มเติม:** [integrate_n8n_discord.md](docs/integrate_n8n_discord.md) — เชื่อม Discord **Bot** กับ n8n
+ทีละขั้น (สร้าง app/bot, สิทธิ์, channel & role id, workflow, ทดสอบ 4 ชั้น, ปัญหาที่เจอบ่อย) ·
+[SCRAPING.md](docs/SCRAPING.md) — วิธีดึง Facebook จริง
 
 **ประกอบการนำเสนอ:** [presentation.html](docs/presentation.html) (เดคหลัก 7 หัวข้อ) ·
 [presentation_appendix.html](docs/presentation_appendix.html) — baseline ความมั่นใจของ AI, ตัวอย่าง alert บน Discord (n8n), เส้นทางส่งต่อทีม

@@ -56,6 +56,8 @@ class Classified:
     ai_sentiment: str = ""           # sentiment ที่ AI ทายก่อนถูกแก้
     ai_topics: list[str] = field(default_factory=list)
     archived: bool = False           # ทีมกด 'อ่านแล้ว' → ไม่นับในสถานะ/สถิติ (ดู classify/archive.py)
+    alerted_at: str = ""             # เวลาที่คอมเมนต์นี้ถูกแจ้งเข้า Discord (ว่าง = ยังไม่เคยแจ้ง)
+                                     # ดู notify/alerts.py — เก็บไว้กันแจ้งซ้ำและให้ทีมเห็นว่าส่งไปแล้ว
 
     def to_dict(self) -> dict:
         return {
@@ -68,6 +70,7 @@ class Classified:
             "ai_sentiment": self.ai_sentiment,
             "ai_topics": self.ai_topics,
             "archived": self.archived,
+            "alerted_at": self.alerted_at,
         }
 
     @classmethod
@@ -82,6 +85,7 @@ class Classified:
             ai_sentiment=d.get("ai_sentiment") or "",
             ai_topics=list(d.get("ai_topics") or []),
             archived=bool(d.get("archived")),
+            alerted_at=d.get("alerted_at") or "",
         )
 
 

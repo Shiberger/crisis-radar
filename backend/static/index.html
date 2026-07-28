@@ -322,19 +322,19 @@ td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text
 .tagbtn:hover{border-color:currentColor}
 .fixbadge{display:inline-block;font-size:10.5px;font-weight:640;color:var(--ink2);background:var(--inset);
   border:1px solid var(--border2);border-radius:5px;padding:0 5px;margin-left:5px;white-space:nowrap;cursor:help}
-dialog#fixDlg{border:1px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--ink);
+dialog#fixDlg,dialog#alertDlg{border:1px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--ink);
   padding:0;max-width:560px;width:calc(100% - 32px);box-shadow:0 20px 60px -20px rgba(0,0,0,.55)}
-dialog#fixDlg::backdrop{background:rgba(10,10,8,.5)}
+dialog#fixDlg::backdrop,dialog#alertDlg::backdrop{background:rgba(10,10,8,.5)}
 /* [open] สำคัญ — ถ้าใส่ display:flex ที่ตัว dialog เฉย ๆ จะไปทับ display:none ตอนปิด แล้วกล่องจะโผล่ตลอด
    จอเตี้ย: ให้เนื้อในเลื่อนเอง ปุ่มบันทึกต้องอยู่ในจอเสมอ */
-dialog#fixDlg[open]{display:flex;flex-direction:column;max-height:88vh}
-#fixDlg .bd{padding:20px 22px;overflow:auto}
-#fixDlg h3{margin:0 0 4px;font-size:16.5px;font-weight:680}
+dialog#fixDlg[open],dialog#alertDlg[open]{display:flex;flex-direction:column;max-height:88vh}
+#fixDlg .bd,#alertDlg .bd{padding:20px 22px;overflow:auto}
+#fixDlg h3,#alertDlg h3{margin:0 0 4px;font-size:16.5px;font-weight:680}
 .quote{background:var(--inset);border-left:3px solid var(--border2);border-radius:0 9px 9px 0;
   padding:11px 14px;font-size:14px;line-height:1.65;margin:13px 0 6px;max-height:170px;overflow:auto;
   white-space:pre-wrap;overflow-wrap:anywhere}
 .qmeta{font-size:12px;color:var(--muted)}
-#fixDlg .lbl{font-size:12.5px;font-weight:660;color:var(--ink2);display:block;margin:16px 0 8px}
+#fixDlg .lbl,#alertDlg .lbl{font-size:12.5px;font-weight:660;color:var(--ink2);display:block;margin:16px 0 8px}
 .pickrow{display:flex;gap:8px;flex-wrap:wrap}
 .pick{border:1.5px solid var(--border2);background:var(--surface);border-radius:9px;padding:8px 13px;
   font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;font-weight:600;color:var(--ink2)}
@@ -342,11 +342,11 @@ dialog#fixDlg[open]{display:flex;flex-direction:column;max-height:88vh}
 .pick.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface));color:var(--ink)}
 .pick .dot{width:9px;height:9px;border-radius:50%;flex:none}
 .pick .ai{color:var(--muted);font-weight:400;font-size:11.5px}
-#fixNote{width:100%;background:var(--surface);border:1px solid var(--border2);color:var(--ink);
+#fixNote,#alertNote{width:100%;background:var(--surface);border:1px solid var(--border2);color:var(--ink);
   border-radius:9px;padding:9px 11px;font-size:13.5px;font-family:inherit}
-#fixDlg .ft{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 22px;
+#fixDlg .ft,#alertDlg .ft{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 22px;
   border-top:1px solid var(--border);background:var(--inset);border-radius:0 0 var(--r) var(--r)}
-#fixErr{color:var(--neg);font-size:12.5px;font-weight:600;flex-basis:100%;line-height:1.5}
+#fixErr,#alertErr{color:var(--neg);font-size:12.5px;font-weight:600;flex-basis:100%;line-height:1.5}
 #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(16px);z-index:80;
   background:var(--ink);color:var(--plane);border-radius:11px;padding:12px 18px;font-size:14px;font-weight:600;
   opacity:0;transition:.2s;pointer-events:none;box-shadow:0 12px 40px -12px rgba(0,0,0,.6);
@@ -357,12 +357,19 @@ dialog#fixDlg[open]{display:flex;flex-direction:column;max-height:88vh}
 
 /* ───────────────────────── คลัง 'อ่านแล้ว' ─────────────────────────
    กด 'อ่านแล้ว' = ทีมจัดการเรื่องนี้แล้ว → ออกจากหน้า Monitor และไม่ถูกส่งเข้า AI ซ้ำรอบหน้า  */
-td.act{white-space:nowrap;width:112px}
-.act-in{display:flex;gap:6px;align-items:center}
+td.act{white-space:nowrap;width:152px}
+.act-in{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .readbtn{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:4px 9px;
   font-size:12px;font-weight:640;color:var(--ink2);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
 .readbtn:hover{border-color:var(--pos);color:var(--pos)}
 .readbtn.undo:hover{border-color:var(--accent);color:var(--accent)}
+/* ปุ่มแจ้งเข้า Discord — อยู่ติดกับคอมเมนต์ เพราะจุดที่คนเห็นว่า "อันนี้ต้องรีบบอกทีม"
+   คือตอนอ่านคอมเมนต์นั้น ไม่ใช่ตอนกลับไปดูสรุปข้างบน · ส่งแล้วเปลี่ยนเป็นสถานะถาวร */
+.alertbtn{background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:4px 9px;
+  font-size:12px;font-weight:640;color:var(--ink2);cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.alertbtn:hover{border-color:#5865f2;color:#5865f2}
+.alertbtn.done{border-color:color-mix(in srgb,#5865f2 45%,var(--border));
+  background:color-mix(in srgb,#5865f2 11%,transparent);color:#5865f2}
 tr.arch{opacity:.72}
 tr.arch td.txt{color:var(--ink2)}
 #viewSeg{display:inline-flex}
@@ -388,7 +395,7 @@ tr.arch td.txt{color:var(--ink2)}
 /* ───────────────────────── print ───────────────────────── */
 @media print{
   .topbar,#setup,#setupSummary,#prog,.tools,.activebar,.seg,.iconbtn,.linkbtn{display:none !important}
-  #toast,#fixDlg{display:none !important}
+  #toast,#fixDlg,#alertDlg{display:none !important}
   body{background:#fff;font-size:11px} .card{box-shadow:none;break-inside:avoid}
   .wrap{padding:0}
 }
@@ -418,6 +425,27 @@ tr.arch td.txt{color:var(--ink2)}
     <span class="grow"></span>
     <button class="ghost" id="fixCancel">ยกเลิก</button>
     <div id="fixErr" class="hidden"></div>
+  </div>
+</dialog>
+
+<!-- ═══ กล่องแจ้งคอมเมนต์เข้า Discord (ส่งผ่าน n8n) ═══
+     ระบบแจ้งเองเฉพาะคอมเมนต์ที่ "ลบและแรง" — เคสที่ AI ให้เป็นกลาง/บวกทั้งที่เป็นเรื่อง
+     คนที่นั่งดูต้องดันเข้า Discord เองได้จากตรงนี้ ไม่ต้องไปก็อปแปะเอง                        -->
+<dialog id="alertDlg" aria-labelledby="alertTitle">
+  <div class="bd">
+    <h3 id="alertTitle">แจ้งคอมเมนต์นี้เข้า Discord</h3>
+    <div class="sub" id="alertSub"></div>
+    <div class="quote" id="alertText"></div>
+    <div class="qmeta" id="alertMeta"></div>
+    <div class="staleflag hidden" id="alertPrev" style="margin-top:12px;display:inline-block"></div>
+    <span class="lbl">บอกทีมหน่อยว่าทำไมต้องดูอันนี้ (ไม่บังคับ — จะแนบไปในข้อความ Discord ด้วย)</span>
+    <input id="alertNote" maxlength="300" placeholder="เช่น AI อ่านเป็นกลาง แต่คนนี้กำลังชวนคนอื่นไปรีวิว 1 ดาว">
+  </div>
+  <div class="ft">
+    <button class="run" id="alertSend" style="padding:10px 22px;font-size:14.5px">ส่งเข้า Discord</button>
+    <span class="grow"></span>
+    <button class="ghost" id="alertCancel">ยกเลิก</button>
+    <div id="alertErr" class="hidden"></div>
   </div>
 </dialog>
 
@@ -595,7 +623,8 @@ tr.arch td.txt{color:var(--ink2)}
           <b>AI อ่านผิดได้</b> — โดยเฉพาะมุกตลก/ประชด · กดที่ <b>ป้ายอารมณ์</b> ในตารางเพื่อแก้อารมณ์และประเด็นเอง
           แล้วระบบจะคิดสถานะให้ใหม่ทันที<br>
           อ่าน/จัดการคอมเมนต์ไหนแล้ว กด <b>“✓ อ่านแล้ว”</b> — ย้ายเข้าคลัง ไม่ขึ้นบนหน้านี้อีก
-          และรอบตรวจถัดไปไม่ต้องส่งเข้า AI ซ้ำ</div></div></header>
+          และรอบตรวจถัดไปไม่ต้องส่งเข้า AI ซ้ำ<br>
+          <span id="alertHint"></span></div></div></header>
       <div class="activebar hidden" id="activeBar"></div>
       <div class="seg" id="viewSeg" style="margin-bottom:13px">
         <button data-v="active" class="on">ยังไม่ได้อ่าน <span id="cntActive" class="tnum"></span></button>
@@ -632,6 +661,7 @@ tr.arch td.txt{color:var(--ink2)}
         <li><b>เทียบกับ “ปกติของเพจนี้”</b> ไม่ได้ดูแค่ว่าคอมเมนต์ลบเยอะไหม แต่ดูว่าชั่วโมงนี้ลบพุ่งกว่าชั่วโมงก่อน ๆ กี่เท่า และคอมเมนต์นั้นมีคนไลก์/ตอบกลับมากแค่ไหน</li>
         <li><b>เตือนเมื่อผิดปกติจริง</b> ทั้งกรณีพุ่งทั้งเพจ กรณีเรื่องใดเรื่องหนึ่งมาแรงขึ้นมาใหม่ และกรณีคอมเมนต์ลบเดี่ยว ๆ ที่คนแห่มากดไลก์ — พร้อมบอกว่าทีมไหนควรรับเรื่อง</li>
         <li><b>คนตัดสินทับ AI ได้</b> ถ้า AI อ่านผิด (เช่น มุกตลกถูกนับเป็นคำบ่น) กดแก้ที่ป้ายอารมณ์ในตารางได้เลย — ระบบจะคิดสถานะใหม่ทันที และ<b>จำไว้ใช้ในรอบตรวจถัดไป</b>ด้วย ไม่ต้องแก้ซ้ำ</li>
+        <li><b>เรื่องด่วนเด้งเข้า Discord เอง</b> คอมเมนต์เชิงลบที่คนเห็นเยอะเกินเกณฑ์ จะถูกส่งเข้า channel ของทีมทันทีตั้งแต่รอบตรวจ (ผ่าน n8n) ไม่ต้องรอให้มีคนเปิดหน้านี้ — ส่วนเคสที่ <b>AI อ่านเป็น “กลาง/บวก” แต่คนอ่านออกว่าเป็นเรื่อง</b> กด “🔔 แจ้ง Discord” ที่แถวนั้นส่งเองได้ · คอมเมนต์เดิมไม่ถูกส่งซ้ำ</li>
         <li><b>อ่านแล้ว = จัดการแล้ว</b> คอมเมนต์ที่กด “✓ อ่านแล้ว” จะย้ายเข้าคลังและ<b>ไม่ถูกนับในสถานะอีก</b> — สถานะข้างบนจึงหมายถึง “ของที่ยังไม่ได้จัดการ” เสมอ · จำนวนในคลังแสดงคู่กันไว้ตลอด และเอากลับได้ทุกเมื่อ</li>
       </ol>
       <div class="foot-note" id="methodFoot"></div>
@@ -718,7 +748,11 @@ fetch('/api/targets').then(r=>r.json()).then(t=>{
   if(!$('#postUrls').value)$('#postUrls').value=(t.post_urls||[]).join('\n');
 }).catch(()=>{}).finally(syncFields);
 // ตอน deploy จะตั้งรหัสไว้กันคนกดยิง Apify เล่น
-fetch('/api/health').then(r=>r.json()).then(h=>{NEED_PASS=!!h.passcode_required;syncFields();}).catch(()=>{});
+fetch('/api/health').then(r=>r.json()).then(h=>{
+  NEED_PASS=!!h.passcode_required;
+  ALERT={...ALERT,...(h.alert||{})};   // ปุ่มแจ้ง Discord ใช้ได้ไหม + เกณฑ์ที่ระบบส่งเอง
+  syncFields();alertHint();
+}).catch(()=>{});
 syncFields();
 
 $('#editBtn').onclick=()=>{$('#setup').classList.remove('hidden');$('#setupSummary').classList.add('hidden');
@@ -1249,6 +1283,10 @@ function renderTable(){
     const read=c.archived
       ? `<button class="readbtn undo" data-unread="${esc(c.comment_id)}" title="เอากลับไปหน้า “ยังไม่ได้อ่าน” — จะกลับมานับในสถานะด้วย">↩ เอากลับ</button>`
       : `<button class="readbtn" data-read="${esc(c.comment_id)}" title="อ่าน/จัดการแล้ว — ย้ายเข้าคลัง จะไม่ขึ้นบนหน้านี้อีก และรอบตรวจหน้าไม่ต้องส่งเข้า AI ซ้ำ">✓ อ่านแล้ว</button>`;
+    // เคสที่ AI ให้เป็น "กลาง/บวก" ระบบจะไม่แจ้งเองเลย — ปุ่มนี้คือทางที่คนดันเรื่องเข้า Discord ได้ทันที
+    const ping=c.alerted_at
+      ? `<button class="alertbtn done" data-ping="${esc(c.comment_id)}" title="แจ้งเข้า Discord แล้วเมื่อ ${esc(fmtFull(c.alerted_at))} · กดอีกครั้งถ้าต้องการส่งซ้ำ">✓ แจ้งแล้ว</button>`
+      : `<button class="alertbtn" data-ping="${esc(c.comment_id)}" title="ส่งคอมเมนต์นี้เข้า Discord ของทีมทันที (ผ่าน n8n) — ใช้ตอน AI อ่านพลาด หรือเรื่องนี้ต้องมีคนรับเดี๋ยวนี้">🔔 แจ้ง Discord</button>`;
     return `<tr class="s-${c.sentiment}${c.archived?' arch':''}">
       <td class="when"><b>${esc(fmtTime(c.created_at))}</b>${esc(fmtDay(c.created_at))}</td>
       <td class="who" title="${esc(c.author)}">${who}</td>
@@ -1261,7 +1299,7 @@ function renderTable(){
       <td>${topics}</td>
       <td class="rch"><span class="tnum">${nf(c.reach)}</span><span class="rbar"><i style="width:${(c.reach/maxReach*100).toFixed(0)}%;background:${c.sentiment==='negative'?'var(--neg)':'var(--muted)'}"></i></span></td>
       <td class="post" title="${esc(c.post_title||'')}">${esc(c.post_title||'—')}</td>
-      <td class="act"><div class="act-in">${read}${link}</div></td></tr>`;}).join('')
+      <td class="act"><div class="act-in">${read}${link}${ping}</div></td></tr>`;}).join('')
     ||`<tr><td colspan="8" class="empty emptybox">${emptyText()}</td></tr>`;
 
   $('#rows').querySelectorAll('.more').forEach(b=>b.onclick=()=>{
@@ -1273,12 +1311,15 @@ function renderTable(){
   $('#rows').querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>openFix(b.dataset.fix));
   $('#rows').querySelectorAll('[data-read]').forEach(b=>b.onclick=()=>sendArchive([b.dataset.read],false));
   $('#rows').querySelectorAll('[data-unread]').forEach(b=>b.onclick=()=>sendArchive([b.dataset.unread],true));
+  $('#rows').querySelectorAll('[data-ping]').forEach(b=>b.onclick=()=>openAlert(b.dataset.ping));
 
   const more=cs.length-shown.length;
   $('#count').innerHTML=`<span>แสดง <b>${nf(shown.length)}</b> จาก ${nf(cs.length)} คอมเมนต์`
       +(arch?' ในคลัง':'')+`</span>`
     +(!arch&&DATA.archived_count?`<span style="color:var(--muted)">· อีก <b>${nf(DATA.archived_count)}</b> `
       +`อยู่ในคลัง (ไม่ถูกนับในสถานะ)</span>`:'')
+    +(DATA.alert_sent_count?`<span style="color:var(--muted)">· แจ้งเข้า Discord แล้ว `
+      +`<b>${nf(DATA.alert_sent_count)}</b> คอมเมนต์</span>`:'')
     +(more>0?`<button class="ghost" id="moreBtn">แสดงเพิ่มอีก ${nf(Math.min(more,100))} รายการ</button>`:'');
   if(more>0)$('#moreBtn').onclick=()=>{FILT.limit+=100;renderTable();};
   renderActiveBar(shown.length,cs.length);
@@ -1395,6 +1436,70 @@ async function sendArchive(ids,unarchive){
       +(changed?` · สถานะเปลี่ยนเป็น “${(STAT[j.result.status]||STAT.NORMAL).t}”`:''),
     ()=>sendArchive(ids,!unarchive));
 }
+
+/* ═══════════════════════════ แจ้งเข้า Discord (ผ่าน n8n) ═══════════════════════════
+   alert เกิดได้ 2 ทาง — ตั้งใจให้ครอบทั้งตอน AI ถูกและตอน AI พลาด:
+     · ระบบส่งเอง  = คอมเมนต์ "ลบและแรง" เด้งตั้งแต่รอบตรวจ ไม่ต้องรอคนเห็นจอ (src/notify/alerts.py)
+     · ปุ่มนี้      = คนที่นั่งดูเจอเคสที่ AI ให้เป็น "กลาง/บวก" แต่จริง ๆ ต้องรีบจัดการ
+   ปุ่มอยู่ติดคอมเมนต์ เพราะจุดที่คนตัดสินใจว่า "ต้องบอกทีม" คือตอนที่อ่านคอมเมนต์นั้นอยู่  */
+let ALERT={configured:false,auto:false,min_reach:150}, PING=null;
+
+function alertHint(){
+  const el=$('#alertHint');if(!el)return;
+  el.innerHTML=ALERT.configured
+    ? (ALERT.auto
+        ? `🔔 <b>แจ้ง Discord อัตโนมัติ</b>เมื่อเจอคอมเมนต์เชิงลบที่มีไลก์+ตอบกลับตั้งแต่ `
+          +`<b>${nf(ALERT.min_reach)}</b> ขึ้นไป — อันที่ AI อ่านพลาด (ให้เป็นกลาง/บวก) `
+          +`กด <b>“🔔 แจ้ง Discord”</b> ที่แถวนั้นส่งเองได้ทันที`
+        : `🔔 การแจ้งอัตโนมัติถูกปิดไว้ — ส่งเข้า Discord ได้ด้วยปุ่ม <b>“🔔 แจ้ง Discord”</b> ในตาราง`)
+    : `🔔 ปุ่ม <b>“แจ้ง Discord”</b> จะใช้ได้เมื่อผู้ดูแลตั้งค่า <b>N8N_WEBHOOK_URL</b> ฝั่ง server แล้ว`;
+}
+function alertErr(msg){$('#alertErr').textContent=msg;$('#alertErr').classList.remove('hidden');}
+
+function openAlert(cid){
+  const c=(DATA?.comments||[]).find(x=>x.comment_id===cid);
+  if(!c)return;
+  PING={c};
+  const s=SENT[c.sentiment];
+  $('#alertSub').textContent=ALERT.configured
+    ? 'ข้อความจะเด้งเข้า channel ของทีมทันที พร้อมลิงก์กลับมาที่คอมเมนต์จริงบน Facebook'
+    : 'ยังไม่ได้ตั้งค่าปลายทาง (N8N_WEBHOOK_URL) — กดส่งแล้วระบบจะบอกวิธีแก้';
+  $('#alertText').textContent=c.text||'';
+  $('#alertMeta').textContent=`${c.author||'—'} · ${fmtFull(c.created_at)} · ไลก์+ตอบกลับ ${nf(c.reach)}`
+    +` · ระบบอ่านเป็น “${s?s.t:'—'}”`;
+  $('#alertPrev').classList.toggle('hidden',!c.alerted_at);
+  if(c.alerted_at)$('#alertPrev').innerHTML=`เคยแจ้งไปแล้วเมื่อ <b>${esc(fmtFull(c.alerted_at))}</b>`
+    +` — กดส่งอีกครั้งจะเด้งซ้ำใน Discord`;
+  $('#alertSend').textContent=c.alerted_at?'ส่งซ้ำเข้า Discord':'ส่งเข้า Discord';
+  $('#alertNote').value='';
+  $('#alertErr').classList.add('hidden');
+  $('#alertDlg').showModal();
+}
+
+async function sendAlert(){
+  const headers={'Content-Type':'application/json'};
+  const pass=sessionStorage.getItem('runPass')||$('#passInput').value.trim()||'';
+  if(pass)headers['X-Run-Passcode']=pass;
+  $('#alertSend').disabled=true;
+  let r,j;
+  try{
+    r=await fetch('/api/alert',{method:'POST',headers,body:JSON.stringify({
+      comment_id:PING.c.comment_id,note:$('#alertNote').value.trim(),
+      force:!!PING.c.alerted_at,                       // ส่งซ้ำได้เฉพาะตอนคนตั้งใจกดซ้ำเอง
+      target:(MODE==='manual'&&JOB_ID)?JOB_ID:'monitor'})});
+    j=await r.json();
+  }catch(e){$('#alertSend').disabled=false;return alertErr('ต่อเซิร์ฟเวอร์ไม่ได้ — ลองใหม่อีกครั้ง');}
+  $('#alertSend').disabled=false;
+  if(r.status===401)
+    return alertErr('ต้องมีรหัสผ่านก่อนถึงจะส่งได้ — ปิดกล่องนี้ กด “ตรวจเอง” เพื่อกรอกรหัส แล้วค่อยกลับมาส่ง');
+  if(!r.ok||!j.result)return alertErr(j.error||'ส่งไม่สำเร็จ — ลองใหม่อีกครั้ง');
+
+  $('#alertDlg').close();
+  render(j.result,{scroll:false,keep:true});    // คงตัวกรองไว้ คนกำลังไล่อ่านแถวนั้นอยู่
+  toast('ส่งเข้า Discord แล้ว · ทีมที่รับเรื่องเห็นทันที');
+}
+$('#alertSend').onclick=()=>sendAlert();
+$('#alertCancel').onclick=()=>$('#alertDlg').close();
 
 function emptyText(){
   if(FILT.view==='archive')

@@ -1,0 +1,104 @@
+{
+  "name": "Crisis Radar → Discord alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crisis-radar-alert",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Crisis Radar webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-260, 0],
+      "webhookId": "a1000000-0000-4000-8000-000000000001",
+      "notes": "URL ของ node นี้คือค่าที่ต้องใส่ใน N8N_WEBHOOK_URL ฝั่ง Crisis Radar\nHeader Auth credential: Name=X-Crisis-Radar-Token, Value=ค่าเดียวกับ N8N_WEBHOOK_SECRET"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2},
+          "conditions": [
+            {
+              "id": "sev-high",
+              "leftValue": "={{ $json.body.severity }}",
+              "rightValue": "high",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "รุนแรงไหม",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-20, 0],
+      "notes": "high = คอมเมนต์ลบแรงเกินเกณฑ์ หรือคนกดแจ้งเอง (ผ่านสายตาคนแล้ว) → เข้า #crisis-alert\nmedium = สัญญาณเบากว่า → เข้า channel เฝ้าระวัง ไม่ต้อง ping ใคร"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/REPLACE/CRISIS-ALERT-CHANNEL",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body.discord) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Discord #crisis-alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, -110],
+      "notes": "body มาสำเร็จรูปจาก Crisis Radar แล้ว (content + embeds) — ไม่ต้องประกอบข้อความเอง\nอยากแยก channel ตามทีม: ใช้ $json.body.routing.owner / .topic เป็นตัวเลือก URL"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/REPLACE/WATCH-CHANNEL",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body.discord) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Discord #watch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 110]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true }) }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "ตอบกลับ Crisis Radar",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [500, 0],
+      "notes": "Crisis Radar บันทึกว่า 'ส่งแล้ว' เมื่อได้ response 2xx เท่านั้น — ส่งไม่ถึงจะยังส่งซ้ำได้รอบหน้า"
+    }
+  ],
+  "connections": {
+    "Crisis Radar webhook": {"main": [[{"node": "รุนแรงไหม", "type": "main", "index": 0}]]},
+    "รุนแรงไหม": {
+      "main": [
+        [{"node": "Discord #crisis-alert", "type": "main", "index": 0}],
+        [{"node": "Discord #watch", "type": "main", "index": 0}]
+      ]
+    },
+    "Discord #crisis-alert": {"main": [[{"node": "ตอบกลับ Crisis Radar", "type": "main", "index": 0}]]},
+    "Discord #watch": {"main": [[{"node": "ตอบกลับ Crisis Radar", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "pinData": {},
+  "meta": {"instanceId": "crisis-radar"},
+  "tags": []
+}

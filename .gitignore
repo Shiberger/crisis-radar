@@ -20,6 +20,10 @@ data/overrides.json
 # คลังคอมเมนต์ที่ทีมกด "อ่านแล้ว" — เก็บตัวคอมเมนต์จริงไว้ข้างใน (มี PII)
 data/archive.json
 
+# บันทึกว่าคอมเมนต์ไหนถูกแจ้งเข้า Discord ไปแล้ว (key = comment_id ของ Facebook)
+# ไฟล์นี้คือตัวกันแจ้งซ้ำ — ถ้าหายตอน restart ทีมจะโดนแจ้งเรื่องเดิมอีกรอบ (ควร mount disk ถาวร)
+data/alerts_sent.json
+
 # python
 __pycache__/
 *.pyc

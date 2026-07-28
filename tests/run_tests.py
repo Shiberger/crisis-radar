@@ -16,7 +16,9 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -27,6 +29,7 @@ from src.classify import archive, lexicon, overrides   # noqa: E402
 from src.classify.pipeline import HybridClassifier     # noqa: E402
 from src.crisis import detector                        # noqa: E402
 from src.models import Classified, Comment             # noqa: E402
+from src.notify import alerts as notify                # noqa: E402
 from src.security import mask_author                    # noqa: E402
 from src.sources.sample import SampleFacebookSource    # noqa: E402
 
@@ -211,6 +214,56 @@ check("T11d ใช้ label เดิม แต่ยอดไลก์เป็
       revived[0].sentiment == old["sentiment"] and revived[0].topics == old["topics"]
       and revived[0].comment.reach == old["reach"] + 999 and revived[0].archived,
       f"{revived[0].sentiment} · reach {old['reach']} → {revived[0].comment.reach}")
+
+# ---- T12: แจ้งเตือน Discord — เกณฑ์ "เรื่องไหนคุ้มที่จะไปรบกวนคน" ----
+# ไม่ยิงเน็ตจริง: สลับตัวส่งเป็นตัวเก็บ payload แล้วตรวจว่าเลือกคอมเมนต์ถูกตัวไหม
+notify.STORE = Path(tempfile.mkdtemp(prefix="crisis-radar-tests-")) / "alerts_sent.json"
+os.environ.update(N8N_WEBHOOK_URL="http://127.0.0.1:1/stub", ALERT_MIN_REACH="150",
+                  ALERT_MAX_PER_RUN="2")
+os.environ.pop("ALERT_AUTO", None)
+os.environ.pop("DISCORD_ROLE_MAP", None)
+
+fired: list[dict] = []
+notify._post = lambda cfg, event: fired.append(event)
+
+report = detector.report_to_dict(rep)
+round1 = [Classified.from_dict(c.to_dict()) for c in classified]
+recs = notify.dispatch_auto(round1, report)
+picked = [e["comment"] for e in fired]
+worst_neg = max(c.comment.reach for c in classified if c.sentiment == "negative")
+check("T12 แจ้งเองเฉพาะคอมเมนต์ลบ เรียงจากคนเห็นเยอะสุด และไม่เกินโควตาต่อรอบ",
+      len(recs) == 2 and picked[0]["reach"] == worst_neg
+      and all(p["sentiment"] == "negative" for p in picked)
+      and all(e["trigger"] == "auto" for e in fired),
+      f"{len(recs)} ข้อความ · reach {[p['reach'] for p in picked]}")
+check("T12b คอมเมนต์ที่แจ้งไปแล้วถูกทำเครื่องหมายไว้ (หน้าเว็บขึ้น 'แจ้งแล้ว')",
+      sum(1 for c in round1 if c.alerted_at) == 2)
+
+# รอบตรวจถัดไปได้คอมเมนต์เดิมกลับมาทั้งชุด — ห้ามเด้งเรื่องเดิมซ้ำ
+fired.clear()
+round2 = [Classified.from_dict(c.to_dict()) for c in classified]
+notify.dispatch_auto(round2, report)
+check("T12c รอบถัดไปไม่แจ้งเรื่องเดิมซ้ำ (ไล่ลงไปที่ตัวใหม่แทน)",
+      {e["comment"]["comment_id"] for e in fired}.isdisjoint({p["comment_id"] for p in picked}),
+      f"ชุดใหม่ {[e['comment']['reach'] for e in fired]}")
+
+# หัวใจของปุ่มบนหน้าเว็บ: เคสที่ AI ให้เป็น "กลาง/บวก" ระบบจะไม่มีวันแจ้งเอง — คนต้องดันเข้าไปเอง
+calm = next(c for c in classified if c.sentiment != "negative")
+fired.clear()
+notify.dispatch_auto([Classified.from_dict(calm.to_dict())], report)
+check("T12d คอมเมนต์ที่ AI ให้เป็นกลาง/บวก ไม่ถูกแจ้งอัตโนมัติเลย", not fired)
+
+rec = notify.send_manual(calm.to_dict(), report, note="คนอ่านแล้วว่าเป็นเรื่อง")
+ev = fired[-1]
+check("T12e คนกดปุ่มแจ้งเองได้ และข้อความบอกชัดว่ามาจากคน ไม่ใช่ระบบ",
+      rec["trigger"] == "manual" and ev["severity"] == "high"
+      and ev["note"] == "คนอ่านแล้วว่าเป็นเรื่อง"
+      and "ทีมส่งเรื่องนี้เข้ามาเอง" in ev["discord"]["embeds"][0]["title"],
+      ev["discord"]["embeds"][0]["title"][:46])
+check("T12f payload พร้อมให้ n8n ส่งต่อ (ข้อความ Discord + ทีมเจ้าของเรื่อง)",
+      bool(ev["routing"]["owner"]) and ev["discord"]["embeds"][0]["color"] > 0
+      and calm.comment.text[:20] in ev["discord"]["embeds"][0]["description"],
+      f"ส่งต่อ {ev['routing']['owner']}")
 
 # ---- output ----
 print("=" * 64)

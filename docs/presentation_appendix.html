@@ -333,24 +333,27 @@ td.c{font-family:var(--mono);white-space:nowrap}
     และที่สำคัญกว่านั้น Discord <b>แยก channel กับ mention role ตามทีมได้</b> ซึ่งเป็นหัวใจของการส่งเรื่องให้ถูกคน</p>
 
   <div class="panel stack">
-    <h3>n8n workflow</h3>
+    <h3>n8n workflow (ทำงานจริงแล้ว — ไฟล์ import อยู่ใน <span class="m">n8n/</span>)</h3>
     <div class="chain">
-      <div class="node"><span class="nk">trigger</span><span class="nv">Schedule</span><span class="nd">ทุก 30 นาที</span></div>
+      <div class="node"><span class="nk">trigger</span><span class="nv">Crisis Radar</span><span class="nd">ยิง webhook ออกเมื่อมีเรื่อง</span></div>
       <div class="arrow">→</div>
-      <div class="node"><span class="nk">http</span><span class="nv">POST /api/run</span><span class="nd">source: facebook</span></div>
+      <div class="node"><span class="nk">webhook</span><span class="nv">n8n</span><span class="nd">ตรวจ header token ก่อนรับ</span></div>
       <div class="arrow">→</div>
-      <div class="node"><span class="nk">wait</span><span class="nv">poll job</span><span class="nd">จน status=done</span></div>
+      <div class="node fork"><span class="nk">if</span><span class="nv">severity</span><span class="nd">high / medium</span></div>
       <div class="arrow">→</div>
-      <div class="node fork"><span class="nk">if</span><span class="nv">status ≠ NORMAL</span><span class="nd">หรือมี topic มาแรง</span></div>
-      <div class="arrow">→</div>
-      <div class="node fire"><span class="nk">discord</span><span class="nv">Webhook</span><span class="nd">เลือก channel ตามประเด็น</span></div>
+      <div class="node fire"><span class="nk">discord</span><span class="nv">Webhook</span><span class="nd">เลือก channel + ping role ตามประเด็น</span></div>
     </div>
-    <p style="font-size:13px;color:var(--ink2)">ถ้าสถานะเป็น NORMAL จะไม่ส่งอะไรเลย — อัปเดต dashboard เงียบ ๆ
+    <p style="font-size:13px;color:var(--ink2)">รอบตรวจคุมด้วย monitor ในตัวอยู่แล้ว n8n จึงไม่ต้องมี Schedule —
+      หน้าที่ของ n8n คือ <b>ตัดสินว่าเรื่องนี้ควรไปเข้าห้องไหนและ ping ใคร</b> ซึ่งเป็นสิ่งที่เปลี่ยนบ่อยกว่าโค้ดมาก
+      · alert เกิดได้ 2 ทาง: <b>ระบบเห็นเอง</b> (คอมเมนต์ลบ + คนเห็นเยอะเกินเกณฑ์) และ
+      <b>คนที่นั่ง monitor กดปุ่มแจ้งเอง</b> สำหรับเคสที่ AI อ่านเป็น “กลาง/บวก” แต่จริง ๆ เป็นเรื่อง
+      · คอมเมนต์เดิมไม่เด้งซ้ำ และสถานะ NORMAL ที่ไม่มีคอมเมนต์เข้าเกณฑ์ก็จะเงียบสนิท
       เพื่อไม่ให้ทีมชินกับการเพิกเฉยต่อ alert</p>
   </div>
 
   <div class="stack">
-    <div class="mocklabel">ภาพจำลองข้อความที่ทีมจะได้รับ (mockup)</div>
+    <div class="mocklabel">ข้อความที่ทีมได้รับ — 2 การ์ดแรกคือรูปแบบที่ระบบส่งจริงวันนี้ (การ์ดที่ 1 สร้างจาก payload จริง
+      ของ pipeline · การ์ดที่ 2 เป็นเคสตัวอย่างของการกดแจ้งเอง) · 2 การ์ดล่างเป็นภาพจำลองของแผนถัดไป</div>
     <div class="dc">
       <div class="dc-side">
         <div class="dc-srv">HOF · Game Ops</div>
@@ -362,6 +365,57 @@ td.c{font-family:var(--mono);white-space:nowrap}
       </div>
       <div class="dc-main">
         <div class="dc-top"># crisis-alert</div>
+
+        <!-- การ์ดนี้สร้างจาก payload จริงที่ระบบยิงออก (n8n/sample_payload.json) -->
+        <div class="dc-msg">
+          <div class="dc-av">📡</div>
+          <div class="dc-body">
+            <div class="dc-name">Crisis Radar <span class="dc-bot">APP</span> <span class="dc-time">วันนี้ 14:08</span></div>
+            <div class="dc-edesc"><span class="dc-mention">@Marketing</span></div>
+            <div class="dc-embed" style="--eb:#d03b3b">
+              <div class="dc-etitle">🚨 คอมเมนต์เชิงลบแรง — คนกดไลก์/ตอบกลับ 203 ครั้ง</div>
+              <div class="dc-quote">"กาชาใหม่โคตรแพง อัตราดรอปก็ห่วย เปย์ไป 2000 ไม่ได้ตัว SSR เลย เอาเปรียบผู้เล่นมาก"</div>
+              <div class="dc-edesc">— โดย <b>Somchai R</b></div>
+              <div class="dc-fields">
+                <div class="dc-f"><div class="fk">อารมณ์ที่ระบบให้</div><div class="fv">ลบ</div></div>
+                <div class="dc-f"><div class="fk">ไลก์+ตอบกลับ</div><div class="fv">203</div></div>
+                <div class="dc-f"><div class="fk">ประเด็น</div><div class="fv">เติมเงิน/ราคา</div></div>
+              </div>
+              <div class="dc-f"><div class="fk">ทำไมถึงเด้ง</div>
+                <div class="fv">คอมเมนต์เชิงลบที่คนกดไลก์/ตอบกลับ 203 ครั้ง (เกณฑ์แจ้งอัตโนมัติตอนนี้ 75)</div></div>
+              <div class="dc-btns">
+                <span class="dc-btn primary">เปิดคอมเมนต์บน Facebook</span>
+                <span class="dc-btn">เปิด Dashboard</span>
+              </div>
+              <div class="dc-foot">Crisis Radar · Talesrunner Thailand · สถานะเพจตอนนี้: วิกฤต · ส่งต่อ: Marketing / Monetization</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dc-msg">
+          <div class="dc-av">📡</div>
+          <div class="dc-body">
+            <div class="dc-name">Crisis Radar <span class="dc-bot">APP</span> <span class="dc-time">วันนี้ 14:22</span></div>
+            <div class="dc-edesc"><span class="dc-mention">@CS</span></div>
+            <div class="dc-embed" style="--eb:#d03b3b">
+              <div class="dc-etitle">🔔 ทีมส่งเรื่องนี้เข้ามาเอง — ระบบอ่านเป็น “กลาง”</div>
+              <div class="dc-quote">"ดีจริง ๆ นะคะที่ล่มตอนคนกำลังจะเล่น ขอบคุณมากค่า"</div>
+              <div class="dc-edesc">— โดย <b>Ploy K</b></div>
+              <div class="dc-fields">
+                <div class="dc-f"><div class="fk">อารมณ์ที่ระบบให้</div><div class="fv">กลาง</div></div>
+                <div class="dc-f"><div class="fk">ไลก์+ตอบกลับ</div><div class="fv">41</div></div>
+                <div class="dc-f"><div class="fk">ประเด็น</div><div class="fv">บั๊ก/เทคนิค</div></div>
+              </div>
+              <div class="dc-f"><div class="fk">ทำไมถึงเด้ง</div>
+                <div class="fv">คนที่นั่งดูหน้า Monitor กดแจ้งเอง — ระบบอ่านคอมเมนต์นี้เป็น “กลาง” ซึ่งไม่ตรงกับที่คนอ่านแล้วเข้าใจ</div></div>
+              <div class="dc-f"><div class="fk">หมายเหตุจากคนที่กดแจ้ง</div>
+                <div class="fv">ประชด ไม่ใช่ชม — เริ่มมีคนมากดไลก์ตาม</div></div>
+              <div class="dc-foot">Crisis Radar · Talesrunner Thailand · สถานะเพจตอนนี้: เฝ้าระวัง · ส่งต่อ: Dev / QA</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mocklabel" style="color:#949ba4;margin-top:4px">ถัดไป (ยังไม่ได้ทำ) — สรุปทั้งรอบในข้อความเดียว</div>
 
         <div class="dc-msg">
           <div class="dc-av">📡</div>

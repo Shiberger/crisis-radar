@@ -16,8 +16,8 @@ crisis_radar/
 │   ├── server.py               # http server + API
 │   ├── jobs.py                 # background job runner
 │   ├── monitor.py              # เฝ้าเพจอัตโนมัติ + เก็บ snapshot ล่าสุด
-│   ├── selftest.py             # ทดสอบ web + monitor + override + archive e2e (31 test)
-│   └── static/index.html       # หน้าเว็บ (จอสถานะ + แก้ label ที่ AI ทายพลาด)
+│   ├── selftest.py             # ทดสอบ web + monitor + override + archive + Discord alert e2e (45 test)
+│   └── static/index.html       # หน้าเว็บ (จอสถานะ + แก้ label ที่ AI ทายพลาด + ปุ่มแจ้ง Discord)
 ├── data/
 │   └── sample_talesrunner_fb_comments.json   # synthetic fixture (ชื่อสมมติ)
 ├── src/
@@ -33,11 +33,18 @@ crisis_radar/
 │   │   ├── overrides.py        # คำตัดสินของคนที่ทับผล AI (แก้เคสที่ AI อ่านผิด)
 │   ├── archive.py          # คลัง 'อ่านแล้ว' — ออกจากหน้า Monitor + ไม่ classify ซ้ำ
 │   │   └── pipeline.py         # hybrid routing
-│   └── crisis/
-│       └── detector.py         # spike detection + report
+│   ├── crisis/
+│   │   └── detector.py         # spike detection + report
+│   └── notify/                 # 🔔 แจ้งออกนอกระบบ (Discord ผ่าน n8n)
+│       ├── alerts.py           # กติกาว่าเรื่องไหนคุ้มที่จะรบกวนคน + ตัวส่ง + กันแจ้งซ้ำ
+│       └── payload.py          # ประกอบข้อความ Discord (embed) + ข้อมูลดิบให้ n8n route ต่อ
+├── n8n/
+│   ├── crisis_radar_discord_alert.json   # workflow พร้อม import
+│   ├── sample_payload.json               # payload จริงที่ระบบยิงออก (ไว้เทสใน n8n)
+│   └── README.md                         # วิธีตั้งค่าทีละขั้น
 ├── tests/
 │   ├── labeled_test_set.json
-│   └── run_tests.py            # 23 test, รัน offline
+│   └── run_tests.py            # 29 test, รัน offline
 ├── output/                     # ผลลัพธ์ (gitignore ไฟล์ generated)
 └── docs/                       # เอกสารส่ง 7 หัวข้อ
 ```

@@ -30,6 +30,7 @@ import jobs      # noqa: E402  (อยู่โฟลเดอร์เดีย
 import monitor   # noqa: E402
 
 from src.classify import archive, lexicon, overrides  # noqa: E402
+from src import notify                                # noqa: E402
 
 STATIC = HERE / "static"
 
@@ -61,7 +62,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, (STATIC / "index.html").read_text(encoding="utf-8"), "text/html")
         elif self.path == "/api/health":
             # passcode_required → หน้าเว็บใช้ตัดสินว่าต้องถามรหัสก่อนดึง Facebook จริงไหม
-            self._send(200, {"ok": True, "passcode_required": bool(RUN_PASSCODE)})
+            # alert → หน้าเว็บใช้บอกผู้ใช้ว่าปุ่ม "แจ้ง Discord" พร้อมใช้ไหม + เกณฑ์อัตโนมัติเท่าไร
+            self._send(200, {"ok": True, "passcode_required": bool(RUN_PASSCODE),
+                             "alert": notify.status()})
         elif self.path == "/api/targets":
             # ค่าตั้งต้นให้ฟอร์ม (URL เพจ/โพสต์จาก data/targets.json) — ไม่มีอะไรลับ
             self._send(200, jobs.get_targets())
@@ -157,6 +160,26 @@ class Handler(BaseHTTPRequestHandler):
 
         return self._store_result(target, jobs.recompute(base))
 
+    def _apply_alert(self, body: dict) -> dict:
+        """กด "แจ้ง Discord" ที่คอมเมนต์จริง — ทางออกของเคสที่ AI อ่านพลาด.
+
+        คอมเมนต์ที่ระบบให้เป็น "กลาง/บวก" จะไม่ถูกแจ้งอัตโนมัติเลย (ตามนิยามคือไม่ใช่เรื่อง)
+        คนที่นั่งดูจึงต้องมีปุ่มดันเข้า Discord เองได้ — ไม่งั้นเจอแล้วก็ได้แต่ก็อปไปแปะเอง
+        """
+        comment_id = str(body.get("comment_id") or "").strip()
+        if not comment_id:
+            raise ValueError("ไม่มี comment_id")
+
+        target, base = self._base_result(body)
+        row = next((c for c in base.get("comments", []) if c.get("comment_id") == comment_id), None)
+        if row is None:
+            raise ValueError("ไม่พบคอมเมนต์นี้ในรายงานที่เปิดอยู่")
+
+        # ส่งก่อน แล้วค่อยคิดรายงานใหม่ — ป้าย "แจ้งแล้ว" ต้องขึ้นเฉพาะตอนยิงสำเร็จจริง
+        rec = notify.send_manual(row, base, note=str(body.get("note") or "")[:300],
+                                 page=jobs.get_targets(), force=bool(body.get("force")))
+        return {**self._store_result(target, jobs.recompute(base)), "alert": rec}
+
     def do_POST(self) -> None:
         if self.path == "/api/run":
             body = self._json_body()
@@ -184,6 +207,18 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, self._apply_archive(self._json_body()))
             except (ValueError, KeyError) as e:
                 self._send(400, {"error": str(e)})
+        elif self.path == "/api/alert":
+            # ยิงข้อความออกนอกระบบ (เข้า Discord ของทีมจริง) → ล็อกด้วยรหัสเดียวกับการแก้ label
+            if RUN_PASSCODE and not self._passcode_ok():
+                self._send(401, {"error": "รหัสผ่านไม่ถูกต้อง"})
+                return
+            try:
+                self._send(200, self._apply_alert(self._json_body()))
+            except (ValueError, KeyError) as e:
+                self._send(400, {"error": str(e)})
+            except RuntimeError as e:
+                # ปลายทางล่ม/URL ผิด — แยกจาก 400 เพราะคนกดไม่ได้ทำอะไรผิด ให้ลองใหม่ได้
+                self._send(502, {"error": str(e)})
         elif self.path == "/api/monitor/refresh":
             # กด "ตรวจใหม่ตอนนี้" = ข้ามรอบ → ยิง Apify นอกคิว จึงต้องมีรหัสเหมือนโหมด Facebook จริง
             cfg = monitor.config()

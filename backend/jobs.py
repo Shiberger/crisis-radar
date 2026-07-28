@@ -23,6 +23,7 @@ from src.classify import archive, lexicon, overrides   # noqa: E402
 from src.classify.pipeline import HybridClassifier    # noqa: E402
 from src.crisis import detector                        # noqa: E402
 from src.models import Classified                      # noqa: E402
+from src import notify                                 # noqa: E402
 from src.sources.sample import SampleFacebookSource   # noqa: E402
 from src.timeutil import now_ict                       # noqa: E402
 
@@ -197,9 +198,16 @@ def run_pipeline(params: dict, log=print) -> dict:
     if fixed:
         log(f"ใช้คำตัดสินที่ทีมแก้เอง {fixed} คอมเมนต์")
     archive.sync(classified)
+    notify.apply(classified)     # คอมเมนต์ที่เคยแจ้ง Discord แล้วต้องไม่ถูกแจ้งซ้ำรอบนี้
 
     log("ตรวจจับ crisis (spike detection)…")
     result = build_result(classified, source=source)
+
+    # เคสที่ "ลบและแรง" ตั้งแต่แรก ไม่ต้องรอให้มีคนเปิดหน้าเว็บมาเห็น — เด้งเข้า Discord เลย
+    # (เคสที่ AI อ่านพลาด ทีมกดแจ้งเองได้จากหน้าเว็บ ดู server.py /api/alert)
+    if notify.dispatch_auto(classified, result, page=get_targets(), log=log):
+        result = build_result(classified, source=source, generated_at=result["generated_at"])
+
     log(f"เสร็จ — สถานะ {result['status']} · alert {len(result['alerts'])} รายการ")
     return result
 
@@ -229,6 +237,7 @@ def build_result(items: list[Classified], source: str, generated_at: str = "") -
     result["topic_labels"] = lexicon.TOPIC_LABELS   # ให้หน้าเว็บแสดงชื่อประเด็นเป็นไทย
     result["override_count"] = sum(1 for c in active if c.overridden)
     result["archived_count"] = len(items) - len(active)
+    result["alert_sent_count"] = sum(1 for c in active if c.alerted_at)
     return result
 
 
@@ -246,6 +255,7 @@ def recompute(result: dict) -> dict:
     overrides.apply(items)
     archive.apply(items)
     archive.sync(items)
+    notify.apply(items)      # ป้าย "แจ้ง Discord แล้ว" ต้องอยู่ครบหลังคิดรายงานใหม่
     return build_result(items, source=result.get("source", "sample"),
                         generated_at=result.get("generated_at", ""))
 

@@ -31,16 +31,30 @@ flowchart LR
     end
 ```
 
-## Orchestration ตอน production (n8n)
+## แจ้งเตือนเข้า Discord ผ่าน n8n (ทำงานจริงแล้ว)
+Crisis Radar เป็นฝ่าย **ยิง webhook ออก** เมื่อมีเรื่องต้องแจ้ง — n8n รับแล้วเลือกปลายทาง
+(รอบตรวจยังคุมด้วย monitor ในตัว ไม่ต้องพึ่ง Schedule ของ n8n)
+
 ```mermaid
 flowchart LR
-    T["⏰ Schedule<br/>(ทุก 30–60 นาที)"] --> S["ดึงคอมเมนต์<br/>ทุกเพจ/เกม"]
-    S --> P["Crisis Radar pipeline"]
-    P --> Q{"สถานะ = CRISIS ?"}
-    Q -->|ใช่| L["ส่ง Discord alert +<br/>mention role ทีมเจ้าของประเด็น"]
-    Q -->|ไม่| M["อัปเดต dashboard เงียบ ๆ"]
-    L --> R["ทีมเข้าไปจัดการ"]
+    subgraph CR["Crisis Radar"]
+      P["รอบตรวจ (monitor)"] --> Q{"คอมเมนต์ลบ +<br/>reach ≥ เกณฑ์ ?"}
+      Q -->|ใช่| A1["auto alert"]
+      Q -->|ไม่| M["อัปเดต dashboard เงียบ ๆ"]
+      M -.->|"AI อ่านเป็น กลาง/บวก<br/>แต่คนอ่านออกว่าเป็นเรื่อง"| A2["🔔 คนกดปุ่มแจ้งเอง"]
+      A1 --> D["กันแจ้งซ้ำ<br/>(alerts_sent.json)"]
+      A2 --> D
+    end
+    D -->|"POST + X-Crisis-Radar-Token"| W["n8n Webhook"]
+    W --> S{"severity"}
+    S -->|high| L1["Discord #crisis-alert<br/>+ mention role ทีมเจ้าของเรื่อง"]
+    S -->|medium| L2["Discord #watch"]
+    L1 --> R["ทีมเข้าไปจัดการ"]
 ```
+
+> **ทำไมต้องมี 2 ทาง:** ระบบแจ้งเองครอบเฉพาะสิ่งที่ AI ตัดสินว่า "ลบและแรง" —
+> เคสที่ AI อ่านพลาด (ให้เป็นกลาง/บวก) จะไม่มีวันถูกแจ้งเลย คนที่นั่งดูจึงต้องดันเข้า Discord เองได้
+> · ตั้งค่า/ไฟล์ workflow: [`n8n/README.md`](../n8n/README.md)
 
 ## Multi-tenant (ทำไม compact + ใช้ยาว)
 ```mermaid
