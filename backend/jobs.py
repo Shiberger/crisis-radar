@@ -188,10 +188,15 @@ def run_pipeline(params: dict, log=print) -> dict:
     if known:
         log(f"ข้าม {len(known)} คอมเมนต์ที่ทีมอ่านแล้ว — ไม่เรียก AI ซ้ำ")
 
-    log(f"จัด sentiment + topic ด้วย AI ({len(fresh)} คอมเมนต์ใหม่)…")
-    classified = HybridClassifier().classify_all(fresh) + archive.rehydrate(known)
-    esc = sum(1 for c in classified if c.escalated_to_llm and not c.archived)
-    log(f"วิเคราะห์เสร็จ · ส่งต่อ LLM {esc} เคส")
+    clf = HybridClassifier(log=log)
+    log(f"จัด sentiment + topic ด้วย AI ({len(fresh)} คอมเมนต์ใหม่) · ชั้นที่สอง: {clf.engine}…")
+    classified = clf.classify_all(fresh) + archive.rehydrate(known)
+    st = clf.stats
+    log(f"วิเคราะห์เสร็จ · ชั้นแรกตัดสินเอง {st['total'] - st['gated'] - st['to_llm']} · "
+        f"กฎเพิ่มเติม {st['gated']} · ส่งเข้า AI {st['to_llm']} เคส")
+    # โชว์ค่าใช้จ่ายจริงต่อรอบ — ตัวเลขนี้คือสิ่งที่ต้องดูตอนตัดสินใจปรับ interval/เพดาน
+    if hasattr(clf.llm, "usage_line") and clf.llm.usage["requests"]:
+        log(f"ค่าใช้จ่าย AI รอบนี้: {clf.llm.usage_line()}")
 
     # คำตัดสินของคนทับ AI ก่อนตรวจ crisis เสมอ — คอมเมนต์ที่ทีมเคยแก้ไว้ต้องไม่ถูกนับผิดซ้ำ
     fixed = overrides.apply(classified)

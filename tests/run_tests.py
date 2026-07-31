@@ -25,7 +25,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+# เทสต้องออฟไลน์ 100% และผลต้องเหมือนเดิมทุกครั้ง — ห้ามยิง Anthropic จริงแม้เครื่องจะมีคีย์อยู่
+# (T13 ทดสอบชั้น Claude ด้วยการสลับตัวส่ง ไม่ใช่ด้วยการต่อเน็ตจริง)
+os.environ["LLM"] = "off"
+
 from src.classify import archive, lexicon, overrides   # noqa: E402
+from src.classify.llm import ResultCache               # noqa: E402
 from src.classify.pipeline import HybridClassifier     # noqa: E402
 from src.crisis import detector                        # noqa: E402
 from src.models import Classified, Comment             # noqa: E402
@@ -264,6 +269,210 @@ check("T12f payload พร้อมให้ n8n ส่งต่อ (ข้อ�
       bool(ev["routing"]["owner"]) and ev["discord"]["embeds"][0]["color"] > 0
       and calm.comment.text[:20] in ev["discord"]["embeds"][0]["description"],
       f"ส่งต่อ {ev['routing']['owner']}")
+
+# ---- T13: ชั้น LLM จริง (Claude) — ประกอบ request / แกะคำตอบ / กันพัง ----
+# ไม่ยิงเน็ต: สลับเฉพาะตัวส่ง HTTP (_post) เป็นตัวปลอม แล้วตรวจว่าที่เหลือทำงานถูก
+from src.classify import llm as llm_mod                 # noqa: E402
+
+llm_cache = ResultCache(Path(tempfile.mkdtemp(prefix="crisis-radar-llm-")) / "cache.json")
+
+
+def fake_api(results, stop_reason="end_turn"):
+    """สร้าง response แบบที่ Anthropic Messages API ตอบกลับจริง (รูปย่อ i/s/c/t)."""
+    return {"stop_reason": stop_reason,
+            "content": [{"type": "text", "text": json.dumps({"r": results})}],
+            "usage": {"input_tokens": 900, "output_tokens": 120}}
+
+
+sarcasm = "ดีจริง ๆ นะคะที่ล่มตอนคนกำลังจะเล่น ขอบคุณมากค่า"
+joke = "รำคาญหัวเด้งสุดละไม่มีไรแก้ทางเลย 😂"
+sent_bodies: list[dict] = []
+claude = llm_mod.ClaudeLLM("sk-ant-test", batch_size=10, cache=llm_cache)
+claude._post = lambda body: (sent_bodies.append(body), fake_api([
+    {"i": 1, "s": "neg", "c": 1.7, "t": ["b", "zz"]},     # conf เกิน 1 + รหัส topic มั่ว
+    {"i": 2, "s": "neu", "c": 0.6, "t": []},
+]))[1]
+
+got = claude.analyze_batch([(sarcasm, []), (joke, [])])
+body = sent_bodies[0]
+check("T13 ส่งหลายคอมเมนต์ใน request เดียว (จุดที่ทำให้ค่า API ไม่บาน)",
+      len(sent_bodies) == 1 and body["messages"][0]["content"].startswith("[1] ")
+      and "[2] " in body["messages"][0]["content"],
+      f"{len(sent_bodies)} request ต่อ 2 คอมเมนต์")
+schema = body["output_config"]["format"]["schema"]["properties"]["r"]["items"]["properties"]
+check("T13b บังคับรูปคำตอบด้วย structured outputs (รูปย่อ) + ใช้ model ที่ตั้งใจ",
+      body["output_config"]["format"]["type"] == "json_schema"
+      and sorted(schema) == ["c", "i", "s", "t"]          # ชื่อ field สั้น = ประหยัด output token
+      and body["model"] == "claude-haiku-4-5" and "effort" not in body.get("output_config", {}),
+      f"{body['model']} · field: {sorted(schema)}")
+check("T13c แปลรหัสย่อกลับเป็นชื่อเต็มถูกตัว + กันค่าเพี้ยน",
+      got[0]["sentiment"] == "negative" and got[0]["confidence"] == 1.0
+      and got[0]["topics"] == ["bug/technical"] and got[1]["sentiment"] == "neutral",
+      f"neg→{got[0]['sentiment']} · b→{got[0]['topics']} · conf 1.7 → {got[0]['confidence']}")
+
+before = len(sent_bodies)
+again = claude.analyze_batch([(sarcasm, [])])
+check("T13d ถามซ้ำข้อความเดิมไม่เสียเงินอีก (รอบตรวจหน้าได้คอมเมนต์เดิมกลับมา)",
+      len(sent_bodies) == before and again[0]["sentiment"] == "negative"
+      and claude.usage["cached_hits"] == 1)
+check("T13e นับ token + ประเมินค่าใช้จ่ายได้",
+      claude.usage["input_tokens"] == 900 and claude.cost_usd() > 0,
+      claude.usage_line())
+
+# ตอบมาไม่ครบ / โดนปฏิเสธ / API ล่ม — ทั้ง 3 เคสต้องไม่ทำให้รอบตรวจพัง
+partial = llm_mod.ClaudeLLM("sk-ant-test", cache=ResultCache(llm_cache.path.with_name("b.json")))
+partial._post = lambda body: fake_api([{"i": 1, "s": "neg", "c": 0.8, "t": []}])
+res = partial.analyze_batch([(sarcasm, []), (joke, [])])
+check("T13f ตอบมาไม่ครบทุกหมายเลข → ช่องที่ขาดเป็น None (ไม่เดาว่าเป็นกลาง)",
+      res[0] is not None and res[1] is None)
+
+refused = llm_mod.ClaudeLLM("sk-ant-test", cache=ResultCache(llm_cache.path.with_name("c.json")))
+refused._post = lambda body: fake_api([], stop_reason="refusal")
+check("T13g โดนปฏิเสธ (stop_reason=refusal) → ไม่พัง คืน None", refused.analyze_batch(
+    [(sarcasm, [])]) == [None])
+
+dead = llm_mod.ClaudeLLM("sk-ant-test", cache=ResultCache(llm_cache.path.with_name("d.json")))
+
+
+def _boom(_body):
+    raise RuntimeError("HTTP 500")
+
+
+dead._post = _boom
+# ต้องใช้คอมเมนต์ที่กฎชั้น 2 ตัดสินไม่ได้ ถึงจะไปถึงชั้น AI แล้วเจอ API ล่ม
+AMBIG = "เกมโหลดช้านิดนึงตอนเข้า แต่พอเข้าได้ก็โอเค"
+hybrid = HybridClassifier(llm=dead, log=lambda _m: None)
+fallback_out = hybrid.classify_all([_mk_comment(AMBIG), _mk_comment("แผนที่ใหม่สวยดีนะ")])
+check("T13h API ล่มทั้งชุด → ตกไปใช้ตัวสำรอง รอบตรวจยังได้ผลครบ",
+      len(fallback_out) == 2 and fallback_out[0].sentiment in ("negative", "neutral")
+      and dead.usage["failed"] == 1 and hybrid.stats["to_llm"] == 1,
+      f"{fallback_out[0].sentiment} (จากตัวสำรอง)")
+
+capped_bodies: list[dict] = []
+capped = llm_mod.ClaudeLLM("sk-ant-test", cache=ResultCache(llm_cache.path.with_name("e.json")))
+capped._post = lambda body: (capped_bodies.append(body), fake_api(
+    [{"i": i + 1, "s": "neg", "c": 0.8, "t": []}
+     for i in range(len(body["messages"][0]["content"].splitlines()))]))[1]
+ambiguous = [_mk_comment("คิดถึงเพื่อนเก่าในเกมจัง กลับมาเล่นกันเถอะ"),
+             _mk_comment("อยากได้ตัวละครใหม่ ๆ บ้างอะ เล่นตัวเดิมนานแล้ว"),
+             _mk_comment("ตอนนี้เข้าได้แล้วนะ ลองรีสตาร์ทเราเตอร์ดู")]
+capped_out = HybridClassifier(llm=capped, max_llm_items=1, log=lambda _m: None).classify_all(ambiguous)
+sent_lines = capped_bodies[0]["messages"][0]["content"].splitlines() if capped_bodies else []
+check("T13i เพดานต่อรอบคุมค่าใช้จ่ายได้จริง (ส่วนเกินใช้ผลชั้นแรก ไม่เข้า AI)",
+      len(sent_lines) == 1 and sum(1 for c in capped_out if c.escalated_to_llm) == 1
+      and len(capped_out) == 3,
+      f"ส่งเข้า Claude {len(sent_lines)} จาก {len(ambiguous)} คอมเมนต์")
+
+check("T13j ไม่มีคีย์ → ใช้ตัวสำรองอัตโนมัติ ไม่ใช่พัง",
+      llm_mod.from_env().name == "offline-heuristic")
+
+# ---- T15: ชั้น 2 (กฎ deterministic) — ลดคอมเมนต์ที่ต้องจ่ายเงินโดยความแม่นต้องไม่ตก ----
+# นี่คือเทสที่ "อนุญาต" ให้กฎอยู่ในระบบ: ถ้ากฎไหนทำให้ accuracy ตก ต้องเอาออก ไม่ใช่ปล่อยผ่าน
+from src.classify.llm import OfflineHeuristicLLM as _Heur, prefilter   # noqa: E402
+
+
+def run_labeled(use_gate: bool):
+    """เดินชุด labeled ด้วย/ไม่ด้วยกฎชั้น 2 → (จำนวนถูก, จำนวนที่ต้องเข้า AI)."""
+    ok = to_llm = 0
+    for c in cases:
+        b = lexicon.classify(c["text"])
+        got = None
+        if b["needs_llm"] or b["confidence"] < 0.5:
+            got = prefilter(c["text"], b) if use_gate else None
+            if got is None:
+                to_llm += 1
+                got = _Heur().analyze(c["text"], b["topics"])
+        ok += (got or b)["sentiment"] == c["gold"]
+    return ok, to_llm
+
+
+plain_ok, plain_llm = run_labeled(False)
+gate_ok, gate_llm = run_labeled(True)
+check("T15 กฎชั้น 2 ต้องไม่ทำให้ความแม่นตกแม้แต่เคสเดียว",
+      gate_ok >= plain_ok, f"{plain_ok}/{len(cases)} → {gate_ok}/{len(cases)}")
+check("T15b กฎชั้น 2 ลดจำนวนคอมเมนต์ที่ต้องจ่ายเงินให้ AI ได้จริง",
+      gate_llm < plain_llm, f"เข้า AI {plain_llm} → {gate_llm} (−{(plain_llm-gate_llm)/plain_llm:.0%})")
+
+gate_cases = [
+    ("วันนี้มีกิจกรรมอะไรพิเศษไหมครับ", "neutral", "คำถามขอข้อมูล"),
+    ("😂😂😂", "neutral", "อีโมจิล้วน"),
+    ("ดีจริง ๆ นะคะที่ล่มตอนคนกำลังจะเล่น ขอบคุณมากค่า", "negative", "ประชด"),
+]
+hits = [(t, prefilter(t, lexicon.classify(t)), want, why) for t, want, why in gate_cases]
+check("T15c กฎชั้น 2 ตัดสิน 3 แบบนี้เองได้ (คำถาม / อีโมจิ / ประชด)",
+      all(g and g["sentiment"] == want for _t, g, want, _w in hits),
+      " · ".join(f"{why}→{(g or {}).get('sentiment')}" for _t, g, _wa, why in hits))
+
+# ที่ต้องไม่โดนกฎแตะ: บ่นในรูปคำถาม + คอมเมนต์กำกวมจริง ต้องไปถึง AI
+keep_cases = ["ทำไมเซิร์ฟล่มอีกแล้วครับ", "เกมโหลดช้านิดนึงตอนเข้า แต่พอเข้าได้ก็โอเค"]
+check("T15d กฎชั้น 2 ไม่แตะของที่ต้องให้ AI อ่านจริง (บ่นในรูปคำถาม / กำกวม)",
+      all(prefilter(t, lexicon.classify(t)) is None for t in keep_cases),
+      "ปล่อยผ่านไปชั้น AI ทั้ง 2 เคส")
+
+# ---- T14: cache รายการ URL โพสต์ — ตัด actor ที่แพงสุดออกจากรอบส่วนใหญ่ ----
+# posts scraper ≈ $0.026/run · comments scraper ≈ $0.008/run (จากบิลจริง)
+# → รอบหนึ่ง 5 โพสต์ = $0.065 ซึ่ง 40% คือ posts scraper ตัวเดียว
+from src.sources.facebook_apify import ApifyFacebookScraper, PostUrlCache   # noqa: E402
+
+cache_dir = Path(tempfile.mkdtemp(prefix="crisis-radar-posts-"))
+PAGE = "https://www.facebook.com/thehof.talesrunner"
+FOUND = [f"{PAGE}/posts/{i}" for i in range(1, 6)]
+
+actor_calls: list[str] = []
+
+
+def mk_scraper(ttl=360, path_name="c.json", comments_per_post=4):
+    s = ApifyFacebookScraper(token="apify_api_test",
+                             post_cache=PostUrlCache(cache_dir / path_name, ttl_min=ttl))
+    def fake_run(actor, run_input):
+        actor_calls.append(actor)
+        if "posts-scraper" in actor:
+            return [{"url": u} for u in FOUND]
+        return [{"text": f"คอมเมนต์ {i}", "date": "2026-07-15T14:00:00.000Z"}
+                for i in range(comments_per_post)]
+    s._run = fake_run
+    return s
+
+
+target = {"type": "page", "name": "TalesRunner", "url": PAGE}
+first = mk_scraper()
+got1 = first.scrape_target(target, 5, 30, log=lambda _m: None)
+run1 = list(actor_calls)
+check("T14 รอบแรกยังต้องยิง posts scraper ตามปกติ (1 + 5 runs)",
+      sum("posts-scraper" in a for a in run1) == 1
+      and sum("comments-scraper" in a for a in run1) == 5 and len(got1) == 20,
+      f"{len(run1)} actor run · {len(got1)} คอมเมนต์")
+
+actor_calls.clear()
+second = mk_scraper()          # cache file เดิม → รอบถัดไปต้องข้าม posts scraper
+got2 = second.scrape_target(target, 5, 30, log=lambda _m: None)
+saved = sum("posts-scraper" in a for a in actor_calls)
+check("T14b รอบถัดไปข้าม posts scraper (ประหยัด ~40% ของค่าใช้จ่ายต่อรอบ)",
+      saved == 0 and sum("comments-scraper" in a for a in actor_calls) == 5 and len(got2) == 20,
+      f"posts scraper {saved} run · ยังได้ {len(got2)} คอมเมนต์เท่าเดิม")
+
+actor_calls.clear()
+expired = ApifyFacebookScraper(token="apify_api_test",
+                               post_cache=PostUrlCache(cache_dir / "c.json", ttl_min=0))
+expired._run = mk_scraper()._run
+expired.get_post_urls(PAGE, 5, log=lambda _m: None)
+check("T14c ตั้ง POST_URLS_TTL_MIN=0 = ปิด cache หาโพสต์ใหม่ทุกรอบ (เผื่ออยากได้สดจริง ๆ)",
+      sum("posts-scraper" in a for a in actor_calls) == 1)
+
+actor_calls.clear()
+other = mk_scraper(path_name="c.json")
+other.get_post_urls(PAGE, 10, log=lambda _m: None)     # ขอ 10 โพสต์ = คนละ key กับที่จำไว้ (5)
+check("T14d ขอจำนวนโพสต์ต่างจากเดิม → ไม่เอา cache ของเก่ามาใช้ผิด ๆ",
+      sum("posts-scraper" in a for a in actor_calls) == 1)
+
+actor_calls.clear()
+dead = mk_scraper(path_name="d.json", comments_per_post=0)
+dead.post_cache.put(PAGE, 5, FOUND)                    # จำไว้แล้ว แต่โพสต์ถูกลบไปหมด
+dead.scrape_target(target, 5, 30, log=lambda _m: None)
+check("T14e URL ที่จำไว้ใช้ไม่ได้แล้ว → ล้าง cache ให้รอบหน้าหาใหม่ (ไม่ค้างอยู่กับโพสต์ที่ตายแล้ว)",
+      dead.post_cache.get(PAGE, 5)[0] is None
+      and sum("posts-scraper" in a for a in actor_calls) == 0,
+      "ล้างแล้ว และไม่ยิง posts scraper ซ้ำในรอบเดียวกัน")
 
 # ---- output ----
 print("=" * 64)

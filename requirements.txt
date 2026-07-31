@@ -4,8 +4,11 @@
 # วิธี A: Apify — *ไม่ต้องลงอะไรเลย* เรียกผ่าน REST API (urllib stdlib) แค่ใส่ APIFY_TOKEN ใน .env
 # playwright>=1.44           # วิธี B (สำรอง): Playwright — + `python -m playwright install chromium`
 
+# ---- ชั้น AI ที่สอง (Claude) ----
+# *ไม่ต้องลงอะไรเช่นกัน* — เรียก Anthropic Messages API ผ่าน urllib (stdlib) ดู src/classify/llm.py
+# แค่ใส่ ANTHROPIC_API_KEY ใน .env · ไม่ใส่ = ใช้ชั้นสองแบบ offline แทน ระบบยังทำงานครบ
+
 # ---- Production (เปิดใช้เมื่อขึ้นจริง) ----
-# anthropic>=0.40            # LLM escalation (Claude Haiku)
 # transformers>=4.40         # Thai sentiment (Wisesight / WangchanBERTa)
 # torch>=2.2                 # backend ของ transformers
 # httpx>=0.27                # Meta Graph API (ปลายทางจริง)

@@ -20,6 +20,9 @@ sys.path.insert(0, str(HERE.parent))
 # ตัวเฝ้าเพจจะยิง Apify จริงตอนรันเทส (เสียเครดิตฟรี ๆ และเทสช้า/ไม่ deterministic)
 os.environ["MONITOR_SOURCE"] = "sample"
 os.environ["MONITOR_INTERVAL_MIN"] = "60"
+# ห้ามยิง Anthropic จริงตอนรันเทส (เครื่อง dev อาจมี ANTHROPIC_API_KEY ใน .env)
+# — เสียเงินฟรีและผลไม่ deterministic · ชั้น Claude มีเทสของตัวเองใน tests/run_tests.py (T13)
+os.environ["LLM"] = "off"
 
 # ปลายทางแจ้งเตือนต้องไม่ชี้ไป n8n/Discord จริงตอนรันเทส — เดี๋ยวจะยิงเข้าห้องทีมจริง
 # (เทสจะตั้ง N8N_WEBHOOK_URL ชี้มา stub ในเครื่องเองตอนถึงหัวข้อ Discord alert)

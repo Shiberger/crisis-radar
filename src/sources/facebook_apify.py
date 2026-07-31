@@ -8,10 +8,16 @@
   1) facebook-posts-scraper : จาก URL เพจ/กลุ่ม → รายการ URL โพสต์ล่าสุด
   2) facebook-comments-scraper : จากแต่ละ URL โพสต์ → คอมเมนต์
 
+💰 **ขั้นที่ 1 คือ actor ที่แพงที่สุดต่อรอบ** — วัดจากบิลจริง: posts scraper ≈ $0.026/run
+   ส่วน comments scraper ≈ $0.008/run · รอบหนึ่ง (5 โพสต์) = $0.026 + 5×$0.008 ≈ $0.065
+   → posts scraper กินไป **40% ของค่าใช้จ่ายทั้งรอบ** ทั้งที่ "โพสต์ล่าสุด 5 อันของเพจ"
+   แทบไม่เปลี่ยนภายในชั่วโมงเดียว จึงจำรายการ URL ไว้ใช้ซ้ำ (ดู PostUrlCache ข้างล่าง)
+
 ต้องมี:
   APIFY_TOKEN ในไฟล์ .env          # จาก console.apify.com > Settings > Integrations
   (เรียกผ่าน REST API ด้วย urllib — ไม่ต้องลง apify-client)
   (กลุ่ม private) FB_COOKIES_JSON=path/to/cookies.json  # export cookie ตอนล็อกอินแล้ว
+  POST_URLS_TTL_MIN=360            # จำรายการโพสต์ไว้กี่นาที (0 = ปิด cache ดึงใหม่ทุกรอบ)
 
 หมายเหตุ field mapping: ชื่อ field ของ output แต่ละ actor/เวอร์ชันอาจต่างกันเล็กน้อย
 → ตัว map เขียนแบบ defensive (ลอง key หลายชื่อ). ถ้าเจอ field ใหม่ ใช้ scrape_facebook.py --inspect
@@ -20,14 +26,21 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import threading
+import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 from ..timeutil import now_ict, to_ict
 
 POSTS_ACTOR = "apify/facebook-posts-scraper"
 COMMENTS_ACTOR = "apify/facebook-comments-scraper"
+
+POST_URLS_CACHE_FILE = Path(__file__).resolve().parent.parent.parent / "data" / "post_urls_cache.json"
+POST_URLS_TTL_MIN = 360      # 6 ชม. — เปลี่ยนได้ด้วย env POST_URLS_TTL_MIN
 
 
 def _ssl_context():
@@ -159,15 +172,93 @@ def load_apify_export(path, brand: str = "talesrunner", page_id: str = "thehof.t
     return {"page": brand.title(), "page_id": page_id, "brand": brand, "comments": kept}
 
 
+class PostUrlCache:
+    """จำ "รายการ URL โพสต์ล่าสุดของเพจ" ไว้ใช้ซ้ำ — ตัดตัว actor ที่แพงสุดออกจากรอบส่วนใหญ่.
+
+    ทำไมคุ้ม: รายการโพสต์ล่าสุดเปลี่ยนวันละไม่กี่ครั้ง แต่รอบตรวจเดินทุกชั่วโมง
+    จำไว้ 6 ชม. = จ่าย posts scraper 1 ครั้งต่อ ~6 รอบ แทนที่จะจ่ายทุกรอบ (ประหยัด ~33% ต่อรอบ)
+
+    ⚠️ **แลกกับอะไร:** โพสต์ใหม่เอี่ยมจะยังไม่ถูกเฝ้าจนกว่ารายการจะรีเฟรช (ช้าสุดเท่า TTL)
+       ถ้าดราม่าเกิดบนโพสต์ประกาศที่เพิ่งลง จะเห็นช้ากว่าปกติ — ต้องการสด ๆ ตั้ง POST_URLS_TTL_MIN=0
+
+    key = URL เพจ + จำนวนโพสต์ที่ขอ (ขอ 3 กับขอ 10 คือคนละรายการ ใช้ร่วมกันไม่ได้)
+    """
+
+    def __init__(self, path: Path = POST_URLS_CACHE_FILE, ttl_min: Optional[int] = None):
+        self.path = path
+        self.ttl_min = POST_URLS_TTL_MIN if ttl_min is None else ttl_min
+        self._lock = threading.Lock()
+
+    def _load(self) -> dict:
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+    @staticmethod
+    def key(target_url: str, max_posts: int) -> str:
+        return f"{target_url.rstrip('/')}|{max_posts}"
+
+    def get(self, target_url: str, max_posts: int) -> tuple[Optional[list[str]], int]:
+        """คืน (urls, อายุเป็นนาที). urls=None แปลว่าไม่มี/หมดอายุ → ต้องยิง actor ใหม่."""
+        if self.ttl_min <= 0:
+            return None, 0
+        rec = self._load().get(self.key(target_url, max_posts))
+        if not rec or not rec.get("urls"):
+            return None, 0
+        age_min = int((time.time() - float(rec.get("ts") or 0)) / 60)
+        if age_min >= self.ttl_min:
+            return None, age_min
+        return list(rec["urls"]), age_min
+
+    def put(self, target_url: str, max_posts: int, urls: list[str]) -> None:
+        if self.ttl_min <= 0 or not urls:
+            return
+        with self._lock:
+            data = self._load()
+            data[self.key(target_url, max_posts)] = {
+                "at": now_ict().isoformat(timespec="minutes"),
+                "ts": time.time(),
+                "urls": list(urls),
+            }
+            try:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self.path.write_text(json.dumps(data, ensure_ascii=False, indent=1),
+                                     encoding="utf-8")
+            except OSError:
+                pass      # เขียนดิสก์ไม่ได้ → รอบหน้าก็แค่ยิง actor ใหม่ ไม่ถึงกับพัง
+
+    def invalidate(self, target_url: str, max_posts: int) -> None:
+        """ทิ้งรายการที่จำไว้ — ใช้เมื่อ URL เดิมดึงคอมเมนต์ไม่ได้เลย (โพสต์ถูกลบ/เปลี่ยนสิทธิ์)."""
+        with self._lock:
+            data = self._load()
+            if data.pop(self.key(target_url, max_posts), None) is not None:
+                try:
+                    self.path.write_text(json.dumps(data, ensure_ascii=False, indent=1),
+                                         encoding="utf-8")
+                except OSError:
+                    pass
+
+
+def _ttl_from_env() -> int:
+    try:
+        return int(str(os.environ.get("POST_URLS_TTL_MIN", "")).strip() or POST_URLS_TTL_MIN)
+    except ValueError:
+        return POST_URLS_TTL_MIN
+
+
 class ApifyFacebookScraper:
     platform = "facebook"
     API = "https://api.apify.com/v2"
 
-    def __init__(self, token: Optional[str] = None, cookies: Optional[list] = None):
+    def __init__(self, token: Optional[str] = None, cookies: Optional[list] = None,
+                 post_cache: Optional[PostUrlCache] = None):
         self.token = token or os.environ.get("APIFY_TOKEN")
         if not self.token:
             raise RuntimeError("ไม่พบ APIFY_TOKEN — ใส่ในไฟล์ .env (ดู .env.example)")
         self.cookies = cookies   # สำหรับกลุ่ม private
+        self.post_cache = post_cache or PostUrlCache(ttl_min=_ttl_from_env())
 
     def check_token(self) -> str:
         """เช็กว่า token ใช้ได้จริง (ไม่เสียเงิน) — คืน username. raise ถ้า token ผิด."""
@@ -193,13 +284,21 @@ class ApifyFacebookScraper:
         except urllib.error.HTTPError as e:
             raise RuntimeError(f"Apify API error {e.code}: {e.read().decode('utf-8', 'ignore')[:300]}") from e
 
-    def get_post_urls(self, target_url: str, max_posts: int) -> list[str]:
+    def get_post_urls(self, target_url: str, max_posts: int, log=print) -> list[str]:
+        """หา URL โพสต์ล่าสุดของเพจ — ใช้รายการที่จำไว้ก่อนถ้ายังไม่หมดอายุ (ประหยัด 1 actor run)."""
+        cached, age_min = self.post_cache.get(target_url, max_posts)
+        if cached:
+            log(f"  [apify] ใช้รายการโพสต์ที่จำไว้ {len(cached)} โพสต์ (อายุ {age_min} นาที) "
+                f"— ประหยัด posts scraper 1 run")
+            return cached
+
         run_input: dict = {"startUrls": [{"url": target_url}], "resultsLimit": max_posts}
         if self.cookies:
             run_input["cookies"] = self.cookies      # กลุ่ม private ต้องใช้
         items = self._run(POSTS_ACTOR, run_input)
-        urls = [_pick(it, "url", "postUrl", "facebookUrl") for it in items]
-        return [u for u in urls if u]
+        urls = [u for u in (_pick(it, "url", "postUrl", "facebookUrl") for it in items) if u]
+        self.post_cache.put(target_url, max_posts, urls)
+        return urls
 
     def get_comments(self, post_url: str, post_id: str, max_comments: int) -> list[dict]:
         # input ขั้นต่ำ (ตรงกับฟอร์ม: Facebook URLs = startUrls, Results amount = resultsLimit)
@@ -225,7 +324,8 @@ class ApifyFacebookScraper:
     def scrape_target(self, target: dict, max_posts: int, max_comments: int, log=print) -> list[dict]:
         """กวาดทั้งเพจ/กลุ่ม: หาโพสต์ล่าสุด max_posts โพสต์ → ดึงคอมเมนต์ทีละโพสต์."""
         log(f"  [apify] {target['type']}: {target['name']} — หาโพสต์…")
-        post_urls = self.get_post_urls(target["url"], max_posts)
+        used_cache = self.post_cache.get(target["url"], max_posts)[0] is not None
+        post_urls = self.get_post_urls(target["url"], max_posts, log=log)
         log(f"  [apify] เจอ {len(post_urls)} โพสต์ → ดึงคอมเมนต์…")
         comments: list[dict] = []
         for i, url in enumerate(post_urls, 1):
@@ -233,4 +333,10 @@ class ApifyFacebookScraper:
             cs = self.get_comments(url, pid, max_comments)
             comments += cs
             log(f"    - โพสต์ {i}/{len(post_urls)}: {len(cs)} คอมเมนต์")
+
+        # URL ที่จำไว้ใช้ไม่ได้แล้วสักอัน (โพสต์ถูกลบ/เปลี่ยนสิทธิ์) → ทิ้ง cache ให้รอบหน้าหาใหม่
+        # ไม่ยิงหาใหม่ทันทีในรอบนี้ เพราะจะกลายเป็นจ่าย 2 เด้งตอนเพจเงียบจริง ๆ
+        if used_cache and not comments:
+            self.post_cache.invalidate(target["url"], max_posts)
+            log("  [apify] รายการโพสต์ที่จำไว้ดึงคอมเมนต์ไม่ได้เลย — ล้างทิ้ง รอบหน้าจะหาโพสต์ใหม่")
         return comments

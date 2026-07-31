@@ -21,13 +21,25 @@ services:
         sync: false
       - key: RUN_PASSCODE # รหัสกันคนกดโหมด Facebook จริงจนเครดิต Apify หมด
         sync: false
+      # --- ชั้น AI ที่สอง (Claude อ่านซ้ำเคสที่ชั้นแรกไม่มั่นใจ) ---
+      # ไม่ใส่ = ระบบยังทำงานครบ แต่ชั้นสองใช้กฎ offline แทน (แม่นน้อยกว่ากับมุกใหม่ ๆ)
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: LLM_MODEL # claude-haiku-4-5 = ถูก+เร็ว · เปลี่ยนเป็น claude-sonnet-5 ถ้าอยากแม่นขึ้น
+        value: "claude-haiku-4-5"
+      - key: LLM_MAX_ITEMS # เพดานคอมเมนต์ที่ส่งเข้า Claude ต่อรอบ — กันบิลบานตอนเพจแตก
+        value: "200"
       # --- โหมดเฝ้าเพจอัตโนมัติ (เปิดเว็บมาเห็นสถานะเลย ไม่ต้องกดปุ่ม) ---
       # ตรวจใหม่เมื่อมีคนเปิดหน้าเว็บและผลล่าสุดเก่าเกิน interval — อย่างมาก 1 รอบต่อ interval
       # ไม่ตั้ง MONITOR_ALWAYS เพราะ free tier หลับหลังไม่มีคนใช้ 15 นาที (thread เบื้องหลังตายอยู่ดี)
-      - key: MONITOR_INTERVAL_MIN
-        value: "60"
+      - key: MONITOR_INTERVAL_MIN # 2 ชม. — free tier ของ Apify รับรายชั่วโมงไม่ไหว (ดู README)
+        value: "120"
       - key: MONITOR_MAX_POSTS
         value: "5"
+      # จำรายการ URL โพสต์ไว้ 6 ชม. — ตัด posts scraper (~40% ของค่า Apify ต่อรอบ) ออกจากรอบส่วนใหญ่
+      # 0 = ปิด cache · ดูรายละเอียดใน .env.example
+      - key: POST_URLS_TTL_MIN
+        value: "360"
       # ปล่อยว่าง = อัตโนมัติ (Facebook จริงถ้ามี APIFY_TOKEN ไม่งั้นข้อมูลตัวอย่าง)
       # ใส่ "sample" ถ้าอยากให้เดโม่วิ่งได้โดยไม่แตะเครดิต Apify เลย
       - key: MONITOR_SOURCE

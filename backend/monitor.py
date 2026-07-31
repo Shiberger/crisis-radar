@@ -14,7 +14,7 @@
 ตั้งค่าผ่าน env (ดู .env.example):
   MONITOR=off                 ปิด monitor ทั้งหมด → หน้าเว็บกลับไปเป็นแบบกดเอง
   MONITOR_SOURCE=facebook|sample   ค่าเริ่มต้น: facebook ถ้ามี APIFY_TOKEN ไม่งั้น sample
-  MONITOR_INTERVAL_MIN=60     ตรวจใหม่ทุกกี่นาที
+  MONITOR_INTERVAL_MIN=120    ตรวจใหม่ทุกกี่นาที (ค่าเริ่มต้น 2 ชม. — คุมค่า Apify/AI)
   MONITOR_MAX_POSTS=5         ต่อรอบ ดูย้อนหลังกี่โพสต์
   MONITOR_MAX_COMMENTS=30     ต่อโพสต์ อ่านกี่คอมเมนต์
   MONITOR_ALWAYS=1            ตรวจตามรอบแม้ไม่มีคนเปิดเว็บ
@@ -75,7 +75,7 @@ def config() -> dict:
 
     # floor กันตั้งถี่เกินจนยิง Apify ทุกครั้งที่มีคนกด F5
     floor = 15 if source == "facebook" else 1
-    interval = max(_int_env("MONITOR_INTERVAL_MIN", 60), floor)
+    interval = max(_int_env("MONITOR_INTERVAL_MIN", 120), floor)
 
     t = jobs.get_targets()
     return {

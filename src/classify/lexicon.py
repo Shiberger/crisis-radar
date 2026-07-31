@@ -36,6 +36,11 @@ NEGATORS = {"ไม่", "หมด", "เลิก"}
 # ร่องรอยประชด — ไม่ตัดสินเอง แต่ยก flag ให้ LLM
 SARCASM_HINTS = {"555", "ขอบคุณมากค่า", "ดีจริง ๆ นะ", "ดีจังเนอะ", "เก่งมาก", "แหม"}
 
+# คำที่บอกว่า "นี่คือคำถาม" — ใช้ตัดคอมเมนต์ถามข้อมูลออกก่อนถึงชั้น AI (ดู classify/llm.py prefilter)
+# คำถามที่ไม่มีคำลบปน = กลาง แทบ 100% ในข้อมูลจริง จึงไม่ต้องจ่ายเงินให้ AI อ่าน
+QUESTION_CUES = {"ไหม", "มั้ย", "หรือเปล่า", "รึเปล่า", "หรอ", "เหรอ", "เมื่อไหร่", "เมื่อไร",
+                 "ยังไง", "อย่างไร", "อะไรบ้าง", "ทำไง", "ขอถาม", "สอบถาม", "ใครรู้", "?"}
+
 TOPIC_KEYWORDS = {
     "bug/technical": ["บั๊ก", "บัก", "ล่ม", "ค้าง", "เข้าไม่ได้", "เด้ง", "error",
                        "หลุด", "โหลดช้า", "lag", "แลค", "dc", "1023", "ระบบพัง",
@@ -92,6 +97,17 @@ def tag_topics(text: str) -> list[str]:
         if any(kw in t for kw in kws):
             found.append(topic)
     return found
+
+
+def looks_like_question(text: str) -> bool:
+    """เป็นคำถามขอข้อมูลไหม — ใช้เป็นเงื่อนไขหนึ่งของ prefilter ก่อนถึงชั้น AI."""
+    t = _normalize(text)
+    return any(q in t for q in QUESTION_CUES)
+
+
+def has_letters(text: str) -> bool:
+    """มีตัวอักษรจริงไหม (ไม่ใช่อีโมจิ/สติกเกอร์/เครื่องหมายล้วน)."""
+    return any(("ก" <= ch <= "๙") or ch.isalpha() for ch in text)
 
 
 def classify(text: str) -> dict:
