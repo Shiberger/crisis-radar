@@ -366,6 +366,22 @@ check("T13i เพดานต่อรอบคุมค่าใช้จ่�
 check("T13j ไม่มีคีย์ → ใช้ตัวสำรองอัตโนมัติ ไม่ใช่พัง",
       llm_mod.from_env().name == "offline-heuristic")
 
+# เจอจริงตอนต่อ API ครั้งแรก: Python บน mac หา CA bundle ไม่เจอ → CERTIFICATE_VERIFY_FAILED
+# ทั้งที่คีย์และเน็ตปกติ · ต้องส่ง context เอง แต่ห้ามปิด verification (ส่ง API key ออกไปกับ request)
+from src.env import ssl_context   # noqa: E402
+import ssl as _ssl                # noqa: E402
+
+_ctx = ssl_context()
+check("T13k ตั้ง SSL context เองได้ แต่ยัง verify certificate ตามปกติ (ไม่ปิดเพื่อความสะดวก)",
+      _ctx.verify_mode == _ssl.CERT_REQUIRED and _ctx.check_hostname is True,
+      f"verify={_ctx.verify_mode.name} · check_hostname={_ctx.check_hostname}")
+
+check("T13l แปลง error ของ API เป็นภาษาคนพร้อมวิธีแก้",
+      "เครดิต" in llm_mod._explain(400, '{"message":"Your credit balance is too low"}')
+      and "ANTHROPIC_API_KEY" in llm_mod._explain(401, '{"type":"authentication_error"}')
+      and "HTTP 418" in llm_mod._explain(418, "teapot"),   # ที่ไม่รู้จักต้องโชว์ของดิบไว้ debug
+      llm_mod._explain(400, '{"message":"Your credit balance is too low"}')[:46])
+
 # ---- T15: ชั้น 2 (กฎ deterministic) — ลดคอมเมนต์ที่ต้องจ่ายเงินโดยความแม่นต้องไม่ตก ----
 # นี่คือเทสที่ "อนุญาต" ให้กฎอยู่ในระบบ: ถ้ากฎไหนทำให้ accuracy ตก ต้องเอาออก ไม่ใช่ปล่อยผ่าน
 from src.classify.llm import OfflineHeuristicLLM as _Heur, prefilter   # noqa: E402
@@ -408,6 +424,49 @@ keep_cases = ["ทำไมเซิร์ฟล่มอีกแล้วค�
 check("T15d กฎชั้น 2 ไม่แตะของที่ต้องให้ AI อ่านจริง (บ่นในรูปคำถาม / กำกวม)",
       all(prefilter(t, lexicon.classify(t)) is None for t in keep_cases),
       "ปล่อยผ่านไปชั้น AI ทั้ง 2 เคส")
+
+# ---- T16: คอมเมนต์เชิงบวก — เจอตอนรันข้อมูลจริงว่าระบบแทบไม่เคยให้ positive เลย ----
+# ต้นเหตุ (วัดจากคอมเมนต์จริง 540 รายการ): 89% ของคอมเมนต์ไหลผ่านชั้น 2/3 ซึ่ง **คืนได้แค่
+# negative/neutral เชิงโครงสร้าง** → ต่อให้เป็นโพสต์ที่คนชมเต็ม ก็ได้ positive = 0
+def resolve(t: str) -> str:
+    """เดินครบ 3 ชั้นแบบไม่ต่อเน็ต (ชั้น 3 = ตัวสำรอง) — เหมือนตอนรันจริงที่ยังไม่ใส่คีย์."""
+    b = lexicon.classify(t)
+    if not (b["needs_llm"] or b["confidence"] < 0.5):
+        return b["sentiment"]
+    return (prefilter(t, b) or _Heur().analyze(t, b["topics"]))["sentiment"]
+
+
+praise = [
+    ("ขอบคุณครับ ทีมงานทำได้ดีมาก", "คำขอบคุณ"),
+    ("เป็นกำลังใจให้ทีมงานนะคะ รอเลยจ้า", "ให้กำลังใจ"),
+    ("❤️❤️❤️", "อีโมจิล้วน"),
+    ("โคตรดีเลยครับ 💓", "ชมตรง ๆ"),
+]
+check("T16 คอมเมนต์ชมต้องได้ positive (ก่อนแก้ได้ neutral ทั้งหมด)",
+      all(resolve(t) == "positive" for t, _w in praise),
+      " · ".join(f"{w}={resolve(t)}" for t, w in praise))
+
+check("T16b ตัวปฏิเสธต้องดูระยะใกล้ ไม่ใช่ทั้งข้อความ",
+      resolve("เกมสนุกมาก เล่นไม่เบื่อเลย") == "positive"
+      and resolve("ไม่สนุกเลยครับ") == "negative",
+      "“สนุกมาก…ไม่เบื่อ”=positive · “ไม่สนุกเลย”=negative")
+
+check("T16c อีโมจิ: ชื่นชม→บวก · หัวเราะเยาะ/ไหว้ ไม่นับเป็นบวก",
+      resolve("👍👍") == "positive" and resolve("🤣🤣") != "positive",
+      f"👍={resolve('👍👍')} · 🤣={resolve('🤣🤣')}")
+
+# กับดัก substring ที่เจอในข้อมูลจริง — ถ้าเผลอเติมคำเดี่ยวลง POSITIVE จะพังทั้งชุด
+traps = [("บริษัทควรต้องรับผิดชอบ กู้ไฟล์ที่หายไป", "'ชอบ' ใน 'รับผิดชอบ'"),
+         ("เป็นการแถลงการณ์เท่านั้นครับ", "'เท่' ใน 'เท่านั้น'"),
+         ("ก็ไม่ไว้ใจทีมงานเดิมอีกต่อไป", "'ไว้ใจ' ที่ถูกปฏิเสธ")]
+check("T16d ไม่นับคำชมที่จริง ๆ เป็นส่วนของคำอื่น (บทเรียนเดียวกับกับดัก 'โค้ด')",
+      all(resolve(t) != "positive" for t, _w in traps),
+      " · ".join(f"{w}→{resolve(t)}" for t, w in traps))
+
+insults = ["มีหน้าไปด่าคนอื่นพ่อแม่ไม่สั่งสอน", "พี่ได้เป็นหัวแถวคนโง่ประจำเม้นท์"]
+check("T16e คอมเมนต์ด่าทอต้องเป็นลบ ไม่ใช่บวก (เคสจริงที่เคยหลุดเป็นบวก)",
+      all(resolve(t) == "negative" for t in insults),
+      " · ".join(resolve(t) for t in insults))
 
 # ---- T14: cache รายการ URL โพสต์ — ตัด actor ที่แพงสุดออกจากรอบส่วนใหญ่ ----
 # posts scraper ≈ $0.026/run · comments scraper ≈ $0.008/run (จากบิลจริง)

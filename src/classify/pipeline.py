@@ -41,7 +41,8 @@ class HybridClassifier:
 
     @property
     def engine(self) -> str:
-        return getattr(self.llm, "name", "unknown")
+        """ชื่อที่เอาไปโชว์ใน log — ต้องอ่านรู้เรื่องสำหรับคนที่ไม่ใช่ dev ด้วย."""
+        return getattr(self.llm, "label", None) or getattr(self.llm, "name", "unknown")
 
     def classify_one(self, c: Comment) -> Classified:
         return self.classify_all([c])[0]

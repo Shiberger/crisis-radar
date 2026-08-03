@@ -44,6 +44,7 @@ import urllib.request
 from pathlib import Path
 from typing import Optional, Protocol
 
+from ..env import ssl_context
 from . import lexicon
 from .lexicon import TOPIC_LABELS
 
@@ -89,6 +90,7 @@ class OfflineHeuristicLLM:
     """
 
     name = "offline-heuristic"
+    label = "กฎออฟไลน์ (ยังไม่ได้เปิด Claude)"
 
     # ประชดที่พบบ่อยในคอมเมนต์เกมไทย: คำบวก + บริบทเชิงล่ม/ปัญหา = จริง ๆ แล้วลบ
     # ⚠️ cue ต้องยาวพอ — เคยใช้ "รอ" เฉย ๆ แล้วไปแมตช์ "รอบนี้" ทำให้คำถามธรรมดากลายเป็นลบ
@@ -106,6 +108,11 @@ class OfflineHeuristicLLM:
         # ถ้ามี cue ปัญหาชัด ๆ ก็ลบ
         if has_neg_context:
             return {"sentiment": "negative", "confidence": 0.7, "topics": topics}
+        # ชม/ให้กำลังใจ โดยไม่มีบริบทปัญหาเลย → บวก
+        # (เดิมตัวนี้คืนได้แค่ negative/neutral — คอมเมนต์ชมที่ไหลมาถึงชั้นนี้จึงกลายเป็นกลางหมด
+        #  ซึ่งเป็นเหตุผลที่รันข้อมูลจริงแล้วแทบไม่เจอ positive เลย)
+        if lexicon.has_positive_signal(text):
+            return {"sentiment": "positive", "confidence": 0.7, "topics": topics}
         return {"sentiment": "neutral", "confidence": 0.55, "topics": topics}
 
     def analyze_batch(self, items: list[tuple[str, list[str]]]) -> list[Optional[dict]]:
@@ -131,11 +138,17 @@ def prefilter(text: str, base: dict) -> Optional[dict]:
             any(c in text.lower() for c in heur._SARCASM_NEG_CUES):
         return {"sentiment": "negative", "confidence": 0.82, "topics": base["topics"]}
 
-    # 2) อีโมจิ/สติกเกอร์ล้วน — ไม่มีอะไรให้ AI อ่าน
+    # 2) อีโมจิ/สติกเกอร์ล้วน — ไม่มีตัวอักษรให้ AI อ่าน ตัดสินจากตัวอีโมจิเอง
     if not lexicon.has_letters(text):
-        return {"sentiment": "neutral", "confidence": 0.6, "topics": []}
+        sentiment = "positive" if any(e in text for e in lexicon.POSITIVE_EMOJI) else "neutral"
+        return {"sentiment": sentiment, "confidence": 0.6, "topics": []}
 
-    # 3) คำถามขอข้อมูล ที่ไม่มีคำลบและไม่มีร่องรอยประชดปนเลย → กลาง
+    # 3) ชม/ให้กำลังใจชัด ๆ โดยไม่มีคำลบและไม่มีร่องรอยประชดปนเลย → บวก ไม่ต้องถาม AI
+    if not neg and not any(h in text for h in lexicon.SARCASM_HINTS) \
+            and lexicon.has_positive_signal(text):
+        return {"sentiment": "positive", "confidence": 0.72, "topics": base["topics"]}
+
+    # 4) คำถามขอข้อมูล ที่ไม่มีคำลบและไม่มีร่องรอยประชดปนเลย → กลาง
     #    (มีคำลบแม้คำเดียว = อาจเป็นการบ่นในรูปคำถาม "ทำไมล่มอีกแล้ว" → ปล่อยให้ AI อ่าน)
     if (not pos and not neg
             and not any(h in text for h in lexicon.SARCASM_HINTS)
@@ -258,6 +271,27 @@ RESULT_SCHEMA = {
 
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
 
+# error ที่เจอบ่อย → บอกวิธีแก้เป็นภาษาคน แทนที่จะโยน JSON ดิบใส่หน้า log ของทีม
+# (คนที่นั่งดู monitor ไม่ควรต้องมาแปล error ของ API เอง)
+_HINTS = (
+    ("credit balance is too low",
+     "เครดิต Anthropic หมด — เติมที่ console.anthropic.com > Plans & Billing "
+     "· ระหว่างนี้ระบบใช้กฎ offline แทน ยังทำงานได้ครบแค่แม่นน้อยลง"),
+    ("authentication_error",
+     "ANTHROPIC_API_KEY ไม่ถูกต้องหรือถูกเพิกถอน — สร้างใหม่ที่ console.anthropic.com"),
+    ("permission_error", "คีย์นี้ไม่มีสิทธิ์เรียกโมเดลที่ตั้งไว้ — เช็ก LLM_MODEL กับสิทธิ์ของคีย์"),
+    ("not_found_error", "ไม่มีโมเดลชื่อนี้ — เช็ก LLM_MODEL (ค่าเริ่มต้น claude-haiku-4-5)"),
+    ("rate_limit_error", "ยิงถี่เกินโควตา — ระบบรอตามที่ API บอกแล้วลองใหม่ให้เอง"),
+)
+
+
+def _explain(code: int, detail: str) -> str:
+    """แปลง error ของ API เป็นข้อความที่บอกได้ว่าต้องไปทำอะไรต่อ."""
+    for needle, hint in _HINTS:
+        if needle in detail:
+            return f"{hint} (HTTP {code})"
+    return f"HTTP {code} {detail}".strip()
+
 
 class ClaudeLLM:
     """เรียก Anthropic Messages API จริง (raw HTTP ผ่าน urllib).
@@ -274,6 +308,7 @@ class ClaudeLLM:
         self.api_key = api_key
         self.model = model
         self.name = model
+        self.label = f"Claude {model}"
         self.batch_size = max(1, batch_size)
         self.timeout = timeout
         self.retries = max(0, retries)
@@ -304,11 +339,14 @@ class ClaudeLLM:
         headers = {"content-type": "application/json",
                    "x-api-key": self.api_key,
                    "anthropic-version": API_VERSION}
+        # ต้องส่ง SSL context เอง — Python บน mac หลายเครื่องหา CA bundle ไม่เจอ
+        # แล้วล้มด้วย CERTIFICATE_VERIFY_FAILED ทั้งที่คีย์และเน็ตปกติ (เจอมาแล้วกับ Apify)
+        ctx = ssl_context()
         last = ""
         for attempt in range(self.retries + 1):
             req = urllib.request.Request(API_URL, data=data, headers=headers, method="POST")
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                with urllib.request.urlopen(req, timeout=self.timeout, context=ctx) as r:
                     return json.loads(r.read())
             except urllib.error.HTTPError as e:
                 detail = ""
@@ -316,7 +354,7 @@ class ClaudeLLM:
                     detail = e.read().decode("utf-8", "replace")[:200]
                 except OSError:
                     pass
-                last = f"HTTP {e.code} {detail}".strip()
+                last = _explain(e.code, detail)
                 # 401 คีย์ผิด · 400 request ผิด → ลองใหม่ก็ได้ผลเดิม เลิกตั้งแต่ตอนนี้
                 if e.code not in RETRY_STATUS or attempt == self.retries:
                     raise RuntimeError(last) from e

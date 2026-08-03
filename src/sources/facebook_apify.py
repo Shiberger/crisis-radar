@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from ..env import ssl_context
 from ..timeutil import now_ict, to_ict
 
 POSTS_ACTOR = "apify/facebook-posts-scraper"
@@ -43,22 +44,8 @@ POST_URLS_CACHE_FILE = Path(__file__).resolve().parent.parent.parent / "data" / 
 POST_URLS_TTL_MIN = 360      # 6 ชม. — เปลี่ยนได้ด้วย env POST_URLS_TTL_MIN
 
 
-def _ssl_context():
-    """หา CA bundle ให้เจอเอง (python.org build บน mac มักหา cert ไม่เจอ).
-
-    ยัง verify cert ตามปกติ (ไม่ปิด verification) — ปลอดภัยเวลาส่ง token.
-    """
-    import ssl
-    try:
-        import certifi
-        return ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        pass
-    for p in ("/etc/ssl/cert.pem", "/etc/ssl/certs/ca-certificates.crt",
-              "/usr/local/etc/openssl@3/cert.pem"):
-        if os.path.exists(p):
-            return ssl.create_default_context(cafile=p)
-    return ssl.create_default_context()
+# ย้ายไปอยู่ src/env.py แล้ว (ตัวเรียก Anthropic ก็เจอปัญหา cert เดียวกัน จึงใช้ร่วมกัน)
+_ssl_context = ssl_context
 
 
 def _pick(item: dict, *keys, default=None):
