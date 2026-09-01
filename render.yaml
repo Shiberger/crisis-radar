@@ -16,6 +16,16 @@ services:
         value: "3.13.2"
       - key: HOST
         value: "0.0.0.0" # ต้องเป็น 0.0.0.0 ไม่งั้น Render เข้าไม่ถึง (PORT ทาง Render ใส่ให้เอง)
+      # --- เก็บ state ถาวร (Supabase) — ต้องมี ไม่งั้นข้อมูลหายทุกครั้งที่ Render restart ---
+      # free tier ใช้ filesystem แบบ ephemeral: ไฟล์ data/*.json หายทุก deploy/restart/หลับตื่น
+      # ที่หายไปคือ ที่จำว่าแจ้ง Discord ไปแล้ว (→ เด้งซ้ำทั้งชุด) · label ที่ทีมแก้เอง ·
+      # คลัง "อ่านแล้ว" · cache ที่ช่วยประหยัดค่า Apify/Claude
+      # ตั้งครั้งแรก: ดู .env.example หัวข้อ "เก็บ state ถาวรด้วย Supabase"
+      # ทางเลือกอื่นถ้าไม่อยากใช้ Supabase: อัปเป็นแพลน Starter แล้ว mount disk ที่ /opt/render/project/src/data
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY # Secret key (sb_secret_...) ไม่ใช่ Publishable — ดู .env.example
+        sync: false
       # --- 2 ตัวนี้ต้องกรอกเองใน Dashboard (sync: false = ไม่เก็บลง git) ---
       - key: APIFY_TOKEN
         sync: false

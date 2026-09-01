@@ -4,6 +4,11 @@
 # วิธี A: Apify — *ไม่ต้องลงอะไรเลย* เรียกผ่าน REST API (urllib stdlib) แค่ใส่ APIFY_TOKEN ใน .env
 # playwright>=1.44           # วิธี B (สำรอง): Playwright — + `python -m playwright install chromium`
 
+# ---- เก็บ state ถาวรด้วย Supabase (ตอน deploy) ----
+# *ไม่ต้องลงอะไรเช่นกัน* — เรียก PostgREST ผ่าน urllib (stdlib) ดู src/state.py
+# แค่ใส่ SUPABASE_URL + SUPABASE_SERVICE_KEY ใน .env · ไม่ใส่ = เก็บลงไฟล์ data/*.json เหมือนเดิม
+# (ตั้งครั้งแรก: เอา docs/supabase_schema.sql ไป Run ใน Supabase SQL Editor แล้ว python3 -m src.state --push)
+
 # ---- ชั้น AI ที่สอง (Claude) ----
 # *ไม่ต้องลงอะไรเช่นกัน* — เรียก Anthropic Messages API ผ่าน urllib (stdlib) ดู src/classify/llm.py
 # แค่ใส่ ANTHROPIC_API_KEY ใน .env · ไม่ใส่ = ใช้ชั้นสองแบบ offline แทน ระบบยังทำงานครบ

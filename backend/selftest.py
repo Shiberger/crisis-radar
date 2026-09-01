@@ -23,6 +23,9 @@ os.environ["MONITOR_INTERVAL_MIN"] = "60"
 # ห้ามยิง Anthropic จริงตอนรันเทส (เครื่อง dev อาจมี ANTHROPIC_API_KEY ใน .env)
 # — เสียเงินฟรีและผลไม่ deterministic · ชั้น Claude มีเทสของตัวเองใน tests/run_tests.py (T13)
 os.environ["LLM"] = "off"
+# state ต้องลงไฟล์ temp เท่านั้น — เครื่อง/CI ที่ตั้ง SUPABASE_URL ไว้จะเขียนทับ state ของจริง
+# ตอนรันเทส (key ใน Supabase มาจาก stem ของชื่อไฟล์ ซึ่งเทสสลับ path แต่ stem เท่าเดิม)
+os.environ["STATE_BACKEND"] = "file"
 
 # ปลายทางแจ้งเตือนต้องไม่ชี้ไป n8n/Discord จริงตอนรันเทส — เดี๋ยวจะยิงเข้าห้องทีมจริง
 # (เทสจะตั้ง N8N_WEBHOOK_URL ชี้มา stub ในเครื่องเองตอนถึงหัวข้อ Discord alert)

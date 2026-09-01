@@ -31,7 +31,7 @@ import jobs      # noqa: E402  (อยู่โฟลเดอร์เดีย
 import monitor   # noqa: E402
 
 from src.classify import archive, lexicon, overrides  # noqa: E402
-from src import notify                                # noqa: E402
+from src import notify, state                         # noqa: E402
 
 STATIC = HERE / "static"
 
@@ -64,8 +64,10 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/health":
             # passcode_required → หน้าเว็บใช้ตัดสินว่าต้องถามรหัสก่อนดึง Facebook จริงไหม
             # alert → หน้าเว็บใช้บอกผู้ใช้ว่าปุ่ม "แจ้ง Discord" พร้อมใช้ไหม + เกณฑ์อัตโนมัติเท่าไร
+            # state → persistent:false บนโฮสต์ที่ filesystem หายตอน restart แปลว่าที่ทีมแก้ label
+            #         ไว้/ที่จำว่าแจ้งไปแล้ว จะหายเมื่อ container รีสตาร์ต (ดู src/state.py)
             self._send(200, {"ok": True, "passcode_required": bool(RUN_PASSCODE),
-                             "alert": notify.status()})
+                             "alert": notify.status(), "state": state.status()})
         elif self.path == "/api/targets":
             # ค่าตั้งต้นให้ฟอร์ม (URL เพจ/โพสต์จาก data/targets.json) — ไม่มีอะไรลับ
             self._send(200, jobs.get_targets())

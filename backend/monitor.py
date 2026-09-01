@@ -21,7 +21,6 @@
 """
 from __future__ import annotations
 
-import json
 import os
 import sys
 import threading
@@ -32,6 +31,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import jobs                                  # noqa: E402  (อยู่โฟลเดอร์เดียวกัน)
+from src import state                        # noqa: E402
 from src.timeutil import now_ict             # noqa: E402
 
 STATE_FILE = ROOT / "data" / "monitor_latest.json"
@@ -91,24 +91,25 @@ def config() -> dict:
 
 
 # ───────────────────────── persistence ─────────────────────────
-# เก็บลงดิสก์เพื่อให้ restart server แล้วยังมีผลล่าสุดโชว์ทันที (ไม่ต้องรอตรวจรอบใหม่)
+# เก็บไว้นอก process เพื่อให้ restart server แล้วยังมีผลล่าสุดโชว์ทันที (ไม่ต้องรอตรวจรอบใหม่)
+# ปลายทางจริงเป็นไฟล์หรือ Supabase แล้วแต่ env — src/state.py ตัดสินให้ (บน Render ต้องเป็น
+# Supabase ไม่งั้น container restart ทีเดียวผลตรวจล่าสุด + ประวัติแนวโน้มหายหมด)
 
 def _load() -> None:
-    try:
-        saved = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    saved = state.read_json(STATE_FILE, default=None)
+    if isinstance(saved, dict):
+        try:
+            updated_ts = float(saved.get("updated_ts") or 0)
+        except (TypeError, ValueError):
+            updated_ts = 0.0
         with _LOCK:
             _STATE["result"] = saved.get("result")
-            _STATE["updated_ts"] = float(saved.get("updated_ts") or 0)
+            _STATE["updated_ts"] = updated_ts
             _STATE["updated_at"] = saved.get("updated_at", "")
-    except (OSError, json.JSONDecodeError, TypeError, ValueError):
-        pass
-    try:
-        hist = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
-        if isinstance(hist, list):
-            with _LOCK:
-                _STATE["history"] = hist[-HISTORY_MAX:]
-    except (OSError, json.JSONDecodeError):
-        pass
+    hist = state.read_json(HISTORY_FILE, default=None)
+    if isinstance(hist, list):
+        with _LOCK:
+            _STATE["history"] = hist[-HISTORY_MAX:]
 
 
 def _save() -> None:
@@ -116,11 +117,9 @@ def _save() -> None:
         payload = {"result": _STATE["result"], "updated_ts": _STATE["updated_ts"],
                    "updated_at": _STATE["updated_at"]}
         history = list(_STATE["history"])
-    try:
-        STATE_FILE.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=1), encoding="utf-8")
-    except OSError:
-        pass   # ดิสก์เขียนไม่ได้ (เช่น read-only fs) → ยังทำงานต่อได้ด้วย state ใน memory
+    # เขียนไม่ลง (ดิสก์ read-only / Supabase ล่ม) → ยังทำงานต่อได้ด้วย state ใน memory
+    state.write_json(STATE_FILE, payload)
+    state.write_json(HISTORY_FILE, history, indent=1)
 
 
 def _log(msg: str) -> None:

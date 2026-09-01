@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from .. import state
 from ..env import ssl_context
 from ..timeutil import now_ict, to_ict
 
@@ -177,11 +178,8 @@ class PostUrlCache:
         self._lock = threading.Lock()
 
     def _load(self) -> dict:
-        try:
-            data = json.loads(self.path.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
-        except (OSError, json.JSONDecodeError):
-            return {}
+        data = state.read_json(self.path, default={})
+        return data if isinstance(data, dict) else {}
 
     @staticmethod
     def key(target_url: str, max_posts: int) -> str:
@@ -209,23 +207,15 @@ class PostUrlCache:
                 "ts": time.time(),
                 "urls": list(urls),
             }
-            try:
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                self.path.write_text(json.dumps(data, ensure_ascii=False, indent=1),
-                                     encoding="utf-8")
-            except OSError:
-                pass      # เขียนดิสก์ไม่ได้ → รอบหน้าก็แค่ยิง actor ใหม่ ไม่ถึงกับพัง
+            # เขียนไม่ลง → รอบหน้าก็แค่ยิง actor ใหม่ ไม่ถึงกับพัง
+            state.write_json(self.path, data, indent=1)
 
     def invalidate(self, target_url: str, max_posts: int) -> None:
         """ทิ้งรายการที่จำไว้ — ใช้เมื่อ URL เดิมดึงคอมเมนต์ไม่ได้เลย (โพสต์ถูกลบ/เปลี่ยนสิทธิ์)."""
         with self._lock:
             data = self._load()
             if data.pop(self.key(target_url, max_posts), None) is not None:
-                try:
-                    self.path.write_text(json.dumps(data, ensure_ascii=False, indent=1),
-                                         encoding="utf-8")
-                except OSError:
-                    pass
+                state.write_json(self.path, data, indent=1)
 
 
 def _ttl_from_env() -> int:

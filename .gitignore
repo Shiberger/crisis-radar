@@ -14,7 +14,7 @@ data/monitor_latest.json
 data/monitor_history.json
 
 # label ที่ทีมแก้เอง — key เป็น comment_id ของ Facebook (ระบุตัวตนย้อนได้) จึงไม่ขึ้น git
-# ถ้า deploy จริงควร mount disk ถาวรให้ไฟล์นี้ ไม่งั้นที่ทีมแก้ไว้จะหายตอน restart
+# ตอน deploy จริงต้องตั้ง Supabase (ดู .env.example) ไม่งั้นที่ทีมแก้ไว้หายตอน container restart
 data/overrides.json
 
 # คลังคอมเมนต์ที่ทีมกด "อ่านแล้ว" — เก็บตัวคอมเมนต์จริงไว้ข้างใน (มี PII)
@@ -25,12 +25,15 @@ data/archive.json
 data/post_urls_cache.json
 
 # ผลที่ Claude เคยตอบ (key = hash ของข้อความ ไม่มีตัวข้อความอยู่ในไฟล์) — เป็นแค่ตัวกันจ่ายซ้ำ
-# หายได้ไม่เสียหาย แค่รอบถัดไปต้องถาม AI ใหม่ · ตอน deploy ควร mount disk ถาวรให้จะประหยัดกว่า
+# หายได้ไม่เสียหาย แค่รอบถัดไปต้องถาม AI ใหม่ (ตั้ง Supabase แล้วจะรอด restart ไปด้วย)
 data/llm_cache.json
 
 # บันทึกว่าคอมเมนต์ไหนถูกแจ้งเข้า Discord ไปแล้ว (key = comment_id ของ Facebook)
-# ไฟล์นี้คือตัวกันแจ้งซ้ำ — ถ้าหายตอน restart ทีมจะโดนแจ้งเรื่องเดิมอีกรอบ (ควร mount disk ถาวร)
+# ไฟล์นี้คือตัวกันแจ้งซ้ำ — ถ้าหายตอน restart ทีมจะโดนแจ้งเรื่องเดิมอีกรอบ ต้องตั้ง Supabase
 data/alerts_sent.json
+
+# ไฟล์ชั่วคราวของการเขียนแบบ atomic ใน src/state.py (ปกติถูก rename ทิ้งทันที)
+data/*.json.tmp
 
 # python
 __pycache__/

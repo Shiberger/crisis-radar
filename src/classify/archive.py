@@ -17,16 +17,17 @@
   คอมเมนต์ลบเยอะ ๆ สถานะจะดูดีขึ้นได้ จึงต้องโชว์จำนวนในคลังคู่กับสถานะเสมอ (ดู index.html)
   และเอากลับออกจากคลังได้ตลอด
 
-เก็บที่ data/archive.json: {comment_id: {"at": iso, "item": <classified dict ล่าสุด>}}
+รูปข้อมูล: {comment_id: {"at": iso, "item": <classified dict ล่าสุด>}}
 เก็บ item เต็มเพราะต้องใช้ 2 อย่าง — ข้ามการ classify ซ้ำ และวาดหน้า "คลัง" ให้ดูย้อนหลังได้
+ปลายทาง = ไฟล์ data/archive.json หรือแถวเดียวใน Supabase แล้วแต่ env (ดู src/state.py)
 """
 from __future__ import annotations
 
-import json
 import threading
 from pathlib import Path
 from typing import Iterable
 
+from .. import state
 from ..models import Classified, Comment
 from ..timeutil import now_ict
 
@@ -35,16 +36,12 @@ _LOCK = threading.Lock()
 
 
 def load() -> dict:
-    try:
-        data = json.loads(STORE.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        return {}
+    data = state.read_json(STORE, default={})
+    return data if isinstance(data, dict) else {}
 
 
 def _write(data: dict) -> None:
-    STORE.parent.mkdir(parents=True, exist_ok=True)
-    STORE.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    state.write_json(STORE, data, indent=1)
 
 
 def add(items: Iterable[dict]) -> int:

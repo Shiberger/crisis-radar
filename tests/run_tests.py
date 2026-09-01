@@ -19,6 +19,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -29,6 +30,9 @@ sys.path.insert(0, str(ROOT / "backend"))   # jobs.build_result — ก้อน
 # เทสต้องออฟไลน์ 100% และผลต้องเหมือนเดิมทุกครั้ง — ห้ามยิง Anthropic จริงแม้เครื่องจะมีคีย์อยู่
 # (T13 ทดสอบชั้น Claude ด้วยการสลับตัวส่ง ไม่ใช่ด้วยการต่อเน็ตจริง)
 os.environ["LLM"] = "off"
+# state ต้องลงไฟล์ temp เท่านั้น — เครื่องที่ตั้ง SUPABASE_URL ไว้ใน .env จะเขียนทับ state
+# ของ production ทันทีที่รันเทส (key มาจากชื่อไฟล์ ซึ่งเทสสลับเป็น temp แต่ stem เหมือนเดิม)
+os.environ["STATE_BACKEND"] = "file"
 
 import jobs                                          # noqa: E402  (backend/jobs.py)
 from src.classify import archive, lexicon, overrides   # noqa: E402
@@ -579,6 +583,134 @@ check("T14e URL ที่จำไว้ใช้ไม่ได้แล้ว 
       dead.post_cache.get(PAGE, 5)[0] is None
       and sum("posts-scraper" in a for a in actor_calls) == 0,
       "ล้างแล้ว และไม่ยิง posts scraper ซ้ำในรอบเดียวกัน")
+
+# ---- T17: state ถาวร (Supabase) — ของที่ห้ามหายตอน container restart ----
+# ทำไมต้องมีเทสนี้: บน Render free tier ไฟล์ใน data/ หายทุกครั้งที่ container restart
+# ผลคือทีมโดนแจ้ง Discord เรื่องเดิมซ้ำ และ label ที่ทีมแก้เองหายเกลี้ยง
+# ไม่ยิง Supabase จริง: ตั้ง stub PostgREST ที่ 127.0.0.1 แล้วเช็กว่าคุยตามสัญญาของ PostgREST
+import threading                                       # noqa: E402
+import urllib.parse                                    # noqa: E402
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer   # noqa: E402
+
+from src import state                                  # noqa: E402
+
+PG_ROWS: dict = {}
+PG_GETS: list[str] = []
+PG_PORT = 8979
+
+
+class _StubPostgREST(BaseHTTPRequestHandler):
+    """ตอบแบบเดียวกับ PostgREST เท่าที่ src/state.py ใช้ — GET ?key=eq.x และ POST upsert."""
+
+    def log_message(self, *_):
+        pass
+
+    def _send(self, code: int, body: bytes = b"") -> None:
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _auth_ok(self) -> bool:
+        return (self.headers.get("apikey") == "KEY123"
+                and self.headers.get("Authorization") == "Bearer KEY123")
+
+    def do_GET(self):
+        if not self._auth_ok():
+            return self._send(401, b'{"message":"bad key"}')
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        k = q.get("key", [""])[0].removeprefix("eq.")
+        PG_GETS.append(k)
+        rows = [{"value": PG_ROWS[k]}] if k in PG_ROWS else []
+        self._send(200, json.dumps(rows).encode("utf-8"))
+
+    def do_POST(self):
+        if not self._auth_ok():
+            return self._send(401, b'{"message":"bad key"}')
+        if self.headers.get("Prefer") != "resolution=merge-duplicates,return=minimal":
+            return self._send(409, b'{"message":"duplicate key"}')   # ไม่ upsert = ชนแถวเดิม
+        body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+        for row in body:
+            PG_ROWS[row["key"]] = row["value"]
+        self._send(201)
+
+
+_pg = ThreadingHTTPServer(("127.0.0.1", PG_PORT), _StubPostgREST)
+threading.Thread(target=_pg.serve_forever, daemon=True).start()
+
+STATE_ENV = dict(SUPABASE_URL=f"http://127.0.0.1:{PG_PORT}", SUPABASE_SERVICE_KEY="KEY123",
+                 STATE_BACKEND="auto", STATE_CACHE_TTL_SEC="0")
+os.environ.update(STATE_ENV)
+state.invalidate()
+
+check("T17 มี SUPABASE_URL + key → สลับไปเก็บบน Supabase เอง (ไม่ต้องแก้โค้ดจุดอื่น)",
+      state.backend() == "supabase" and state.ping()["ok"])
+
+# จุดสำคัญที่สุด: ที่จำว่า "แจ้ง Discord ไปแล้ว" ต้องรอด restart ไม่งั้นทีมโดนแจ้งซ้ำ
+notify.STORE = ROOT / "data" / "alerts_sent.json"       # path เดิม → key "alerts_sent"
+notify._write({"c1": {"at": "2026-09-01T10:00+07:00", "trigger": "auto"}})
+state.invalidate()                                      # จำลอง container restart (memory หายหมด)
+check("T17b restart แล้วยังจำได้ว่าแจ้งคอมเมนต์ไหนไปแล้ว → ไม่เด้งซ้ำใน Discord",
+      "c1" in notify.load() and "alerts_sent" in PG_ROWS,
+      f"แถวใน DB: {sorted(PG_ROWS)}")
+
+# label ที่ทีมแก้เอง — ของที่เสียเวลาคนมากที่สุด หายไม่ได้เด็ดขาด
+overrides.STORE = ROOT / "data" / "overrides.json"
+overrides.set_override("c9", sentiment="neutral", note="มุกตลก ไม่ใช่คำบ่น 😂",
+                       ai_sentiment="negative")
+state.invalidate()
+back = overrides.load()
+check("T17c คำตัดสินของคน (พร้อมภาษาไทย/อีโมจิ) รอดครบ ไม่โดน escape เพี้ยน",
+      back["c9"]["sentiment"] == "neutral" and back["c9"]["note"].endswith("😂")
+      and back["c9"]["ai_sentiment"] == "negative")
+
+# หน้าเว็บ poll ทุกไม่กี่วินาที — ถ้าอ่านทีไรยิงเน็ตทุกที ทั้งช้าและกิน quota ฟรี
+os.environ["STATE_CACHE_TTL_SEC"] = "60"
+state.invalidate()
+PG_GETS.clear()
+for _ in range(5):
+    overrides.load()
+check("T17d อ่านซ้ำ ๆ ไม่ยิง Supabase ทุกครั้ง (หน้าเว็บ poll ถี่ได้โดยไม่ช้า)",
+      len(PG_GETS) == 1, f"อ่าน 5 ครั้ง → ยิงจริง {len(PG_GETS)} ครั้ง")
+
+# read-modify-write เป็นแพตเทิร์นหลักของทุก store — ถ้า cache คืน object ตัวเดียวกัน
+# การแก้ที่ยังไม่ได้เขียนลง DB จะรั่วไปโผล่ที่คนอ่านคนถัดไป
+leaked = overrides.load()
+leaked["c9"]["note"] = "แก้มั่ว ๆ ยังไม่ได้เขียน"
+check("T17e อ่านแต่ละครั้งได้ก้อนของตัวเอง — แก้ทิ้งไว้ไม่รั่วไปหาคนอ่านคนถัดไป",
+      overrides.load()["c9"]["note"].endswith("😂"))
+
+# Supabase ล่ม = ระบบต้องเดินต่อด้วยของที่จำไว้ ไม่ใช่ทำเหมือน "ไม่เคยแจ้งใครเลย"
+# (คืนค่าว่างตอนล่ม = ยิงซ้ำทั้งชุด ซึ่งแย่กว่าไม่แจ้ง)
+notify.load()                                           # อ่านสด ๆ 1 ครั้งก่อน แล้วค่อยล่ม
+_pg.shutdown()
+os.environ["STATE_CACHE_TTL_SEC"] = "0"                 # บังคับให้ต้องไปอ่านจริงทุกครั้ง
+state.TIMEOUT = 1                                       # ไม่ต้องนั่งรอ 8 วิจริงในเทส
+t_out = time.time()
+survived = notify.load()
+first_call_sec = time.time() - t_out
+for _ in range(3):
+    notify.load()
+check("T17f Supabase ล่ม → ใช้ค่าที่จำไว้ต่อ ไม่ลืมว่าเคยแจ้งอะไรไปแล้ว",
+      "c1" in survived, f"ยังจำได้ {len(survived)} รายการ")
+check("T17g ล่มแล้วไม่ปล่อยให้ทุก request ไปรอ timeout ซ้ำ ๆ (หน้าเว็บไม่ค้างเป็นแถว)",
+      time.time() - t_out - first_call_sec < 1.0,
+      f"ครั้งแรกรอ {first_call_sec:.1f}s · อีก 3 ครั้งถัดมารวม {time.time()-t_out-first_call_sec:.2f}s")
+
+# Dashboard หน้า Data API โชว์ URL เป็น ".../rest/v1" — คนส่วนใหญ่ก็ paste ทั้งก้อนมาเลย
+# ถ้าไม่ตัดให้จะต่อ path ซ้ำแล้วได้ 404 PGRST125 ซึ่งอ่านไม่ออกว่าพลาดตรงไหน
+check("T17h paste URL มาทั้ง '/rest/v1' ก็ยังใช้ได้ (ไม่ต่อ path ซ้ำจนได้ 404)",
+      state._clean_url(f"http://127.0.0.1:{PG_PORT}/rest/v1/")
+      == state._clean_url(f"http://127.0.0.1:{PG_PORT}")
+      == f"http://127.0.0.1:{PG_PORT}")
+
+# กลับไปโหมดไฟล์ให้เทสอื่นที่รันทีหลัง (และ output ข้างล่าง) ไม่แตะเน็ต
+for _k in STATE_ENV:
+    os.environ[_k] = ""
+os.environ["STATE_BACKEND"] = "file"
+state.invalidate()
+
 
 # ---- output ----
 print("=" * 64)

@@ -13,8 +13,9 @@ alert เกิดได้ 2 ทาง — ตั้งใจให้ครอ
 (ยังไม่มี n8n ก็ตั้ง DISCORD_WEBHOOK_URL แทนได้ — payload ชั้น discord ยิงเข้า Discord ได้ตรง ๆ)
 
 กันสแปม 3 ชั้น เพราะ alert ที่เด้งซ้ำจนคนปิดแจ้งเตือน = เท่ากับไม่มีระบบเตือน:
-  - คอมเมนต์เดิมส่งซ้ำไม่ได้ (data/alerts_sent.json จำ comment_id ที่ส่งแล้ว) — สำคัญมาก
-    เพราะรอบ scrape ถัดไปได้คอมเมนต์เดิมกลับมาเกือบทั้งหมด
+  - คอมเมนต์เดิมส่งซ้ำไม่ได้ (state 'alerts_sent' จำ comment_id ที่ส่งแล้ว) — สำคัญมาก
+    เพราะรอบ scrape ถัดไปได้คอมเมนต์เดิมกลับมาเกือบทั้งหมด · **ที่จำนี้ต้องรอด restart**
+    ไม่งั้นทุกครั้งที่ deploy ทีมจะโดนแจ้งเรื่องเดิมทั้งชุดอีกรอบ → ตั้ง Supabase (ดู src/state.py)
   - auto ส่งได้มากสุด ALERT_MAX_PER_RUN ต่อรอบ (เรียงจาก reach มากสุดลงมา)
   - คอมเมนต์ที่ทีมกด "อ่านแล้ว" ไม่ auto ส่ง — ถือว่าจัดการไปแล้ว
 
@@ -37,6 +38,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from .. import state
 from ..crisis.detector import VIRAL_REACH
 from ..env import ssl_context
 from ..models import Classified
@@ -85,16 +87,12 @@ def status() -> dict:
 # ───────────────────────── ที่จำว่าส่งอะไรไปแล้ว ─────────────────────────
 
 def load() -> dict:
-    try:
-        data = json.loads(STORE.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        return {}
+    data = state.read_json(STORE, default={})
+    return data if isinstance(data, dict) else {}
 
 
 def _write(data: dict) -> None:
-    STORE.parent.mkdir(parents=True, exist_ok=True)
-    STORE.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    state.write_json(STORE, data, indent=1)
 
 
 def sent_record(comment_id: str) -> dict | None:

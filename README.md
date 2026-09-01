@@ -27,7 +27,7 @@ python3 backend/server.py         # แล้วเปิด http://127.0.0.1:80
 |---|---|
 | เฝ้าเพจไหน | `targets[].url` ใน [data/targets.json](data/targets.json) (ตอนนี้ = เพจ TalesRunner) |
 | ตรวจใหม่เมื่อไหร่ | ผลล่าสุดเก่าเกิน `MONITOR_INTERVAL_MIN` (ค่าเริ่มต้น **120 นาที**) แล้วมีคนเปิดหน้าเว็บ |
-| เก็บผลไว้ที่ไหน | `data/monitor_latest.json` + ประวัติย่อ `data/monitor_history.json` — restart server แล้วยังเห็นผลล่าสุดทันที |
+| เก็บผลไว้ที่ไหน | ไฟล์ `data/monitor_latest.json` + ประวัติย่อ `data/monitor_history.json` (หรือ [Supabase](#-เก็บ-state-ถาวร-supabase) ตอน deploy) — restart server แล้วยังเห็นผลล่าสุดทันที |
 | แหล่งข้อมูล | Facebook จริงถ้ามี `APIFY_TOKEN` · ไม่มี → ข้อมูลตัวอย่าง (เดโม่ได้ฟรี) |
 
 **ค่าใช้จ่าย Apify ควบคุมได้:** ตรวจใหม่ได้มากสุด **1 รอบต่อ interval** ไม่ว่าจะมีคนเปิดเว็บพร้อมกันกี่คน
@@ -140,7 +140,7 @@ lexicon เจอคำว่า **รำคาญ** + **เด้ง** → ต�
 | เอาไปพัฒนา AI ต่อ | ไฟล์ override = ชุดข้อมูล "AI ทายอะไร vs คนตัดสินว่าอะไร" → เอาไปปรับ lexicon/prompt ได้ตรงจุด |
 
 > ⚠️ ถ้าตั้ง `RUN_PASSCODE` ไว้ การแก้ label ต้องกรอกรหัสก่อน (ลิงก์สาธารณะไม่ควรแก้ข้อมูลของทีมได้)
-> · ตอน deploy ควร mount disk ถาวรให้ `data/overrides.json` ไม่งั้นที่แก้ไว้จะหายตอน restart
+> · ตอน deploy ต้องตั้ง [Supabase](#-เก็บ-state-ถาวร-supabase) ไม่งั้นที่แก้ไว้จะหายตอน restart
 
 ## ✓ คลัง "อ่านแล้ว" (archive)
 
@@ -160,7 +160,7 @@ lexicon เจอคำว่า **รำคาญ** + **เด้ง** → ต�
 
 > ⚠️ **คอมเมนต์ในคลังไม่ถูกนับในสถานะ/spike** (ถือว่าจัดการแล้ว) — แปลว่ากด "อ่านแล้ว" คอมเมนต์ลบเยอะ ๆ
 > สถานะจะดูดีขึ้นได้ · หน้าเว็บจึงแสดงจำนวนในคลังคู่กับสถานะเสมอ และ **สถานะหมายถึง "ของที่ยังไม่ได้จัดการ"**
-> · เก็บที่ `data/archive.json` (ตอน deploy ควร mount disk ถาวร ไม่งั้นหายตอน restart)
+> · เก็บที่ `data/archive.json` หรือ [Supabase](#-เก็บ-state-ถาวร-supabase) ตอน deploy (ไม่งั้นหายตอน restart)
 
 ## 🔔 แจ้งเตือนเข้า Discord (ผ่าน n8n)
 
@@ -190,7 +190,7 @@ n8n ส่งเข้า Discord (คอมเมนต์ที่แรงจ
 workflow พร้อม import: [`n8n/crisis_radar_daily_digest.json`](n8n/crisis_radar_daily_digest.json)
 
 > ⚠️ ข้อความที่ส่งออกมีคอมเมนต์จริง + ชื่อผู้คอมเมนต์ → ใช้กับ channel ภายในทีมเท่านั้น (ดู [docs/7_security.md](docs/7_security.md) §3.2)
-> · ล็อกด้วย `RUN_PASSCODE` เหมือนการแก้ label · ตอน deploy ควร mount disk ถาวรให้ `data/alerts_sent.json` ไม่งั้นทีมจะโดนแจ้งเรื่องเดิมซ้ำหลัง restart
+> · ล็อกด้วย `RUN_PASSCODE` เหมือนการแก้ label · ตอน deploy **ต้อง**ตั้ง [Supabase](#-เก็บ-state-ถาวร-supabase) ให้ที่จำนี้รอด restart ไม่งั้นทีมจะโดนแจ้งเรื่องเดิมซ้ำทั้งชุดทุกครั้งที่ deploy
 
 ## รันแบบ CLI (สำหรับ dev)
 ```bash
@@ -222,6 +222,7 @@ sources/  → classify/           → crisis/       → dashboard.py
 | AI | Thai lexicon (ชั้น 1) + **Claude Haiku 4.5 อ่านซ้ำเคสกำกวม** (ชั้น 2) + คนแก้ทับได้ | เพิ่ม Wisesight/WangchanBERTa เป็นชั้น 1 + feed override กลับไป fine-tune |
 | Dashboard | static HTML | React (reuse stack Warz) + API |
 | Orchestration | monitor ในตัว (เฝ้าตามรอบ เก็บ snapshot ลงไฟล์) + ยิง webhook เข้า n8n เมื่อมีเรื่องต้องแจ้ง | n8n เดิม + แยก channel/ping role ตามทีม, ต่อ Jira/ระบบ ticket |
+| State | ไฟล์ `data/*.json` ตอน dev · Supabase (Postgres, key-value 1 ตาราง) ตอน deploy — สลับด้วย env ไม่แก้โค้ด | ตารางเดิม แตก view/ตารางย่อยจาก `jsonb` เมื่อต้องทำรายงานย้อนหลังจริง |
 
 ## Deploy ขึ้นเว็บ (Render — สำหรับ demo ให้ทีมกดเอง)
 
@@ -232,14 +233,62 @@ repo นี้มี [render.yaml](render.yaml) ให้แล้ว ทำต�
 3. กรอก 2 ค่าตอน deploy:
    - `APIFY_TOKEN` — token จาก Apify (ถ้าจะใช้โหมด Facebook จริง)
    - `RUN_PASSCODE` — รหัสอะไรก็ได้ที่ตั้งเอง **กันคนที่ได้ลิงก์กดดึง Facebook จนเครดิต Apify หมด**
-4. รอ build เสร็จ → ได้ URL `https://crisis-radar-xxxx.onrender.com`
+4. ตั้ง **Supabase** ให้ state ไม่หายตอน restart (ดูหัวข้อถัดไป — ข้ามไม่ได้ถ้าใช้จริง)
+5. รอ build เสร็จ → ได้ URL `https://crisis-radar-xxxx.onrender.com`
 
 เปิดลิงก์มาจะเห็นสถานะล่าสุดจาก **โหมดเฝ้าอัตโนมัติ** ทันที · โหมด **ตัวอย่าง** กดได้ทุกคน ·
 **ตรวจใหม่ตอนนี้** / **Facebook จริง** จะถามรหัสก่อน
 
 > Render free tier จะ sleep หลังไม่มีคนใช้ 15 นาที → เปิดครั้งถัดไปรอโหลด ~1 นาที แล้ว monitor
-> จะตรวจรอบใหม่ให้เอง · job ที่ค้างอยู่ตอน sleep จะหาย และ snapshot บนดิสก์ถูกล้างตอน restart
-> (ดิสก์เป็น ephemeral) — พอสำหรับ demo · อยากให้ประวัติอยู่ยาว ต้องต่อ disk หรือ DB
+> จะตรวจรอบใหม่ให้เอง · job ที่ค้างอยู่ตอน sleep จะหาย — พอสำหรับ demo
+
+## 🗄 เก็บ state ถาวร (Supabase)
+
+Render/Vercel/Fly ใช้ filesystem แบบ **ephemeral** — ทุก deploy/restart/หลับ-ตื่น ไฟล์ใน `data/`
+หายหมด ซึ่งไม่ใช่แค่ "ประวัติหาย" แต่กระทบงานจริงของทีม:
+
+| ที่หายไป | ผลที่ทีมเจอ |
+|---|---|
+| ที่จำว่าแจ้ง Discord ไปแล้ว | **โดนแจ้งเรื่องเดิมซ้ำทั้งชุด** ทุกครั้งที่ deploy → คนปิดแจ้งเตือน = ไม่มีระบบเตือน |
+| label ที่ทีมแก้เอง | ที่นั่งแก้ทีละคอมเมนต์หายเกลี้ยง ต้องแก้ใหม่หมด |
+| คลัง "อ่านแล้ว" | ของเก่าไหลกลับมาเต็มหน้าจน ของใหม่จมหาย |
+| cache รายการโพสต์ + ผลที่ Claude เคยตอบ | จ่าย Apify/Claude ซ้ำในรอบถัดไป |
+
+แก้ด้วย **Supabase** (Postgres ฟรี 500MB · state ทั้งหมดของโปรเจกต์นี้ < 1MB) — เรียกผ่าน
+PostgREST ด้วย `urllib` **ไม่เพิ่ม dependency สักตัว** ตามแนวเดิมของโปรเจกต์ที่ยิง Apify/Anthropic
+ด้วย stdlib ล้วน
+
+```bash
+# 1) supabase.com → New project
+# 2) SQL Editor → วาง docs/supabase_schema.sql ทั้งไฟล์ → Run
+# 3) เอา 2 ค่านี้ใส่ .env (อยู่คนละหน้ากัน):
+#      Settings > Data API  → Project URL   (= https://<project-ref>.supabase.co)
+#      Settings > API Keys  → Secret key    (sb_secret_...)
+
+python3 -m src.state           # เช็กว่าต่อได้ไหม + มีอะไรอยู่ในนั้นบ้าง
+python3 -m src.state --push    # ย้าย data/*.json ที่มีอยู่ขึ้นไปครั้งแรก
+python3 -m src.state --pull    # ดึงกลับลงไฟล์ (สำรอง / ถอยกลับเป็นโหมดไฟล์)
+```
+
+จากนั้นใส่ `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` ใน Render Dashboard แล้ว deploy
+เช็กได้ที่ `/api/health` → `"state": {"backend": "supabase", "persistent": true}`
+
+**ทำไม 1 ตาราง key-value ไม่ normalize:** โค้ดอ่านทั้งก้อน-เขียนทั้งก้อนอยู่แล้ว 7 ก้อน
+(`overrides`, `archive`, `alerts_sent`, `monitor_latest`, `monitor_history`, `llm_cache`,
+`post_urls_cache`) ไม่มีจุดไหน query/join ข้ามก้อน — normalize = เพิ่มงาน migration ทุกครั้งที่
+field เปลี่ยน โดยไม่ได้อะไรกลับมา
+
+> · **ใช้ Secret key ตัวเดียว ไม่ต้องใส่ Publishable key** — Supabase เปลี่ยนชื่อคีย์แล้ว:
+> `Secret key` (`sb_secret_...`) = `service_role` เดิม · `Publishable key` (`sb_publishable_...`) =
+> `anon` เดิม (project เก่าที่ยังเป็น JWT `eyJhbGci...` ก็ใช้ `service_role` ตัวนั้นได้)
+> · publishable ไม่ต้องใส่เพราะโปรเจกต์นี้ไม่มีจุดไหนที่เบราว์เซอร์ยิงเข้า Supabase ตรง ๆ —
+> หน้าเว็บคุยกับ Python server เท่านั้น · และต่อให้ใส่ก็อ่านไม่ได้ เพราะ `app_state` เปิด RLS
+> แบบไม่มี policy (ข้างในมี PII: คอมเมนต์จริง + comment_id ของ Facebook)
+> · Secret key bypass RLS = คีย์ที่ผ่านทุกด่าน อยู่ฝั่ง server เท่านั้น **ห้ามหลุดไป frontend**
+> · ไม่ตั้ง = เก็บลงไฟล์เหมือนเดิม (พอสำหรับรันบนเครื่องตัวเอง) · บังคับโหมดไฟล์ด้วย `STATE_BACKEND=file`
+> · Supabase ล่ม = ระบบเดินต่อด้วยค่าที่จำไว้ใน memory ไม่ล้มทั้งรอบ (เทส T17f/T17g)
+> · **ทางเลือกที่ไม่ต้องแก้โค้ด:** Render แพลน Starter ($7/เดือน) + persistent disk ($0.25/GB/เดือน)
+>   แล้ว mount ที่ `/opt/render/project/src/data` — เร็วกว่านิดหน่อย แต่มีค่าใช้จ่ายรายเดือน
 
 ## เอกสารส่ง (ดู `docs/`)
 1. [Project Summary](docs/1_project_summary.md)

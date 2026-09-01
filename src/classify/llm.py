@@ -44,6 +44,7 @@ import urllib.request
 from pathlib import Path
 from typing import Optional, Protocol
 
+from .. import state
 from ..env import ssl_context
 from . import lexicon
 from .lexicon import TOPIC_LABELS
@@ -174,11 +175,8 @@ class ResultCache:
         self._data = self._load()
 
     def _load(self) -> dict:
-        try:
-            data = json.loads(self.path.read_text(encoding="utf-8"))
-            return data if isinstance(data, dict) else {}
-        except (OSError, json.JSONDecodeError):
-            return {}
+        data = state.read_json(self.path, default={})
+        return data if isinstance(data, dict) else {}
 
     @staticmethod
     def key(model: str, text: str) -> str:
@@ -196,11 +194,9 @@ class ResultCache:
             if len(self._data) > self.limit:      # ตัดของเก่าทิ้ง (dict เรียงตามลำดับที่ใส่)
                 for k in list(self._data)[:len(self._data) - self.limit]:
                     self._data.pop(k, None)
-            try:
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                self.path.write_text(json.dumps(self._data, ensure_ascii=False), encoding="utf-8")
-            except OSError:
-                pass      # ดิสก์เขียนไม่ได้ (read-only fs) → ยังทำงานต่อได้ด้วย cache ใน memory
+            # เขียนไม่ลง (ดิสก์ read-only / Supabase ล่ม) → ยังทำงานต่อด้วย cache ใน memory
+            # แค่รอบหน้าต้องถาม Claude ใหม่ ไม่ถึงกับพัง
+            state.write_json(self.path, self._data)
 
 
 # ───────────────────────── engine จริง (Claude) ─────────────────────────

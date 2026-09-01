@@ -10,15 +10,18 @@
     ไม่ต้องมานั่งแก้ซ้ำทุกครั้ง
   - เก็บค่าที่ AI ทายไว้เดิมด้วยเสมอ → ตรวจสอบย้อนหลังได้ และเอาไปเป็นชุดข้อมูลปรับ
     lexicon/prompt ต่อได้ (ดู tests/labeled_test_set.json)
-  - ไฟล์เดียว JSON — ไม่ต้องมี DB ให้ทีมดูแล
+  - เก็บเป็น JSON ก้อนเดียว (dict) — อ่านทั้งก้อน เขียนทั้งก้อน ไม่มี schema ให้ดูแล
+    ปลายทางจริงเป็นไฟล์ data/overrides.json หรือแถวเดียวใน Supabase แล้วแต่ env (ดู src/state.py)
+    **บนโฮสต์ที่ไฟล์หายตอน restart (Render free tier) ต้องตั้ง Supabase** ไม่งั้นที่ทีมนั่งแก้
+    ทีละคอมเมนต์หายเกลี้ยงทุกครั้งที่ deploy
 """
 from __future__ import annotations
 
-import json
 import threading
 from pathlib import Path
 from typing import Iterable, Optional
 
+from .. import state
 from ..models import Classified
 from ..timeutil import now_ict
 from .lexicon import TOPIC_LABELS
@@ -30,16 +33,12 @@ _LOCK = threading.Lock()
 
 
 def load() -> dict:
-    try:
-        data = json.loads(STORE.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
-        return {}
+    data = state.read_json(STORE, default={})
+    return data if isinstance(data, dict) else {}
 
 
 def _write(data: dict) -> None:
-    STORE.parent.mkdir(parents=True, exist_ok=True)
-    STORE.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    state.write_json(STORE, data, indent=1)
 
 
 def clean_topics(topics: Optional[Iterable[str]]) -> list[str]:
