@@ -15,6 +15,7 @@ import hmac
 import json
 import os
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -180,6 +181,44 @@ class Handler(BaseHTTPRequestHandler):
                                  page=jobs.get_targets(), force=bool(body.get("force")))
         return {**self._store_result(target, jobs.recompute(base)), "alert": rec}
 
+    def _apply_digest(self, body: dict) -> dict:
+        """สรุปประจำวัน 1 ข้อความ — ปลายทางของ n8n Schedule Trigger (ดู n8n/README.md).
+
+        ที่ interval วันละรอบ auto-alert จะเด้งเฉพาะคอมเมนต์ที่เกินเกณฑ์เท่านั้น วันที่ไม่มีเลย
+        ทีมจะไม่ได้ยินอะไรจากระบบ — ซึ่งแยกไม่ออกจาก "ระบบตาย" digest จึงส่งทุกวันเสมอ
+
+        refresh=true  → สั่งดึงรอบใหม่ก่อน **ถ้าถึงรอบแล้วเท่านั้น** (monitor เป็นคนตัดสิน)
+                        จึงยิงซ้ำกี่ครั้งก็ไม่เกิน 1 scrape ต่อ MONITOR_INTERVAL_MIN — เพดานเครดิต
+                        Apify ยังอยู่ที่ค่า interval ไม่ใช่ที่จำนวนครั้งที่ n8n เรียก
+        push=true     → Crisis Radar ยิงเข้า n8n webhook เอง (ใช้ตอน cron อยู่ที่อื่นที่ต่อ Discord ไม่ได้)
+                        ไม่ใส่ = คืน payload กลับไปให้ผู้เรียกยิงเข้า Discord เอง (ทางหลักของ n8n)
+        """
+        wait_sec = min(max(int(body.get("wait_sec") or 0), 0), 540)   # cap ใต้ timeout ปกติของ n8n
+        if body.get("refresh"):
+            monitor.request_refresh()
+            deadline = time.time() + wait_sec
+            while monitor.snapshot()["refreshing"] and time.time() < deadline:
+                time.sleep(3)
+
+        snap = monitor.snapshot()
+        if snap["refreshing"]:
+            # ยังดึงไม่เสร็จ → บอกให้ผู้เรียกมาใหม่ ไม่ส่งสรุปจากข้อมูลเก่าเงียบ ๆ
+            raise TimeoutError(f"ยังดึงข้อมูลไม่เสร็จ ({snap['running_sec']} วิ) — เรียกใหม่อีกครั้ง")
+
+        latest = monitor.latest_result()
+        result = latest.get("result")
+        if not result:
+            raise ValueError("ยังไม่มีผลตรวจให้สรุป — สั่ง refresh ก่อน (หรือรอรอบแรก)")
+
+        # เทียบกับรอบก่อนหน้าเพื่อบอก "ขึ้นหรือลง" — ไม่มีของเทียบก็ไม่ต้องเดาให้
+        hist = snap.get("history") or []
+        prev = hist[-2] if len(hist) >= 2 else None
+        out = notify.digest.send(result, page=jobs.get_targets(), prev=prev,
+                                 push=bool(body.get("push")), force=bool(body.get("force")))
+        out["data_age_sec"] = snap.get("age_sec")
+        out["monitor_error"] = snap.get("error")
+        return out
+
     def do_POST(self) -> None:
         if self.path == "/api/run":
             body = self._json_body()
@@ -218,6 +257,20 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(400, {"error": str(e)})
             except RuntimeError as e:
                 # ปลายทางล่ม/URL ผิด — แยกจาก 400 เพราะคนกดไม่ได้ทำอะไรผิด ให้ลองใหม่ได้
+                self._send(502, {"error": str(e)})
+        elif self.path == "/api/digest":
+            # ยิงข้อความออกนอกระบบเหมือน /api/alert → ล็อกด้วยรหัสเดียวกัน (n8n ส่ง header มาได้)
+            if RUN_PASSCODE and not self._passcode_ok():
+                self._send(401, {"error": "รหัสผ่านไม่ถูกต้อง"})
+                return
+            try:
+                self._send(200, self._apply_digest(self._json_body()))
+            except (ValueError, KeyError) as e:
+                self._send(400, {"error": str(e)})
+            except TimeoutError as e:
+                # 202 = รับเรื่องแล้วแต่ยังไม่พร้อม — n8n ตั้ง retry ทับตรงนี้ได้โดยไม่ต้องมองว่าพัง
+                self._send(202, {"pending": True, "error": str(e)})
+            except RuntimeError as e:
                 self._send(502, {"error": str(e)})
         elif self.path == "/api/monitor/refresh":
             # กด "ตรวจใหม่ตอนนี้" = ข้ามรอบ → ยิง Apify นอกคิว จึงต้องมีรหัสเหมือนโหมด Facebook จริง

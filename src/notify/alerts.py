@@ -38,6 +38,7 @@ import urllib.request
 from pathlib import Path
 
 from ..crisis.detector import VIRAL_REACH
+from ..env import ssl_context
 from ..models import Classified
 from ..timeutil import now_ict
 from .payload import SENT_TH, build_event
@@ -133,7 +134,7 @@ def _post(cfg: dict, event: dict) -> None:
     req = urllib.request.Request(cfg["url"], data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
                                  headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT):
+        with urllib.request.urlopen(req, timeout=TIMEOUT, context=ssl_context()):
             return
     except urllib.error.HTTPError as e:
         # 401/403 = secret ไม่ตรง · 404 = workflow ไม่ได้เปิด/URL ผิด — บอกให้ตรงจุดจะได้ไม่ต้องเดา

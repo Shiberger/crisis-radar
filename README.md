@@ -182,15 +182,22 @@ auto ส่งได้มากสุด `ALERT_MAX_PER_RUN` ต่อรอบ
 อยู่ใน [n8n/README.md](n8n/README.md) · ยังไม่มี n8n ตั้ง `DISCORD_WEBHOOK_URL` ยิงเข้า Discord ตรง ๆ ก็ได้
 · ไม่ตั้งอะไรเลย = ปิดฟีเจอร์นี้ทั้งหมด (ปุ่มยังอยู่ แต่บอกวิธีเปิดใช้)
 
+**โหมดเครดิตจำกัด — ดึงวันละรอบ + สรุปวันละ 1 ข้อความ:** ให้ n8n Schedule Trigger ยิง
+`POST /api/digest` ตอน 09:00 → Crisis Radar ดึง Apify รอบเดียวของวันแล้วคืนสรุปทั้งเพจกลับไปให้
+n8n ส่งเข้า Discord (คอมเมนต์ที่แรงจริงก็ยังเด้งแยกเป็น alert จากรอบเดียวกันนั้น)
+เพดานค่าใช้จ่ายอยู่ที่ `MONITOR_INTERVAL_MIN` ไม่ใช่จำนวนครั้งที่ n8n เรียก — ยิงซ้ำก็ยัง scrape
+รอบเดียว · ที่ 5 โพสต์/วัน ≈ **$0.066/รอบ → 30 วัน ≈ $2** (เครดิตฟรี Apify $5/เดือน)
+workflow พร้อม import: [`n8n/crisis_radar_daily_digest.json`](n8n/crisis_radar_daily_digest.json)
+
 > ⚠️ ข้อความที่ส่งออกมีคอมเมนต์จริง + ชื่อผู้คอมเมนต์ → ใช้กับ channel ภายในทีมเท่านั้น (ดู [docs/7_security.md](docs/7_security.md) §3.2)
 > · ล็อกด้วย `RUN_PASSCODE` เหมือนการแก้ label · ตอน deploy ควร mount disk ถาวรให้ `data/alerts_sent.json` ไม่งั้นทีมจะโดนแจ้งเรื่องเดิมซ้ำหลัง restart
 
 ## รันแบบ CLI (สำหรับ dev)
 ```bash
 python3 run_demo.py        # → output/crisis_report.md, classified.json, dashboard.html
-python3 tests/run_tests.py # → 55 test, ผลจริง (รันออฟไลน์ ไม่ยิง API จริง)
+python3 tests/run_tests.py # → 60 test, ผลจริง (รันออฟไลน์ ไม่ยิง API จริง)
 python3 -m src.classify.llm # → ทดสอบชั้น Claude กับ API จริง (ต้องมี ANTHROPIC_API_KEY)
-python3 backend/selftest.py # → ทดสอบ web + monitor + override + archive + Discord alert end-to-end (45 test)
+python3 backend/selftest.py # → ทดสอบ web + monitor + override + archive + Discord alert + สรุปรายวัน end-to-end (49 test)
 ```
 
 ## ดึง Facebook จริง (ผ่าน Apify — ไม่ต้องลง package)

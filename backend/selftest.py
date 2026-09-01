@@ -26,8 +26,15 @@ os.environ["LLM"] = "off"
 
 # ปลายทางแจ้งเตือนต้องไม่ชี้ไป n8n/Discord จริงตอนรันเทส — เดี๋ยวจะยิงเข้าห้องทีมจริง
 # (เทสจะตั้ง N8N_WEBHOOK_URL ชี้มา stub ในเครื่องเองตอนถึงหัวข้อ Discord alert)
-for _k in ("N8N_WEBHOOK_URL", "DISCORD_WEBHOOK_URL", "N8N_WEBHOOK_SECRET", "DISCORD_ROLE_MAP"):
-    os.environ.pop(_k, None)
+# RUN_PASSCODE ก็เช่นกัน — ถ้าเครื่อง dev ตั้งรหัสจริงไว้ใน .env (ให้ตรงกับ production) เทสทั้งชุด
+# ที่สมมติว่า "ไม่ตั้งรหัส" จะโดน 401 ผิดที่ผิดทาง
+#
+# ตั้งเป็นสตริงว่าง ไม่ใช่ pop — import server ด้านล่างเรียก load_dotenv() ซึ่งใช้ setdefault()
+# เติมค่าจาก .env กลับให้ทุกคีย์ที่ "หายไป" ทันที (pop ทำให้หายไปพอดี) ต้องให้คีย์ยังอยู่ (กัน
+# setdefault เติม) แต่ค่าว่าง (falsy เท่ากับไม่ได้ตั้ง ตามจุดที่โค้ดเช็ก `if RUN_PASSCODE:` ฯลฯ)
+for _k in ("N8N_WEBHOOK_URL", "DISCORD_WEBHOOK_URL", "N8N_WEBHOOK_SECRET", "DISCORD_ROLE_MAP",
+          "RUN_PASSCODE"):
+    os.environ[_k] = ""
 
 import monitor  # noqa: E402
 import server   # noqa: E402
@@ -364,6 +371,29 @@ def main() -> int:
         time.sleep(0.3)
     check("ปิด ALERT_AUTO → ไม่แจ้งอัตโนมัติอีก (เหลือแต่ปุ่มที่คนกด)", len(HOOK_HITS) == 0,
           f"{len(HOOK_HITS)} ข้อความ")
+
+    # 9) สรุปประจำวัน — ปลายทางที่ n8n Schedule Trigger เรียกวันละครั้ง (โหมดดึงวันละรอบ)
+    dg = post("/api/digest", {"refresh": True, "wait_sec": 30})
+    check("/api/digest คืนสรุปพร้อมยิงเข้า Discord (n8n ไม่ต้องประกอบข้อความเอง)",
+          dg["skipped"] is False and dg["event"] == "crisis_radar.daily_digest"
+          and len(dg["discord"]["embeds"]) == 1 and bool(dg["report"]["status"]),
+          f'สถานะ {dg["report"]["status"]} · top {len(dg["top_negative"])} คอมเมนต์')
+    check("สรุปดึงจากผลตรวจล่าสุดจริง ไม่ได้คิดเลขใหม่คนละชุดกับหน้าเว็บ",
+          dg["report"]["total"] == get("/api/monitor/result")["result"]["total"],
+          f'{dg["report"]["total"]} คอมเมนต์')
+
+    HOOK_HITS.clear()
+    dup = post("/api/digest", {"refresh": True})
+    check("n8n retry / กด Execute ซ้ำ → ไม่ได้สรุปซ้ำสองใบในวันเดียว (และไม่ยิง webhook)",
+          dup["skipped"] is True and not HOOK_HITS and "ส่งไปแล้ว" in dup.get("reason", ""),
+          dup.get("reason", ""))
+
+    pushed = post("/api/digest", {"force": True, "push": True})
+    check("push:true → Crisis Radar ยิงเข้า n8n เอง (สำหรับ cron ที่อยู่นอก n8n)",
+          pushed["pushed"] is True and len(HOOK_HITS) == 1
+          and HOOK_HITS[-1]["body"]["event"] == "crisis_radar.daily_digest"
+          and HOOK_HITS[-1]["token"] == "s3cr3t",
+          f'{len(HOOK_HITS)} ครั้ง · {HOOK_HITS[-1]["body"]["severity"] if HOOK_HITS else "-"}')
     hook.shutdown()
 
     print("-" * 50)

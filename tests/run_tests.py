@@ -24,11 +24,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "backend"))   # jobs.build_result — ก้อนผลจริงที่หน้าเว็บ/สรุปรายวันใช้
 
 # เทสต้องออฟไลน์ 100% และผลต้องเหมือนเดิมทุกครั้ง — ห้ามยิง Anthropic จริงแม้เครื่องจะมีคีย์อยู่
 # (T13 ทดสอบชั้น Claude ด้วยการสลับตัวส่ง ไม่ใช่ด้วยการต่อเน็ตจริง)
 os.environ["LLM"] = "off"
 
+import jobs                                          # noqa: E402  (backend/jobs.py)
 from src.classify import archive, lexicon, overrides   # noqa: E402
 from src.classify.llm import ResultCache               # noqa: E402
 from src.classify.pipeline import HybridClassifier     # noqa: E402
@@ -269,6 +271,51 @@ check("T12f payload พร้อมให้ n8n ส่งต่อ (ข้อ�
       bool(ev["routing"]["owner"]) and ev["discord"]["embeds"][0]["color"] > 0
       and calm.comment.text[:20] in ev["discord"]["embeds"][0]["description"],
       f"ส่งต่อ {ev['routing']['owner']}")
+
+# ---- T12g–T12k: สรุปประจำวัน (โหมดดึงวันละรอบ) ----
+# ต่างจาก alert รายคอมเมนต์: ต้องส่ง "ทุกวัน" แม้วันที่ไม่มีอะไรเลย ไม่งั้นทีมแยกไม่ออกว่า
+# เงียบเพราะปกติดี หรือเงียบเพราะ scraper ตาย
+from src.notify import digest as digest_mod             # noqa: E402
+
+full = jobs.build_result([Classified.from_dict(c.to_dict()) for c in classified], source="sample")
+page = {"page_name": "TalesRunner TH", "page_url": "https://facebook.com/x"}
+
+fired.clear()
+d1 = digest_mod.send(full, page=page, prev={"negative": 5, "total": 40}, push=True)
+dev = fired[-1]
+embed = dev["discord"]["embeds"][0]
+body = json.dumps(embed, ensure_ascii=False)
+check("T12g สรุปรวมทั้งรอบเป็นข้อความเดียว (ไม่ใช่คอมเมนต์ละใบ)",
+      len(fired) == 1 and dev["event"] == "crisis_radar.daily_digest"
+      and len(dev["discord"]["embeds"]) == 1,
+      f'{len(fired)} ข้อความ · {dev["event"]}')
+check("T12h บอกส่วนต่างจากรอบก่อน — ตัวเลขเดี่ยว ๆ อ่านไม่ออกว่าดีขึ้นหรือแย่ลง",
+      f'+{full["sentiment_mix"]["negative"] - 5} จากรอบก่อน' in body,
+      f'ลบ {full["sentiment_mix"]["negative"]} · รอบก่อน 5')
+top_reach = [t["reach"] for t in dev["top_negative"]]
+check("T12i ชูคอมเมนต์ลบที่คนเห็นเยอะสุดขึ้นมาให้อ่านก่อน",
+      top_reach == sorted(top_reach, reverse=True) and len(top_reach) == 3
+      and all(t["sentiment"] == "ลบ" for t in dev["top_negative"]),
+      f"reach {top_reach}")
+
+# n8n retry / มีคนกด Execute เอง ต้องไม่ทำให้ทีมได้สรุปซ้ำสองใบในวันเดียว
+fired.clear()
+again = digest_mod.send(full, page=page, push=True)
+check("T12j เรียกซ้ำในวันเดียวกันไม่ส่งซ้ำ (n8n retry ได้โดยไม่ต้องกลัว)",
+      again["skipped"] and not fired, again.get("reason", ""))
+
+# วันที่เพจปกติดี: ยังต้องส่ง และต้องไม่ ping ใครให้รำคาญ
+os.environ["DISCORD_ROLE_MAP"] = json.dumps({"bug/technical": "999"})
+calm_items = [Classified(_mk_comment("เกมสนุกดีชอบมาก"), "positive", 0.9) for _ in range(20)]
+calm_result = jobs.build_result(calm_items, source="sample")
+fired.clear()
+digest_mod.send(calm_result, page=page, push=True, force=True)
+calm_ev = fired[-1]
+check("T12k วันที่ปกติก็ยังส่ง (เป็นสัญญาณชีพของระบบ) แต่ไม่ ping ใคร",
+      calm_ev["report"]["status"] == "NORMAL" and calm_ev["discord"]["content"] == ""
+      and calm_ev["severity"] == "low",
+      f'สถานะ {calm_ev["report"]["status"]} · content ว่าง = ไม่ ping')
+os.environ.pop("DISCORD_ROLE_MAP", None)
 
 # ---- T13: ชั้น LLM จริง (Claude) — ประกอบ request / แกะคำตอบ / กันพัง ----
 # ไม่ยิงเน็ต: สลับเฉพาะตัวส่ง HTTP (_post) เป็นตัวปลอม แล้วตรวจว่าที่เหลือทำงานถูก

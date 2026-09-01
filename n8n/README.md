@@ -6,10 +6,28 @@
 
 Crisis Radar **ยิง webhook ออก** เมื่อมีคอมเมนต์ที่ต้องมีคนรับเรื่อง — n8n เป็นตัวรับแล้วส่งต่อเข้า Discord
 
+มี 2 workflow แยกกัน เพราะทิศทางการยิงคนละทาง:
+
 ```
-Crisis Radar ──POST──▶  n8n Webhook  ──▶ severity?  ──high──▶ Discord #crisis-alert
-(auto / คนกดปุ่ม)                                    └─medium─▶ Discord #watch
+A) alert รายคอมเมนต์ — Crisis Radar เป็นคนเริ่ม (เกิดเมื่อไหร่ก็ได้)
+   Crisis Radar ──POST──▶ n8n Webhook ──▶ severity? ──high──▶ Discord #crisis-alert
+   (auto / คนกดปุ่ม)                                 └medium─▶ Discord #watch
+
+B) สรุปประจำวัน — n8n เป็นคนเริ่ม (วันละครั้งตามเวลาที่ตั้ง)
+   n8n Schedule 09:00 ──POST /api/digest──▶ Crisis Radar (ดึง Apify + สรุป)
+                        ◀──payload สรุป──┘
+                        └──▶ Discord #crisis-daily
 ```
+
+| | A. alert รายคอมเมนต์ | B. สรุปประจำวัน |
+|---|---|---|
+| ไฟล์ workflow | `crisis_radar_discord_alert.json` | `crisis_radar_daily_digest.json` |
+| ใครเริ่ม | Crisis Radar ยิงเข้า n8n | n8n เรียก Crisis Radar |
+| ตอบคำถามว่า | “มีคอมเมนต์นี้ที่ต้องรีบดู” | “เมื่อวานเพจเป็นยังไง วันนี้ต้องสนใจอะไร” |
+| ส่งกี่ข้อความ | 1 คอมเมนต์ = 1 ข้อความ | ทั้งรอบ = 1 ข้อความ |
+| ส่งวันที่เงียบ ๆ ไหม | ไม่ส่ง | **ส่งเสมอ** — เป็นสัญญาณชีพว่าระบบยังทำงาน |
+
+ใช้คู่กันได้ (แนะนำ) — B เป็นตัวทริกเกอร์รอบดึงของวัน แล้ว A จะเด้งจากรอบเดียวกันนั้นเอง
 
 **ทำไมไม่ยิง Discord ตรง ๆ:** channel ที่ใช้ ทีมที่ต้อง ping และปลายทางอื่น (Jira/Sheet/LINE)
 เปลี่ยนบ่อยกว่าตัวโค้ดมาก — วางไว้ที่ n8n ทีมแก้เองได้โดยไม่ต้องแตะ repo แล้ว deploy ใหม่
@@ -48,6 +66,49 @@ PUBLIC_URL=https://<url ของ dashboard>          # แนบลิงก์
 
 **ทดสอบก่อนต่อของจริง:** ใน n8n กด *Listen for test event* แล้วกดปุ่มแจ้งจากหน้าเว็บ 1 ครั้ง
 หรือวาง `sample_payload.json` เป็น pinned data ของ Webhook node เพื่อลองไล่ workflow ทั้งเส้น
+
+## ติดตั้ง workflow B — สรุปประจำวัน (โหมดดึงวันละรอบ)
+
+ใช้เมื่อ **เครดิต Apify จำกัด** จนดึงได้แค่วันละรอบ: ให้ n8n เป็นคนกำหนดเวลาดึง แล้วสรุปทั้งวัน
+ในข้อความเดียว (แทนที่จะรอให้มีคนเปิดหน้าเว็บถึงจะเริ่มดึง — ซึ่งบน Render free tier ที่ container
+หลับหลังไม่มีคนใช้ 15 นาที แปลว่าอาจไม่มีรอบดึงเลยทั้งวัน)
+
+1. **Crisis Radar (.env / Environment ของ Render):**
+
+   ```bash
+   MONITOR_INTERVAL_MIN=1380   # 23 ชม. — เพดานจริงของค่าใช้จ่าย: ยิงซ้ำกี่ครั้งก็ scrape ได้รอบเดียว
+   MONITOR_MAX_POSTS=5         # ≈ $0.066/รอบ → 30 วัน ≈ $2 (เครดิตฟรี Apify $5/เดือน)
+   ALERT_MAX_PER_RUN=3         # วันละรอบ = คอมเมนต์สะสม 24 ชม. ต่อรอบ ไม่ลดจะเด้งรัวตอนเช้า
+   RUN_PASSCODE=<ตั้งรหัส>      # /api/digest ยิงข้อความออกนอกระบบ จึงล็อกด้วยรหัสเดียวกับปุ่มอื่น
+   PUBLIC_URL=https://<url ของ dashboard>
+   ```
+
+2. **n8n:** Import `crisis_radar_daily_digest.json` → แก้ 4 จุดที่เขียนว่า `REPLACE`
+   (URL ของ Crisis Radar ×2 · `X-Run-Passcode` ×2 · Discord webhook URL ×2)
+3. Workflow **Settings → Timezone → Asia/Bangkok** (ไม่ตั้ง = 09:00 จะเป็นเวลา UTC = 16:00 บ้านเรา)
+4. **Activate** → กด *Execute Workflow* 1 ครั้งเพื่อลองจริง
+
+**ทำไมยิงซ้ำแล้วไม่เปลืองเครดิต:** `/api/digest` ส่ง `refresh:true` = “ดึงใหม่ **ถ้าถึงรอบแล้ว**”
+คนตัดสินคือ Crisis Radar (จาก `MONITOR_INTERVAL_MIN`) ไม่ใช่ n8n → n8n retry, มีคนกด Execute เอง,
+หรือมีคนเปิดหน้าเว็บพร้อมกัน 10 คน ก็ยังเป็น **1 scrape ต่อ interval** เท่าเดิม
+และตัวสรุปเองกันซ้ำรายวันอีกชั้น (จำที่ `data/alerts_sent.json` คีย์ `digest:YYYY-MM-DD`)
+
+**response ที่ต้องรู้จัก:**
+
+| ได้อะไรกลับมา | แปลว่า | workflow ทำอะไรต่อ |
+|---|---|---|
+| `discord` + `report` | สรุปพร้อมส่ง | ยิงเข้า Discord |
+| `skipped: true` | วันนี้ส่งไปแล้ว | ไม่ทำอะไร (ไม่ใช่ error) |
+| HTTP 202 `pending: true` | ยังดึงไม่เสร็จ | รอ 5 นาทีแล้วขอใหม่ (มีใน workflow แล้ว) |
+| HTTP 400 | ยังไม่มีผลตรวจให้สรุป | ดู log ฝั่ง Crisis Radar |
+
+`sample_digest_payload.json` = ของจริงที่ endpoint นี้คืนกลับมา (สร้างจาก pipeline ไม่ได้เขียนมือ)
+ฟิลด์ที่ใช้บ่อย: `$json.discord` (ข้อความสำเร็จรูป) · `$json.severity` (high/medium/low ตามสถานะเพจ)
+· `$json.report.status` · `$json.top_negative[]` (อยากทำการ์ดแยกใบต่อคอมเมนต์)
+
+> cron อยู่ที่อื่น (cron-job.org / GitHub Actions) ที่ไม่มีที่ให้ต่อ Discord? ส่ง `{"push": true}`
+> ไปด้วย — Crisis Radar จะยิงเข้า `N8N_WEBHOOK_URL` เองเหมือน alert ปกติ (workflow A จะรับให้
+> โดยลงห้อง `#watch` เพราะ severity ไม่ใช่ high — อยากแยกห้องให้เช็ก `$json.body.event` ก่อน)
 
 ## หน้าตา payload
 

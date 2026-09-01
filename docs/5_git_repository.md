@@ -16,7 +16,7 @@ crisis_radar/
 │   ├── server.py               # http server + API
 │   ├── jobs.py                 # background job runner
 │   ├── monitor.py              # เฝ้าเพจอัตโนมัติ + เก็บ snapshot ล่าสุด
-│   ├── selftest.py             # ทดสอบ web + monitor + override + archive + Discord alert e2e (45 test)
+│   ├── selftest.py             # ทดสอบ web + monitor + override + archive + Discord alert + สรุปรายวัน e2e (49 test)
 │   └── static/index.html       # หน้าเว็บ (จอสถานะ + แก้ label ที่ AI ทายพลาด + ปุ่มแจ้ง Discord)
 ├── data/
 │   └── sample_talesrunner_fb_comments.json   # synthetic fixture (ชื่อสมมติ)
@@ -37,14 +37,17 @@ crisis_radar/
 │   │   └── detector.py         # spike detection + report
 │   └── notify/                 # 🔔 แจ้งออกนอกระบบ (Discord ผ่าน n8n)
 │       ├── alerts.py           # กติกาว่าเรื่องไหนคุ้มที่จะรบกวนคน + ตัวส่ง + กันแจ้งซ้ำ
-│       └── payload.py          # ประกอบข้อความ Discord (embed) + ข้อมูลดิบให้ n8n route ต่อ
+│       ├── payload.py          # ประกอบข้อความ Discord (embed) + ข้อมูลดิบให้ n8n route ต่อ
+│       └── digest.py           # สรุปประจำวัน 1 ข้อความ (โหมดดึงวันละรอบ)
 ├── n8n/
-│   ├── crisis_radar_discord_alert.json   # workflow พร้อม import
-│   ├── sample_payload.json               # payload จริงที่ระบบยิงออก (ไว้เทสใน n8n)
+│   ├── crisis_radar_discord_alert.json   # A) alert รายคอมเมนต์ — Crisis Radar ยิงเข้า n8n
+│   ├── crisis_radar_daily_digest.json    # B) สรุปรายวัน — n8n Schedule เรียก Crisis Radar
+│   ├── sample_payload.json               # payload จริงของ A (ไว้เทสใน n8n)
+│   ├── sample_digest_payload.json        # payload จริงของ B
 │   └── README.md                         # วิธีตั้งค่าทีละขั้น
 ├── tests/
 │   ├── labeled_test_set.json
-│   └── run_tests.py            # 29 test, รัน offline
+│   └── run_tests.py            # 60 test, รัน offline
 ├── output/                     # ผลลัพธ์ (gitignore ไฟล์ generated)
 └── docs/                       # เอกสารส่ง 7 หัวข้อ
 ```

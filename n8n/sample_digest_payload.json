@@ -1,0 +1,190 @@
+{
+  "event": "crisis_radar.daily_digest",
+  "version": 1,
+  "trigger": "schedule",
+  "severity": "high",
+  "date": "2026-09-01",
+  "sent_at": "2026-09-01T10:02:04+07:00",
+  "brand": "talesrunner",
+  "page": {
+    "name": "TalesRunner Thailand (Official / thehof)",
+    "url": "https://www.facebook.com/thehof.talesrunner"
+  },
+  "report": {
+    "status": "CRISIS",
+    "total": 41,
+    "negative": 28,
+    "neutral": 5,
+    "positive": 8,
+    "unique_authors": 37,
+    "max_reach": 203,
+    "escalated_count": 6,
+    "alert_sent_count": 0,
+    "generated_at": "2026-09-01 10:02 น.",
+    "source": "sample",
+    "dashboard_url": "https://crisis-radar.onrender.com"
+  },
+  "previous": {
+    "negative": 9,
+    "total": 40,
+    "status": "WATCH"
+  },
+  "topics": [
+    {
+      "topic": "bug/technical",
+      "label": "บั๊ก/เทคนิค",
+      "negative": 15,
+      "owner": "Dev / QA",
+      "is_emerging": false
+    },
+    {
+      "topic": "billing/price",
+      "label": "เติมเงิน/ราคา",
+      "negative": 8,
+      "owner": "Marketing / Monetization",
+      "is_emerging": false
+    },
+    {
+      "topic": "rewards/redeem",
+      "label": "ของรางวัล/โค้ด",
+      "negative": 7,
+      "owner": "Marketing (แคมเปญ/โค้ด) + CS",
+      "is_emerging": true
+    },
+    {
+      "topic": "content/event",
+      "label": "คอนเทนต์/อีเวนต์",
+      "negative": 6,
+      "owner": "Content / Event",
+      "is_emerging": false
+    },
+    {
+      "topic": "balance/fairness",
+      "label": "สมดุล/ความเป็นธรรม",
+      "negative": 2,
+      "owner": "Game Design",
+      "is_emerging": false
+    }
+  ],
+  "alerts": [
+    {
+      "title": "คอมเมนต์ลบพุ่งผิดปกติช่วง 14:00 น. — แรงกว่าปกติ 176 เท่า",
+      "level": "high",
+      "owner": "Dev / QA",
+      "topic": "bug/technical"
+    },
+    {
+      "title": "เรื่อง “ของรางวัล/โค้ด” กำลังมาแรงในชั่วโมงล่าสุด",
+      "level": "medium",
+      "owner": "Marketing (แคมเปญ/โค้ด) + CS",
+      "topic": "rewards/redeem"
+    },
+    {
+      "title": "คอมเมนต์ลบ 1 อันกำลังกระจายวงกว้าง (คนกดไลก์/ตอบกลับ 203 ครั้ง)",
+      "level": "medium",
+      "owner": "Marketing / Monetization",
+      "topic": "billing/price"
+    }
+  ],
+  "top_negative": [
+    {
+      "comment_id": "c18",
+      "author": "Somchai R",
+      "text": "กาชาใหม่โคตรแพง อัตราดรอปก็ห่วย เปย์ไป 2000 ไม่ได้ตัว SSR เลย เอาเปรียบผู้เล่นมาก",
+      "reach": 203,
+      "url": "",
+      "topics": [
+        "billing/price",
+        "balance/fairness"
+      ],
+      "sentiment": "ลบ",
+      "owner": "Marketing / Monetization",
+      "alerted_at": ""
+    },
+    {
+      "comment_id": "c28",
+      "author": "jubjib",
+      "text": "เติมกาชาไป 1500 ระบบล่มเงินหายไม่ได้ของ จะเอาคืนยังไง",
+      "reach": 132,
+      "url": "",
+      "topics": [
+        "bug/technical",
+        "billing/price",
+        "rewards/redeem"
+      ],
+      "sentiment": "ลบ",
+      "owner": "Dev / QA",
+      "alerted_at": ""
+    },
+    {
+      "comment_id": "c17",
+      "author": "progamerTH",
+      "text": "เซิร์ฟล่มอีกแล้วเหรอ เข้าไม่ได้เหมือนกัน",
+      "reach": 121,
+      "url": "",
+      "topics": [
+        "bug/technical",
+        "content/event"
+      ],
+      "sentiment": "ลบ",
+      "owner": "Dev / QA",
+      "alerted_at": ""
+    }
+  ],
+  "routing": {
+    "owner": "Dev / QA",
+    "role_id": "1234567890123456789"
+  },
+  "discord": {
+    "content": "<@&1234567890123456789>",
+    "embeds": [
+      {
+        "title": "🚨 สรุปประจำวัน — TalesRunner Thailand (Official / thehof) · สถานะ วิกฤต",
+        "description": "**ต้องจัดการวันนี้** — เชิงลบ 28 จาก 41 คอมเมนต์ และกระจุกตัวผิดปกติ",
+        "color": 13646651,
+        "fields": [
+          {
+            "name": "คอมเมนต์ที่อ่านรอบนี้",
+            "value": "41",
+            "inline": true
+          },
+          {
+            "name": "เชิงลบ",
+            "value": "28 · 68% (+19 จากรอบก่อน)",
+            "inline": true
+          },
+          {
+            "name": "คนคอมเมนต์",
+            "value": "37",
+            "inline": true
+          },
+          {
+            "name": "ประเด็นที่ถูกบ่นมากสุด",
+            "inline": false,
+            "value": "• **บั๊ก/เทคนิค** 15 คอมเมนต์ → Dev / QA\n• **เติมเงิน/ราคา** 8 คอมเมนต์ → Marketing / Monetization\n• **ของรางวัล/โค้ด** 7 คอมเมนต์ → Marketing (แคมเปญ/โค้ด) + CS  🆕 เพิ่งโผล่"
+          },
+          {
+            "name": "คอมเมนต์ลบที่คนเห็นเยอะสุด (3 อันดับแรก)",
+            "inline": false,
+            "value": "**203** ไลก์+ตอบกลับ · เติมเงิน/ราคา · สมดุล/ความเป็นธรรม\nกาชาใหม่โคตรแพง อัตราดรอปก็ห่วย เปย์ไป 2000 ไม่ได้ตัว SSR เลย เอาเปรียบผู้เล่นมาก\n\n**132** ไลก์+ตอบกลับ · บั๊ก/เทคนิค · เติมเงิน/ราคา\nเติมกาชาไป 1500 ระบบล่มเงินหายไม่ได้ของ จะเอาคืนยังไง\n\n**121** ไลก์+ตอบกลับ · บั๊ก/เทคนิค · คอนเทนต์/อีเวนต์\nเซิร์ฟล่มอีกแล้วเหรอ เข้าไม่ได้เหมือนกัน"
+          },
+          {
+            "name": "สัญญาณที่ระบบจับได้",
+            "inline": false,
+            "value": "• คอมเมนต์ลบพุ่งผิดปกติช่วง 14:00 น. — แรงกว่าปกติ 176 เท่า\n• เรื่อง “ของรางวัล/โค้ด” กำลังมาแรงในชั่วโมงล่าสุด\n• คอมเมนต์ลบ 1 อันกำลังกระจายวงกว้าง (คนกดไลก์/ตอบกลับ 203 ครั้ง)"
+          },
+          {
+            "name": "ดูทั้งหมด",
+            "value": "[เปิด Dashboard](https://crisis-radar.onrender.com)",
+            "inline": false
+          }
+        ],
+        "footer": {
+          "text": "Crisis Radar · ข้อมูลดึงเมื่อ 2026-09-01 10:02 น. · ที่มา sample"
+        },
+        "timestamp": "2026-09-01T10:02:04+07:00",
+        "url": "https://www.facebook.com/thehof.talesrunner"
+      }
+    ]
+  }
+}

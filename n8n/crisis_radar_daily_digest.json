@@ -1,0 +1,265 @@
+{
+  "name": "Crisis Radar → สรุปประจำวันเข้า Discord",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "b2000000-0000-4000-8000-000000000001",
+      "name": "ทุกวัน 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -460,
+        0
+      ],
+      "notes": "ตั้ง Timezone ของ workflow เป็น Asia/Bangkok (Settings > Timezone) ไม่งั้น 09:00 จะเป็นเวลา UTC\nนี่คือ 'รอบดึง Apify' รอบเดียวของวัน — อยากได้ 2 รอบก็เปลี่ยนเป็น 0 9,18 * * * แล้วลด MONITOR_INTERVAL_MIN เหลือ 600"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE-crisis-radar.onrender.com/api/digest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Run-Passcode",
+              "value": "REPLACE-ค่าเดียวกับ RUN_PASSCODE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ refresh: true, wait_sec: 540 }) }}",
+        "options": {
+          "timeout": 570000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "b2000000-0000-4000-8000-000000000002",
+      "name": "ดึง Facebook + สรุปประจำวัน",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -220,
+        0
+      ],
+      "notes": "refresh:true = สั่งดึงรอบใหม่ 'ถ้าถึงรอบแล้วเท่านั้น' — Crisis Radar เป็นคนตัดสินจาก MONITOR_INTERVAL_MIN\nยิงซ้ำกี่ครั้งก็ไม่เกิน 1 scrape ต่อ interval → เครดิต Apify ไม่บานแม้ workflow รันซ้ำ\nรอบแรกของวันใช้เวลาหลายนาที (Apify + AI) จึงตั้ง timeout ไว้ 9.5 นาที"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-digest",
+              "leftValue": "={{ $json.discord }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000003",
+      "name": "มีสรุปให้ส่งไหม",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        20,
+        0
+      ],
+      "notes": "ไม่มี discord ได้ 2 กรณี:\n  skipped:true → วันนี้ส่งไปแล้ว (n8n retry / มีคนกดเอง) — ไม่ต้องส่งซ้ำ\n  pending:true → ยังดึงไม่เสร็จ (HTTP 202) → ไปทางล่าง: รอแล้วขอสรุปอีกรอบ"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/REPLACE/DAILY-DIGEST-CHANNEL",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.discord) }}",
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000004",
+      "name": "Discord #crisis-daily",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        -120
+      ],
+      "notes": "ข้อความมาสำเร็จรูปแล้ว (content + embeds) — ไม่ต้องประกอบเอง\nอยากแยกห้องตามความแรง: ใช้ $json.severity (high/medium/low) หรือ $json.report.status เป็นตัวเลือก URL\nอยากได้การ์ดคอมเมนต์แยกใบ: วน $json.top_negative แทน",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "minutes"
+      },
+      "id": "b2000000-0000-4000-8000-000000000005",
+      "name": "รอ 5 นาที",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        280,
+        140
+      ],
+      "webhookId": "b2000000-0000-4000-8000-000000000005"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE-crisis-radar.onrender.com/api/digest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Run-Passcode",
+              "value": "REPLACE-ค่าเดียวกับ RUN_PASSCODE"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ refresh: false, wait_sec: 0 }) }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "b2000000-0000-4000-8000-000000000006",
+      "name": "ขอสรุปอีกรอบ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        140
+      ],
+      "notes": "refresh:false — รอบดึงเดิมน่าจะเสร็จแล้ว ไม่ต้องสั่งดึงใหม่ (และจะไม่ยิง Apify ซ้ำอยู่ดี)\nยังไม่ได้อีก = รอบนี้ข้ามไป พรุ่งนี้ค่อยว่ากัน — ดีกว่าส่งสรุปจากข้อมูลเก่าโดยไม่บอกใคร"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/REPLACE/DAILY-DIGEST-CHANNEL",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.discord) }}",
+        "options": {}
+      },
+      "id": "b2000000-0000-4000-8000-000000000007",
+      "name": "Discord #crisis-daily (รอบสอง)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        140
+      ],
+      "alwaysOutputData": false,
+      "notes": "ถ้ารอบสองก็ยังไม่มี $json.discord จะยิง body ว่างแล้ว Discord ตอบ 400 → execution ขึ้นสีแดงใน n8n\nซึ่งเป็นสิ่งที่ต้องการ: อยากรู้ว่ารอบไหนสรุปไม่ออก ไม่ใช่ให้เงียบหาย",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "ทุกวัน 09:00": {
+      "main": [
+        [
+          {
+            "node": "ดึง Facebook + สรุปประจำวัน",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ดึง Facebook + สรุปประจำวัน": {
+      "main": [
+        [
+          {
+            "node": "มีสรุปให้ส่งไหม",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "มีสรุปให้ส่งไหม": {
+      "main": [
+        [
+          {
+            "node": "Discord #crisis-daily",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "รอ 5 นาที",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "รอ 5 นาที": {
+      "main": [
+        [
+          {
+            "node": "ขอสรุปอีกรอบ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ขอสรุปอีกรอบ": {
+      "main": [
+        [
+          {
+            "node": "Discord #crisis-daily (รอบสอง)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Bangkok"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "crisis-radar"
+  },
+  "tags": []
+}
