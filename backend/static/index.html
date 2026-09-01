@@ -100,6 +100,14 @@ h2{font-size:16.5px;font-weight:680;letter-spacing:-.01em;margin:0}
 .fld input,.fld select,.fld textarea{background:var(--surface);border:1px solid var(--border2);color:var(--ink);
   border-radius:9px;padding:9px 11px;font-size:14px;font-family:inherit}
 .fld input[type=number]{width:92px}
+/* แถวลิงก์เพจ (ใส่ได้หลายเพจ) — ปุ่ม ✕ ติดขวาของช่อง ไม่ใช่ลอยอยู่คนละที่ */
+.urlrow{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.urlrow input{flex:1;min-width:0;max-width:420px}
+.urlx{background:var(--surface);border:1px solid var(--border2);color:var(--muted);
+      border-radius:8px;width:30px;height:30px;flex:none;cursor:pointer;font-size:13px;line-height:1}
+.urlx:hover{color:var(--neg);border-color:var(--neg)}
+#daysSeg{flex-wrap:wrap}
+#addPage:disabled{opacity:.45;cursor:not-allowed}
 .runrow{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 .run{background:var(--accent);color:#fff;border:0;border-radius:11px;padding:13px 26px;font-size:15.5px;
   font-weight:680;cursor:pointer;display:inline-flex;align-items:center;gap:9px;box-shadow:0 2px 10px -4px var(--accent)}
@@ -478,22 +486,11 @@ tr.arch td.txt{color:var(--ink2)}
     <header>
       <span class="stepnum">1</span>
       <div><h2>ตรวจเอง — เลือกข้อมูลที่ต้องการตรวจ</h2>
-        <div class="sub">ปกติระบบเฝ้าเพจให้อยู่แล้วโดยอัตโนมัติ · ส่วนนี้ไว้ตรวจนอกรอบ เช่น เจาะโพสต์ที่สงสัย หรือดูข้อมูลตัวอย่าง</div></div>
+        <div class="sub">ปกติระบบเฝ้าเพจให้อยู่แล้วโดยอัตโนมัติ · ส่วนนี้ไว้ตรวจนอกรอบ เช่น เจาะโพสต์ที่สงสัย หรือดูเพจอื่นเพิ่ม</div></div>
     </header>
 
-    <div class="modes" id="modes">
-      <button class="mode on" data-src="sample" aria-pressed="true">
-        <span class="tick">✓</span>
-        <span><b>ข้อมูลตัวอย่าง</b><small>ลองใช้ได้ทันที ไม่ต้องตั้งค่าอะไร · เหมาะกับการดูว่าระบบทำงานยังไง</small></span>
-      </button>
-      <button class="mode" data-src="facebook" aria-pressed="false">
-        <span class="tick">✓</span>
-        <span><b>Facebook จริง</b><small>ดึงคอมเมนต์สดจากเพจที่ระบุ · ใช้เวลาสักครู่ และมีค่าใช้จ่ายตามจำนวนโพสต์</small></span>
-      </button>
-    </div>
-
-    <div id="fbBox" class="hidden">
-      <span class="sublabel">ตั้งค่าสำหรับโหมด Facebook จริง — จะให้ตรวจแค่ไหน?</span>
+    <div id="fbBox">
+      <span class="sublabel">จะให้ตรวจแค่ไหน?</span>
       <div class="modes" id="scopes">
         <button class="mode on" data-scope="page" aria-pressed="true">
           <span class="tick">✓</span>
@@ -506,12 +503,26 @@ tr.arch td.txt{color:var(--ink2)}
       </div>
 
       <div class="fields">
-        <label class="fld" id="fldPageUrl">ลิงก์เพจ Facebook
-          <input id="pageUrl" type="url" placeholder="https://www.facebook.com/…" style="width:300px">
-        </label>
-        <label class="fld" id="fldPosts">ดูย้อนหลังกี่โพสต์
-          <input id="maxp" type="number" value="10" min="1" max="50">
-          <span class="tip">ยิ่งเยอะ ยิ่งใช้เวลานาน</span>
+        <div class="fld" id="fldPageUrl" style="flex-basis:100%">ลิงก์เพจ Facebook
+          <div id="pageList"></div>
+          <button type="button" class="ghost" id="addPage"
+                  style="align-self:flex-start;padding:6px 12px;font-size:12.5px">+ เพิ่มเพจ</button>
+          <span class="tip">ใส่ได้หลายเพจในรอบเดียว (สูงสุด 10) · ค่า Apify คิดแยกต่อเพจ</span>
+        </div>
+        <div class="fld" id="fldDays">ช่วงเวลาที่ต้องการดู
+          <div class="seg" id="daysSeg">
+            <button type="button" data-days="1">1 วัน</button>
+            <button type="button" data-days="3">3 วัน</button>
+            <button type="button" data-days="7" class="on">7 วัน</button>
+            <button type="button" data-days="14">14 วัน</button>
+            <button type="button" data-days="30">30 วัน</button>
+            <button type="button" data-days="0">ไม่จำกัด</button>
+          </div>
+          <span class="tip">โพสต์ที่เก่ากว่าช่วงนี้จะถูกข้าม — ยิ่งช่วงสั้น ยิ่งถูกและเร็ว</span>
+        </div>
+        <label class="fld" id="fldPosts">เพดานโพสต์ต่อเพจ
+          <input id="maxp" type="number" value="25" min="1" max="50">
+          <span class="tip">กันบิลบานตอนเพจโพสต์ถี่</span>
         </label>
         <label class="fld" id="fldPostUrls" style="flex-basis:100%">ลิงก์โพสต์ (วางบรรทัดละ 1 ลิงก์)
           <textarea id="postUrls" rows="3" placeholder="https://www.facebook.com/share/p/…" style="width:100%;font-size:13px"></textarea>
@@ -707,14 +718,14 @@ $('#themeBtn').onclick=()=>{
 $('#printBtn').onclick=()=>window.print();
 
 /* ═══════════════════════════ state ═══════════════════════════ */
-let SRC='sample', SCOPE='page', DATA=null, NEED_PASS=false, TLMODE='count';
+let SRC='facebook', SCOPE='page', DAYS=7, DATA=null, NEED_PASS=false, TLMODE='count';
 // view: 'active' = ยังไม่ได้อ่าน (ค่าเริ่มต้น — คือสิ่งที่ทีมต้องจัดการ) · 'archive' = อ่านแล้ว
 let FILT={view:'active',sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50};
 const inView=c=>FILT.view==='archive'?!!c.archived:!c.archived;
 
 /* โหมดของหน้าเว็บ
    'monitor' = ผลที่โชว์อยู่มาจากตัวเฝ้าเพจอัตโนมัติ (ค่าเริ่มต้น — ไม่ต้องกดอะไร)
-   'manual'  = ผู้ใช้กดตรวจเองจากฟอร์ม (ข้อมูลตัวอย่าง / เจาะโพสต์)                     */
+   'manual'  = ผู้ใช้กดตรวจเองจากฟอร์ม (เพจอื่น / เจาะโพสต์ / ช่วงเวลาอื่น)              */
 let MODE='monitor', MON=null, MON_TS=0, NEXT_AT=0, MANUAL_BUSY=false, JOB_ID=null;
 
 /* ═══════════════════════════ setup form ═══════════════════════════ */
@@ -722,31 +733,63 @@ function pick(container,attr,val){
   $$(container+' .mode').forEach(b=>{const on=b.dataset[attr]===val;
     b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});
 }
-$('#modes').onclick=e=>{const b=e.target.closest('.mode');if(!b)return;
-  SRC=b.dataset.src;pick('#modes','src',SRC);syncFields();};
 $('#scopes').onclick=e=>{const b=e.target.closest('.mode');if(!b)return;
   SCOPE=b.dataset.scope;pick('#scopes','scope',SCOPE);syncFields();};
 
+/* ── รายการลิงก์เพจ (ใส่ได้หลายเพจในรอบเดียว) ─────────────────────────────
+   เก็บเป็น array แล้ววาดใหม่ทั้งชุด — ง่ายกว่าไล่ผูก event ทีละแถว และไม่มีทางหลุด
+   แถวแรกลบไม่ได้: ต้องมีอย่างน้อย 1 ช่องเสมอ ไม่งั้นผู้ใช้จะเจอฟอร์มว่างเปล่าที่กดอะไรไม่ได้ */
+const MAX_PAGES=10;
+let PAGES=[''], PAGE_PH='https://www.facebook.com/…';
+function drawPages(){
+  $('#pageList').innerHTML=PAGES.map((v,i)=>
+    `<div class="urlrow"><input type="url" data-i="${i}" value="${esc(v)}"
+        placeholder="${esc(i===0?PAGE_PH:'https://www.facebook.com/…')}">
+     ${i?`<button type="button" class="urlx" data-x="${i}" title="เอาออก">✕</button>`:''}</div>`).join('');
+  $('#addPage').disabled=PAGES.length>=MAX_PAGES;
+}
+$('#pageList').oninput=e=>{const el=e.target.closest('input[data-i]');if(!el)return;
+  PAGES[+el.dataset.i]=el.value;syncFields();};
+$('#pageList').onclick=e=>{const b=e.target.closest('.urlx');if(!b)return;
+  PAGES.splice(+b.dataset.x,1);drawPages();syncFields();};
+$('#addPage').onclick=()=>{if(PAGES.length<MAX_PAGES){PAGES.push('');drawPages();
+  $('#pageList').querySelector('input:last-of-type')?.focus();syncFields();}};
+$('#daysSeg').onclick=e=>{const b=e.target.closest('button[data-days]');if(!b)return;
+  DAYS=+b.dataset.days;
+  $$('#daysSeg button').forEach(x=>x.classList.toggle('on',+x.dataset.days===DAYS));
+  syncFields();};
+
+/* จำนวนเพจที่กรอกจริง (ช่องว่าง = ใช้เพจที่ตั้งไว้ใน targets.json → นับเป็น 1) */
+const pageCount=()=>Math.max(1,PAGES.filter(u=>u.trim()).length);
+
 function syncFields(){
-  const fb=SRC==='facebook', page=SCOPE==='page';
-  $('#fbBox').classList.toggle('hidden',!fb);
+  const page=SCOPE==='page';
   $('#fldPageUrl').classList.toggle('hidden',!page);
+  $('#fldDays').classList.toggle('hidden',!page);
   $('#fldPosts').classList.toggle('hidden',!page);
   $('#fldPostUrls').classList.toggle('hidden',page);
-  $('#fldPass').classList.toggle('hidden',!(fb&&NEED_PASS));
-  $('#hint').innerHTML = !fb
-    ? 'ใช้ชุดข้อมูลจำลอง 41 คอมเมนต์ · ไม่ต่อเน็ต ไม่มีค่าใช้จ่าย เห็นผลใน 2–3 วินาที'
-    : page
-      ? `จะไล่ดูโพสต์ล่าสุด <b>${esc($('#maxp').value)}</b> โพสต์ แล้วอ่านคอมเมนต์ทุกโพสต์ · ใช้เวลาหลายนาที`
-      : 'อ่านเฉพาะโพสต์ที่วางลิงก์ไว้ · เหมาะตอนที่รู้อยู่แล้วว่าดราม่าอยู่โพสต์ไหน';
+  $('#fldPass').classList.toggle('hidden',!NEED_PASS);
+  if(page){
+    const n=pageCount(), cap=+$('#maxp').value||25;
+    // ประมาณการค่าใช้จ่าย: posts scraper 1 run/เพจ (~$0.026) + comments scraper ~$0.008/โพสต์
+    // ใช้ "เพดาน" เป็นตัวคิด = กรณีแย่สุด ของจริงมักถูกกว่าเพราะโพสต์เก่ากว่าช่วงที่เลือกถูกข้าม
+    const worst=(n*0.026+n*cap*0.008).toFixed(2);
+    $('#hint').innerHTML=`${n>1?`<b>${n} เพจ</b> · `:''}`+
+      (DAYS?`เอาเฉพาะคอมเมนต์ใน <b>${DAYS} วัน</b>ล่าสุด — โพสต์ที่เก่ากว่านั้นจะถูกข้าม (ไม่เสียเงิน)`
+          :`<b>ไม่จำกัดช่วงเวลา</b> — จะไล่ครบทุกโพสต์เท่าที่เพดานกำหนด`)+
+      ` · ค่า Apify สูงสุด ≈ <b>$${worst}</b> ต่อรอบ`;
+  }else{
+    $('#hint').innerHTML='อ่านเฉพาะโพสต์ที่วางลิงก์ไว้ · เหมาะตอนที่รู้อยู่แล้วว่าดราม่าอยู่โพสต์ไหน · ไม่ใช้ช่วงเวลา';
+  }
 }
 $('#maxp').oninput=syncFields;
 
 // เติมค่าตั้งต้นจาก data/targets.json — ผู้ใช้จะได้ไม่ต้องไปหา URL เอง
 fetch('/api/targets').then(r=>r.json()).then(t=>{
-  $('#pageUrl').placeholder=t.page_url||'https://www.facebook.com/…';
+  PAGE_PH=t.page_url||PAGE_PH;
   if(!$('#postUrls').value)$('#postUrls').value=(t.post_urls||[]).join('\n');
-}).catch(()=>{}).finally(syncFields);
+}).catch(()=>{}).finally(()=>{drawPages();syncFields();});
+drawPages();
 // ตอน deploy จะตั้งรหัสไว้กันคนกดยิง Apify เล่น
 fetch('/api/health').then(r=>r.json()).then(h=>{
   NEED_PASS=!!h.passcode_required;
@@ -789,7 +832,7 @@ function stepFromLogs(logs){
 async function run(){
   const headers={'Content-Type':'application/json'};
   $('#setupErr').classList.add('hidden');
-  if(SRC==='facebook'&&NEED_PASS){
+  if(NEED_PASS){
     const pass=$('#passInput').value.trim()||sessionStorage.getItem('runPass')||'';
     if(!pass){
       $('#setup').classList.remove('hidden');$('#setupSummary').classList.add('hidden');
@@ -808,8 +851,9 @@ async function run(){
   $('#prog').scrollIntoView({behavior:'smooth',block:'center'});
 
   const body={source:SRC,only:'page',scope:SCOPE,
-              page_url:$('#pageUrl').value.trim(),
+              page_urls:PAGES.map(s=>s.trim()).filter(Boolean),
               post_urls:$('#postUrls').value.split('\n').map(s=>s.trim()).filter(Boolean),
+              days:SCOPE==='page'?DAYS:0,
               max_posts:+$('#maxp').value,max_comments:+$('#maxc').value};
   let r;
   try{r=await fetch('/api/run',{method:'POST',headers,body:JSON.stringify(body)});}
@@ -1575,7 +1619,7 @@ function showMonitorIdle(m){
   $('#welcome').classList.remove('hidden');$('#setup').classList.remove('hidden');
   $('#wTitle').textContent=m.error?'ตรวจอัตโนมัติรอบแรกไม่สำเร็จ':'กำลังจะเริ่มตรวจ';
   $('#wText').innerHTML=m.error
-    ? `สาเหตุ: <b>${esc(shortErr(m.error))}</b><br>ระหว่างนี้ลองโหมด <b>ข้อมูลตัวอย่าง</b> ด้านบนเพื่อดูว่าระบบทำงานยังไง`
+    ? `สาเหตุ: <b>${esc(shortErr(m.error))}</b><br>ลองกด <b>ตรวจเอง</b> ด้านบนแล้วสั่งตรวจใหม่ หรือเช็ก APIFY_TOKEN / ลิงก์เพจ`
     : 'ระบบเฝ้าเพจให้อยู่ตลอด ไม่ต้องเลือกโพสต์เอง — เปิดหน้านี้เมื่อไหร่ก็เห็นว่า:';
   setLive(m.error?'ตรวจไม่สำเร็จ':'กำลังจะเริ่ม',m.error?'var(--neg)':'var(--muted)');
 }
@@ -1604,7 +1648,7 @@ async function refreshNow(){
   $('#rerunBtn').disabled=false;
   if(r.status===401){
     sessionStorage.removeItem('runPass');$('#passInput').value='';
-    SRC='facebook';pick('#modes','src','facebook');syncFields();   // โชว์ช่องรหัสให้กรอก
+    syncFields();                                                  // โชว์ช่องรหัสให้กรอก
     $('#setup').classList.remove('hidden');$('#setupSummary').classList.add('hidden');
     $('#setupErr').textContent='การตรวจนอกรอบต้องกรอกรหัสผ่านก่อน (ผู้ดูแลตั้งไว้กันเครดิต Apify หมด) — กรอกแล้วกด “ตรวจใหม่ตอนนี้” อีกครั้ง';
     $('#setupErr').classList.remove('hidden');$('#passInput').focus();return;

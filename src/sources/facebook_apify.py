@@ -197,7 +197,26 @@ class PostUrlCache:
             return None, age_min
         return list(rec["urls"]), age_min
 
-    def put(self, target_url: str, max_posts: int, urls: list[str]) -> None:
+    def get_posts(self, target_url: str, max_posts: int) -> Optional[list[dict]]:
+        """เหมือน get() แต่คืน [{"url","at"}] — มี 'at' ให้กรองตามช่วงเวลาได้.
+
+        record เก่าที่จำไว้ก่อนมีฟีเจอร์นี้จะไม่มี 'posts' → คืน url ที่มี at ว่าง
+        (at ว่าง = ไม่รู้อายุ → ตัวกรองจะ **เก็บไว้** ไม่ทิ้ง ดู scrape_target)
+        """
+        if self.ttl_min <= 0:
+            return None
+        rec = self._load().get(self.key(target_url, max_posts))
+        if not rec or not rec.get("urls"):
+            return None
+        if int((time.time() - float(rec.get("ts") or 0)) / 60) >= self.ttl_min:
+            return None
+        posts = rec.get("posts")
+        if isinstance(posts, list) and posts:
+            return [dict(p) for p in posts]
+        return [{"url": u, "at": ""} for u in rec["urls"]]
+
+    def put(self, target_url: str, max_posts: int, urls: list[str],
+            posts: Optional[list[dict]] = None) -> None:
         if self.ttl_min <= 0 or not urls:
             return
         with self._lock:
@@ -206,6 +225,8 @@ class PostUrlCache:
                 "at": now_ict().isoformat(timespec="minutes"),
                 "ts": time.time(),
                 "urls": list(urls),
+                "posts": [dict(p) for p in posts] if posts else
+                         [{"url": u, "at": ""} for u in urls],
             }
             # เขียนไม่ลง → รอบหน้าก็แค่ยิง actor ใหม่ ไม่ถึงกับพัง
             state.write_json(self.path, data, indent=1)
@@ -261,10 +282,14 @@ class ApifyFacebookScraper:
         except urllib.error.HTTPError as e:
             raise RuntimeError(f"Apify API error {e.code}: {e.read().decode('utf-8', 'ignore')[:300]}") from e
 
-    def get_post_urls(self, target_url: str, max_posts: int, log=print) -> list[str]:
-        """หา URL โพสต์ล่าสุดของเพจ — ใช้รายการที่จำไว้ก่อนถ้ายังไม่หมดอายุ (ประหยัด 1 actor run)."""
-        cached, age_min = self.post_cache.get(target_url, max_posts)
+    def get_posts(self, target_url: str, max_posts: int, log=print) -> list[dict]:
+        """หาโพสต์ล่าสุดของเพจ → [{"url","at"}] — 'at' คือเวลาโพสต์ (ICT) หรือ "" ถ้า actor ไม่ส่งมา.
+
+        ใช้รายการที่จำไว้ก่อนถ้ายังไม่หมดอายุ (ประหยัด posts scraper 1 run)
+        """
+        cached = self.post_cache.get_posts(target_url, max_posts)
         if cached:
+            age_min = self.post_cache.get(target_url, max_posts)[1]
             log(f"  [apify] ใช้รายการโพสต์ที่จำไว้ {len(cached)} โพสต์ (อายุ {age_min} นาที) "
                 f"— ประหยัด posts scraper 1 run")
             return cached
@@ -272,10 +297,21 @@ class ApifyFacebookScraper:
         run_input: dict = {"startUrls": [{"url": target_url}], "resultsLimit": max_posts}
         if self.cookies:
             run_input["cookies"] = self.cookies      # กลุ่ม private ต้องใช้
-        items = self._run(POSTS_ACTOR, run_input)
-        urls = [u for u in (_pick(it, "url", "postUrl", "facebookUrl") for it in items) if u]
-        self.post_cache.put(target_url, max_posts, urls)
-        return urls
+        posts = []
+        for it in self._run(POSTS_ACTOR, run_input):
+            u = _pick(it, "url", "postUrl", "facebookUrl")
+            if not u:
+                continue
+            # actor แต่ละเวอร์ชันตั้งชื่อ field เวลาไม่เหมือนกัน — ไล่ชื่อที่เคยเจอ
+            # ไม่เจอเลย → ปล่อย "" (ไม่รู้อายุ) ดีกว่าเดาเป็นเวลาปัจจุบันแล้วกรองผิด
+            raw = _pick(it, "time", "timestamp", "date", "publishedAt", "createdAt", "publishTime")
+            posts.append({"url": u, "at": _parse_date(raw) if raw is not None else ""})
+        self.post_cache.put(target_url, max_posts, [p["url"] for p in posts], posts)
+        return posts
+
+    def get_post_urls(self, target_url: str, max_posts: int, log=print) -> list[str]:
+        """เอาเฉพาะ URL (ตัวเรียกเดิมที่ไม่สนใจเวลาโพสต์)."""
+        return [p["url"] for p in self.get_posts(target_url, max_posts, log=log)]
 
     def get_comments(self, post_url: str, post_id: str, max_comments: int) -> list[dict]:
         # input ขั้นต่ำ (ตรงกับฟอร์ม: Facebook URLs = startUrls, Results amount = resultsLimit)
@@ -298,11 +334,41 @@ class ApifyFacebookScraper:
             log(f"    - โพสต์ {i}/{len(post_urls)}: {len(cs)} คอมเมนต์")
         return comments
 
-    def scrape_target(self, target: dict, max_posts: int, max_comments: int, log=print) -> list[dict]:
-        """กวาดทั้งเพจ/กลุ่ม: หาโพสต์ล่าสุด max_posts โพสต์ → ดึงคอมเมนต์ทีละโพสต์."""
+    def scrape_target(self, target: dict, max_posts: int, max_comments: int, log=print,
+                      since: Optional[datetime] = None) -> list[dict]:
+        """กวาดทั้งเพจ/กลุ่ม: หาโพสต์ล่าสุด max_posts โพสต์ → ดึงคอมเมนต์ทีละโพสต์.
+
+        since = เอาเฉพาะโพสต์ที่ลงหลังเวลานี้ (None = เอาหมด)
+        **นี่คือจุดที่ประหยัดเงินจริงของการเลือกช่วงเวลา** — posts scraper จ่ายครั้งเดียวเท่าเดิม
+        แต่ comments scraper (คิดต่อโพสต์) จะยิงเฉพาะโพสต์ที่อยู่ในช่วง
+        โพสต์ที่ actor ไม่ส่งเวลามา (at ว่าง) จะ **เก็บไว้** — ยอมจ่ายเกินดีกว่าพลาดดราม่า
+        """
         log(f"  [apify] {target['type']}: {target['name']} — หาโพสต์…")
         used_cache = self.post_cache.get(target["url"], max_posts)[0] is not None
-        post_urls = self.get_post_urls(target["url"], max_posts, log=log)
+        posts = self.get_posts(target["url"], max_posts, log=log)
+
+        if since is not None:
+            keep, old, unknown = [], 0, 0
+            for p in posts:
+                if not p.get("at"):
+                    unknown += 1
+                    keep.append(p)
+                    continue
+                try:
+                    if datetime.fromisoformat(p["at"]) >= since:
+                        keep.append(p)
+                    else:
+                        old += 1
+                except ValueError:
+                    keep.append(p)
+            if old:
+                log(f"  [apify] ข้าม {old} โพสต์ที่เก่ากว่าช่วงที่เลือก "
+                    f"— ประหยัด comments scraper {old} run")
+            if unknown:
+                log(f"  [apify] {unknown} โพสต์ไม่มีเวลากำกับ — ดึงไว้ก่อน (กรองอีกทีตอนนับคอมเมนต์)")
+            posts = keep
+
+        post_urls = [p["url"] for p in posts]
         log(f"  [apify] เจอ {len(post_urls)} โพสต์ → ดึงคอมเมนต์…")
         comments: list[dict] = []
         for i, url in enumerate(post_urls, 1):

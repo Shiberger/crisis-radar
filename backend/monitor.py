@@ -15,8 +15,10 @@
   MONITOR=off                 ปิด monitor ทั้งหมด → หน้าเว็บกลับไปเป็นแบบกดเอง
   MONITOR_SOURCE=facebook|sample   ค่าเริ่มต้น: facebook ถ้ามี APIFY_TOKEN ไม่งั้น sample
   MONITOR_INTERVAL_MIN=120    ตรวจใหม่ทุกกี่นาที (ค่าเริ่มต้น 2 ชม. — คุมค่า Apify/AI)
-  MONITOR_MAX_POSTS=5         ต่อรอบ ดูย้อนหลังกี่โพสต์
+  MONITOR_MAX_POSTS=5         ต่อรอบ ดูย้อนหลังกี่โพสต์ (เพดานคุมค่าใช้จ่าย)
   MONITOR_MAX_COMMENTS=30     ต่อโพสต์ อ่านกี่คอมเมนต์
+  MONITOR_DAYS=7              เอาเฉพาะคอมเมนต์ใน N วันล่าสุด (0 = ไม่จำกัด)
+                              ช่วยทั้งคุมค่าใช้จ่าย (ข้ามโพสต์เก่า) และให้หน้าจอเป็นข้อมูลสด
   MONITOR_ALWAYS=1            ตรวจตามรอบแม้ไม่มีคนเปิดเว็บ
 """
 from __future__ import annotations
@@ -84,6 +86,7 @@ def config() -> dict:
         "interval_min": interval,
         "max_posts": _int_env("MONITOR_MAX_POSTS", 5),
         "max_comments": _int_env("MONITOR_MAX_COMMENTS", 30),
+        "days": max(0, _int_env("MONITOR_DAYS", 0)),
         "always": _truthy(os.environ.get("MONITOR_ALWAYS", "")),
         "page_name": t.get("page_name", ""),
         "page_url": t.get("page_url", ""),
@@ -168,6 +171,7 @@ def _worker(cfg: dict) -> None:
             "source": cfg["source"], "only": "page", "scope": "page",
             "page_url": cfg["page_url"],
             "max_posts": cfg["max_posts"], "max_comments": cfg["max_comments"],
+            "days": cfg["days"],
         }, log=_log)
         rec = {"at": now_ict().isoformat(timespec="minutes"),
                "status": result.get("status", "NORMAL"),
@@ -206,6 +210,7 @@ def snapshot() -> dict:
             "page_name": cfg["page_name"],
             "page_url": cfg["page_url"],
             "interval_min": cfg["interval_min"],
+            "days": cfg["days"],
             "always": cfg["always"],
             "refreshing": _STATE["refreshing"],
             "running_sec": int(now - _STATE["started_ts"]) if _STATE["refreshing"] else 0,

@@ -14,6 +14,7 @@ import os
 import sys
 import threading
 import uuid
+from datetime import timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -96,6 +97,34 @@ def _clean_fb_urls(raw) -> list[str]:
     return ok
 
 
+# เพดานเพจต่อรอบ — Apify คิดเงินต่อเพจ (1 posts run + N comments runs) ถ้าไม่จำกัด
+# คนวางลิงก์ทีเดียว 50 เพจ = บิลบานโดยไม่ตั้งใจ · ต้องการมากกว่านี้ให้แบ่งหลายรอบ
+MAX_PAGES = 10
+
+
+def _dedup_urls(urls: list[str]) -> list[str]:
+    """ตัด URL ซ้ำแบบไม่สนใจ / ปิดท้ายและตัวพิมพ์ — กันจ่าย Apify 2 รอบให้เพจเดียวกัน."""
+    seen, out = set(), []
+    for u in urls:
+        k = u.rstrip("/").lower()
+        if k not in seen:
+            seen.add(k)
+            out.append(u)
+    return out
+
+
+def _since_from(params: dict):
+    """days → เวลาตัด (ICT). ไม่ส่งมา/0/ค่าพัง = ไม่จำกัดช่วง (คืน None)."""
+    try:
+        days = int(params.get("days") or 0)
+    except (TypeError, ValueError):
+        return None
+    if days <= 0:
+        return None
+    params["days"] = days
+    return now_ict() - timedelta(days=days)
+
+
 def _fetch_facebook(params: dict, log=print):
     """ดึง Facebook จริงผ่าน Apify → เขียน live file → คืน comments (masked).
 
@@ -108,13 +137,21 @@ def _fetch_facebook(params: dict, log=print):
     targets = [t for t in cfg["targets"] if only == "all" or t["type"] == only]
 
     # ถ้าผู้ใช้พิมพ์ URL เพจเองบนหน้าเว็บ → ใช้อันนั้นแทนที่ตั้งไว้ใน targets.json
+    # รับได้หลายเพจในรอบเดียว (page_urls) — page_url เดี่ยวยังใช้ได้ เพื่อไม่ให้ของเดิม/n8n พัง
     # พิมพ์มาแล้วแต่ใช้ไม่ได้ → ฟ้องเลย ไม่เงียบ ๆ ไปใช้ค่า default (ผู้ใช้จะเข้าใจผิดว่าดึงเพจที่ตัวเองใส่)
-    raw_page = str(params.get("page_url") or "").strip()
-    custom_page = _clean_fb_urls([raw_page])
-    if raw_page and not custom_page:
-        raise ValueError(f"URL เพจไม่ถูกต้อง (ต้องเป็นลิงก์ facebook.com): {raw_page}")
-    if custom_page:
-        targets = [{"type": "page", "name": custom_page[0], "url": custom_page[0]}]
+    raw_pages = [str(u).strip() for u in (params.get("page_urls") or []) if str(u).strip()]
+    single = str(params.get("page_url") or "").strip()
+    if single and single not in raw_pages:
+        raw_pages.insert(0, single)
+    custom_pages = _dedup_urls(_clean_fb_urls(raw_pages))
+    if raw_pages and not custom_pages:
+        raise ValueError("URL เพจไม่ถูกต้อง (ต้องเป็นลิงก์ facebook.com): "
+                         + ", ".join(raw_pages[:3]))
+    if len(custom_pages) > MAX_PAGES:
+        raise ValueError(f"ใส่เพจได้มากสุด {MAX_PAGES} เพจต่อรอบ (ใส่มา {len(custom_pages)}) "
+                         f"— ค่า Apify คิดต่อเพจ ถ้าต้องการมากกว่านี้ให้แบ่งเป็นหลายรอบ")
+    if custom_pages:
+        targets = [{"type": "page", "name": u, "url": u} for u in custom_pages]
 
     cookies = None
     cpath = os.environ.get("FB_COOKIES_JSON")
@@ -129,6 +166,7 @@ def _fetch_facebook(params: dict, log=print):
     # scope = 'page' → กวาดทั้งเพจ: Posts Scraper หาโพสต์ล่าสุด N โพสต์ → Comments Scraper ทีละโพสต์
     #         'urls' → เจาะเฉพาะโพสต์ที่ระบุ (actor เดียว ถูกกว่า/เร็วกว่า)
     # URL เอาจากที่ผู้ใช้พิมพ์บนหน้าเว็บก่อน ถ้าไม่พิมพ์ค่อย fallback ไป targets.json
+    since = _since_from(params)
     scope = params.get("scope", "page")
     raw_posts = [u for u in (params.get("post_urls") or []) if str(u).strip()]
     user_posts = _clean_fb_urls(raw_posts)
@@ -142,12 +180,15 @@ def _fetch_facebook(params: dict, log=print):
     else:
         if scope == "urls":
             log("ไม่มี URL โพสต์ที่ใช้ได้ (ต้องเป็นลิงก์ facebook.com) — สลับไปโหมดทั้งเพจให้")
+        if len(targets) > 1:
+            log(f"กวาด {len(targets)} เพจในรอบนี้ — ค่า Apify คิดแยกต่อเพจ")
         for t in targets:
             if t["type"] == "group" and not scraper.cookies:
                 log(f"ข้าม {t['name']} — กลุ่ม private ต้องมี cookie")
                 continue
-            log(f"กวาดทั้งเพจ {t['name']} — โพสต์ล่าสุด {max_posts} โพสต์ …")
-            comments += scraper.scrape_target(t, max_posts, max_comments, log=log)
+            window = f" ที่ลงใน {params['days']} วันล่าสุด" if since else ""
+            log(f"กวาดทั้งเพจ {t['name']} — โพสต์ล่าสุดไม่เกิน {max_posts} โพสต์{window} …")
+            comments += scraper.scrape_target(t, max_posts, max_comments, log=log, since=since)
 
     from src.sources.facebook_apify import filter_noise
     comments, dropped = filter_noise(comments, cfg.get("page_id", ""), cfg.get("exclude_authors"))
@@ -178,8 +219,21 @@ def run_pipeline(params: dict, log=print) -> dict:
         log("เชื่อม Apify ดึง Facebook จริง… (อาจใช้เวลาหลายนาที)")
         comments = _fetch_facebook(params, log)
 
+    # ตัดตามช่วงเวลาที่ผู้ใช้เลือก — ตัวตัดสินสุดท้ายอยู่ที่ "เวลาของคอมเมนต์" ไม่ใช่เวลาโพสต์
+    # (โพสต์เก่าอาทิตย์ที่แล้วอาจมีคนมาคอมเมนต์เมื่อวาน ซึ่งต้องนับ · และโพสต์ที่ actor ไม่ส่ง
+    #  เวลามาก็ถูกดึงมาทั้งก้อน ต้องมากรองตรงนี้)
+    since = _since_from(params)
+    if since:
+        before = len(comments)
+        comments = [c for c in comments if c.created_at >= since]
+        if before != len(comments):
+            log(f"เอาเฉพาะช่วง {params['days']} วันล่าสุด — เหลือ {len(comments)} จาก {before} คอมเมนต์")
+
     log(f"ได้ {len(comments)} คอมเมนต์")
     if not comments:
+        if since:
+            raise RuntimeError(f"ไม่มีคอมเมนต์ในช่วง {params['days']} วันล่าสุด "
+                               f"— ลองขยายช่วงเวลา หรือเช็กว่าเพจมีคนคอมเมนต์อยู่จริง")
         raise RuntimeError("ไม่มีคอมเมนต์ — เช็ก APIFY_TOKEN / cookie / เป้าหมาย")
 
     # คอมเมนต์ที่ทีมกด "อ่านแล้ว" ไปแล้วไม่ต้องส่งเข้า AI ซ้ำ — ใช้ label เดิมที่เก็บไว้

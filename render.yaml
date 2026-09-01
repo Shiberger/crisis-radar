@@ -44,8 +44,12 @@ services:
       # ไม่ตั้ง MONITOR_ALWAYS เพราะ free tier หลับหลังไม่มีคนใช้ 15 นาที (thread เบื้องหลังตายอยู่ดี)
       - key: MONITOR_INTERVAL_MIN # 2 ชม. — free tier ของ Apify รับรายชั่วโมงไม่ไหว (ดู README)
         value: "120"
-      - key: MONITOR_MAX_POSTS
+      - key: MONITOR_MAX_POSTS # เพดานโพสต์ต่อรอบ — ตัวคุมค่าใช้จ่ายหลัก
         value: "5"
+      # โชว์เฉพาะคอมเมนต์ใน 7 วันล่าสุด — ลดงานอย่างเดียว ไม่เพิ่มค่าใช้จ่าย
+      # (โพสต์เก่ากว่านี้ถูกข้ามก่อนเรียก comments scraper) · 0 = ไม่จำกัด
+      - key: MONITOR_DAYS
+        value: "7"
       # จำรายการ URL โพสต์ไว้ 6 ชม. — ตัด posts scraper (~40% ของค่า Apify ต่อรอบ) ออกจากรอบส่วนใหญ่
       # 0 = ปิด cache · ดูรายละเอียดใน .env.example
       - key: POST_URLS_TTL_MIN

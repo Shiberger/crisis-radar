@@ -584,6 +584,87 @@ check("T14e URL ที่จำไว้ใช้ไม่ได้แล้ว 
       and sum("posts-scraper" in a for a in actor_calls) == 0,
       "ล้างแล้ว และไม่ยิง posts scraper ซ้ำในรอบเดียวกัน")
 
+# ---- T18: เลือก "ช่วงเวลา" แทน "จำนวนโพสต์" + ตรวจหลายเพจในรอบเดียว ----
+# ทำไม: ทีมตอบไม่ได้ว่าอยากดู "กี่โพสต์" แต่ตอบได้ทันทีว่าอยากดู "อาทิตย์ที่แล้ว"
+# และช่วงเวลาไม่ใช่แค่ UI สวยขึ้น — โพสต์ที่เก่ากว่าช่วงถูกข้ามก่อนเรียก comments scraper
+# ซึ่งเป็นตัวที่คิดเงินต่อโพสต์ → เลือกช่วงสั้นลง = จ่ายน้อยลงจริง
+from datetime import timedelta                        # noqa: E402
+
+from src.timeutil import now_ict as _now_ict          # noqa: E402
+
+NOW_T = _now_ict()
+POSTS_AGE = {"new": 1, "recent": 3, "old": 40}        # โพสต์ 3 อัน + อีกอันไม่มีเวลากำกับ
+win_calls: list[tuple] = []
+
+
+def mk_win_scraper(ttl=0):
+    """actor ปลอมที่ส่ง 'เวลาโพสต์' มาด้วย — ของจริง actor บางเวอร์ชันไม่ส่ง จึงมีเคส notime ปน"""
+    s = ApifyFacebookScraper(token="apify_api_test",
+                             post_cache=PostUrlCache(cache_dir / "win.json", ttl_min=ttl))
+
+    def fake_run(actor, run_input):
+        u = run_input["startUrls"][0]["url"]
+        win_calls.append((actor, u))
+        if "posts-scraper" in actor:
+            out = [{"url": f"{u}/p/{k}", "time": (NOW_T - timedelta(days=d)).isoformat()}
+                   for k, d in POSTS_AGE.items()]
+            out.append({"url": f"{u}/p/notime"})       # actor ไม่ส่งเวลามา
+            return out[:run_input["resultsLimit"]]
+        # คอมเมนต์อายุเท่าโพสต์ที่มันอยู่ · โพสต์ notime มีคอมเมนต์เก่า 40 วัน
+        age = next((d for k, d in POSTS_AGE.items() if f"/p/{k}" in u), 40)
+        return [{"id": f"c{age}-{i}", "text": f"เกมล่มอีกแล้ว เซ็งมาก {i}", "likesCount": 5,
+                 "date": (NOW_T - timedelta(days=age)).isoformat()} for i in range(3)]
+    s._run = fake_run
+    return s
+
+
+win_calls.clear()
+mk_win_scraper().scrape_target(target, 25, 30, log=lambda _m: None,
+                               since=NOW_T - timedelta(days=7))
+cmt_runs = sum("comments-scraper" in a for a, _ in win_calls)
+check("T18 โพสต์ที่เก่ากว่าช่วงที่เลือกถูกข้ามก่อนเรียก actor ที่คิดเงินต่อโพสต์",
+      cmt_runs == 3, f"comments scraper {cmt_runs} run จาก 4 โพสต์ (ข้ามโพสต์อายุ 40 วัน)")
+
+win_calls.clear()
+mk_win_scraper().scrape_target(target, 25, 30, log=lambda _m: None)
+check("T18b ไม่เลือกช่วงเวลา = พฤติกรรมเดิมทุกอย่าง (ไม่ข้ามโพสต์ไหนเลย)",
+      sum("comments-scraper" in a for a, _ in win_calls) == 4)
+
+# โพสต์ที่ actor ไม่ส่งเวลามาต้องถูก "ดึงไว้ก่อน" (ยอมจ่ายเกินดีกว่าพลาดดราม่า)
+# แล้วค่อยตัดที่ชั้นคอมเมนต์ ซึ่งมีเวลาแน่นอนเสมอ — ไม่งั้นของเก่าจะหลุดเข้ารายงาน
+_win_pages = ["https://www.facebook.com/gameA", "https://www.facebook.com/gameB",
+              "https://www.facebook.com/gameA/"]        # ตัวที่ 3 คือตัวแรกซ้ำ (แค่มี / ปิดท้าย)
+import src.sources.facebook_apify as _fa_mod            # noqa: E402
+
+_real_init = ApifyFacebookScraper.__init__
+ApifyFacebookScraper.__init__ = lambda self, **kw: _real_init(
+    self, token="apify_api_test", post_cache=PostUrlCache(cache_dir / "win2.json", ttl_min=0))
+ApifyFacebookScraper._run = lambda self, actor, ri: mk_win_scraper()._run(actor, ri)
+
+archive.STORE = Path(tempfile.mkdtemp(prefix="crisis-radar-arch2-")) / "archive.json"
+win_calls.clear()
+res_win = jobs.run_pipeline({"source": "facebook", "only": "page", "scope": "page",
+                             "page_urls": _win_pages, "days": 7,
+                             "max_posts": 25, "max_comments": 30}, log=lambda _m: None)
+pages_hit = {u for a, u in win_calls if "posts-scraper" in a}
+check("T18c ใส่หลายเพจในรอบเดียวได้ และ URL ซ้ำไม่ถูกคิดเงิน 2 รอบ",
+      len(pages_hit) == 2, f"ยิง posts scraper {len(pages_hit)} เพจ จากที่ใส่มา {len(_win_pages)} ลิงก์")
+check("T18d คอมเมนต์เก่าถูกตัดออกแม้โพสต์ไม่มีเวลากำกับ (ตัวตัดสินสุดท้ายคือเวลาคอมเมนต์)",
+      res_win["total"] == 12, f"เหลือ {res_win['total']} คอมเมนต์ (2 เพจ × โพสต์ new+recent × 3)")
+
+for bad, why in ((["https://evil.com/x"], "URL นอก facebook"),
+                 ([f"https://www.facebook.com/g{i}" for i in range(11)], "เกิน 10 เพจ")):
+    try:
+        jobs.run_pipeline({"source": "facebook", "only": "page", "scope": "page",
+                           "page_urls": bad, "days": 7, "max_posts": 5, "max_comments": 30},
+                          log=lambda _m: None)
+        check(f"T18e กัน {why}", False)
+    except ValueError as e:
+        check(f"T18e กัน {why} — ฟ้องให้คนแก้เองได้", True, str(e)[:46])
+
+ApifyFacebookScraper.__init__ = _real_init
+
+
 # ---- T17: state ถาวร (Supabase) — ของที่ห้ามหายตอน container restart ----
 # ทำไมต้องมีเทสนี้: บน Render free tier ไฟล์ใน data/ หายทุกครั้งที่ container restart
 # ผลคือทีมโดนแจ้ง Discord เรื่องเดิมซ้ำ และ label ที่ทีมแก้เองหายเกลี้ยง
