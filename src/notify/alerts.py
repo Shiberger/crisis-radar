@@ -41,7 +41,7 @@ from pathlib import Path
 from .. import state
 from ..crisis.detector import VIRAL_REACH
 from ..env import ssl_context
-from ..models import Classified
+from ..models import Classified, page_key
 from ..timeutil import now_ict
 from .payload import SENT_TH, build_event
 
@@ -180,7 +180,8 @@ def send(row: dict, report: dict, *, trigger: str, severity: str, reason: str,
     _post(cfg, event)
     return _mark(cid, {"at": now_ict().isoformat(timespec="minutes"), "trigger": trigger,
                        "severity": severity, "reason": reason, "note": note,
-                       "via": cfg["via"], "status": report.get("status", "")})
+                       "via": cfg["via"], "status": report.get("status", ""),
+                       "page": str(row.get("page_name") or "")})
 
 
 def send_manual(row: dict, report: dict, note: str = "", page: dict | None = None,
@@ -196,30 +197,71 @@ def send_manual(row: dict, report: dict, note: str = "", page: dict | None = Non
                 note=note, page=page, force=force)
 
 
+def _page_status(report: dict) -> dict[str, str]:
+    """key เพจ → สถานะของเพจนั้น (ว่าง = รอบเพจเดียว/ผลเก่าที่ไม่มีข้อมูลรายเพจ)."""
+    return {p.get("key", ""): p.get("status", "") for p in (report.get("pages") or [])}
+
+
+def _spread(cands: list[Classified], quota: int) -> list[Classified]:
+    """เกลี่ยโควตาต่อรอบให้ทั่วทุกเพจ แทนที่จะให้เพจเดียวกินหมด.
+
+    ของเดิมเรียงตาม reach แล้วตัดเอา 5 อันแรก — พอกวาด 7 เพจ เพจเดียวที่คนเยอะ (เพจใหญ่
+    reach สูงเป็นปกติอยู่แล้ว) จะกินโควตาทั้งรอบ แล้วอีก 6 เพจ **เงียบสนิทบน Discord**
+    ทั้งที่มีคอมเมนต์เข้าเกณฑ์ · ซึ่งอันตรายกว่าไม่มีระบบเตือน เพราะทีมเชื่อว่าเงียบ = ไม่มีเรื่อง
+
+    วิธี: วนทีละรอบ หยิบตัวแรงสุดของแต่ละเพจไปก่อน 1 อัน แล้วค่อยวนซ้ำ — ทุกเพจที่มีของ
+    เข้าเกณฑ์ได้ที่นั่งอย่างน้อย 1 ที่เสมอ ถ้าโควตายังเหลือค่อยแบ่งให้เพจที่มีของเยอะ
+    """
+    by_page: dict[str, list[Classified]] = {}
+    for it in cands:
+        by_page.setdefault(page_key(it.comment.page_url, it.comment.page_name), []).append(it)
+    if len(by_page) <= 1:
+        return cands[:quota]
+    # เพจที่มีคอมเมนต์แรงสุดได้คิวก่อนในแต่ละรอบ — ยังคงจัดลำดับความสำคัญอยู่ แค่ไม่ผูกขาด
+    order = sorted(by_page.values(), key=lambda g: g[0].comment.reach, reverse=True)
+    out: list[Classified] = []
+    while len(out) < quota and any(order):
+        for g in order:
+            if not g:
+                continue
+            out.append(g.pop(0))
+            if len(out) >= quota:
+                break
+    return out
+
+
 def dispatch_auto(items: list[Classified], report: dict, page: dict | None = None,
                   log=None) -> list[dict]:
     """ส่ง alert ให้คอมเมนต์ที่ "ลบและแรง" ตั้งแต่รอบตรวจ (ยังไม่เคยส่ง) — แก้ .alerted_at ในที่.
 
     ช่วง CRISIS ลดเกณฑ์ลงครึ่งหนึ่ง เพราะตอนเพจกำลังไหม้ คอมเมนต์ลบที่ reach ปานกลาง
-    ก็มีน้ำหนักกว่าปกติ — โควตาต่อรอบยังคุมไม่ให้ท่วมอยู่ดี
+    ก็มีน้ำหนักกว่าปกติ — โควตาต่อรอบยังคุมไม่ให้ท่วมอยู่ดี · รอบที่กวาดหลายเพจ ใช้สถานะ
+    **ของเพจนั้น** ตัดสิน ไม่ใช่สถานะรวม: เพจเดียวที่ไหม้ไม่ควรทำให้อีก 6 เพจถูกลดเกณฑ์ตาม
+    (จะได้ alert ท่วมจากเพจที่ปกติดี จนเรื่องจริงจมหาย)
     """
     cfg = config()
     if not (cfg["url"] and cfg["auto"]):
         return []
 
-    threshold = cfg["min_reach"]
-    if report.get("status") == "CRISIS":
-        threshold = max(1, threshold // 2)
+    pstat = _page_status(report)
+    base = cfg["min_reach"]
+    crisis_all = report.get("status") == "CRISIS"
+
+    def threshold_for(it: Classified) -> int:
+        st = pstat.get(page_key(it.comment.page_url, it.comment.page_name), "")
+        hot = (st == "CRISIS") if st else crisis_all
+        return max(1, base // 2) if hot else base
 
     known = load()
     cands = [it for it in items
              if it.sentiment == "negative" and not it.archived
-             and it.comment.reach >= threshold
+             and it.comment.reach >= threshold_for(it)
              and it.comment.comment_id not in known]
     cands.sort(key=lambda it: it.comment.reach, reverse=True)
 
     out: list[dict] = []
-    for it in cands[:cfg["max_per_run"]]:
+    for it in _spread(cands, cfg["max_per_run"]):
+        threshold = threshold_for(it)
         reason = (f"คอมเมนต์เชิงลบที่คนกดไลก์/ตอบกลับ {it.comment.reach:,} ครั้ง "
                   f"(เกณฑ์แจ้งอัตโนมัติตอนนี้ {threshold:,})")
         try:
@@ -234,7 +276,9 @@ def dispatch_auto(items: list[Classified], report: dict, page: dict | None = Non
         out.append(rec)
 
     if log and out:
-        log(f"แจ้ง Discord อัตโนมัติ {len(out)} คอมเมนต์ (เชิงลบ + คนเห็นเยอะเกินเกณฑ์)")
+        pages = {r.get("page") for r in out if r.get("page")}
+        log(f"แจ้ง Discord อัตโนมัติ {len(out)} คอมเมนต์ (เชิงลบ + คนเห็นเยอะเกินเกณฑ์)"
+            + (f" · กระจาย {len(pages)} เพจ" if len(pages) > 1 else ""))
     if log and len(cands) > len(out) and out:
         log(f"อีก {len(cands) - len(out)} คอมเมนต์เข้าเกณฑ์แต่เกินโควตาต่อรอบ — ดูได้บนหน้าเว็บ")
     return out

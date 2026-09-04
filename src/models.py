@@ -12,6 +12,19 @@ from datetime import datetime
 from typing import Optional, Protocol
 
 
+def page_key(url: str = "", name: str = "") -> str:
+    """key ประจำเพจ — ใช้จัดกลุ่ม/จับคู่ "คอมเมนต์นี้เป็นของเพจไหน" ทุกที่ในระบบ.
+
+    อยู่ตรงนี้เพราะมีคนใช้ 4 ที่: รายงานฝั่ง server (backend/jobs.py), ข้อความ Discord
+    (notify/payload.py + digest.py) และหน้าเว็บ (pkey() ใน index.html) — คิดคนละแบบเมื่อไหร่
+    ข้อความแจ้งเตือนจะแปะสถานะของเพจ A ไว้บนคอมเมนต์ของเพจ B ซึ่งแย่กว่าไม่บอกอะไรเลย
+
+    URL มาก่อนชื่อเสมอ เพราะชื่อเพจแก้ทีหลังได้ (ทีมเปลี่ยนใน page_presets) แต่ URL นิ่ง
+    """
+    u = str(url or "").strip().rstrip("/").lower()
+    return u or str(name or "").strip().lower() or "-"
+
+
 @dataclass
 class Comment:
     platform: str            # 'facebook' | 'pantip' | 'google_play' ...

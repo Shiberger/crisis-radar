@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from ..classify.lexicon import TOPIC_LABELS
 from ..crisis.detector import TOPIC_OWNER
+from ..models import page_key
 from ..timeutil import now_ict
 
 EVENT = "crisis_radar.comment_alert"
@@ -41,6 +42,27 @@ def topic_labels(topics) -> list[str]:
     return [TOPIC_LABELS.get(t, t) for t in (topics or [])]
 
 
+def page_of(row: dict, report: dict) -> dict:
+    """เพจของคอมเมนต์นี้ + สถานะของ "เพจนั้น" (ไม่ใช่สถานะรวมของทั้งรอบ).
+
+    Discord คือช่องทางที่ไม่มีที่ให้ไล่ดูต่อ — คนอ่านต้องตัดสินใจจากข้อความเดียวว่าจะไปที่ไหน
+    ถ้าไม่บอกเพจ ทีมที่ดูแล 7 เพจต้องเปิด dashboard ทุกครั้งเพื่อหาว่าเรื่องนี้ของใคร
+    ซึ่งทำให้ alert เสียความหมายไปครึ่งหนึ่ง
+
+    และสถานะต้องเป็นของเพจนั้นจริง ๆ — เอาสถานะรวมมาแปะข้าง ๆ คอมเมนต์ของเพจเดียว
+    คือการโกหก: รอบที่เพจ A ไหม้ คอมเมนต์ของเพจ B จะถูกส่งพร้อมป้าย "วิกฤต" ทั้งที่ B ปกติ
+    """
+    k = page_key(row.get("page_url"), row.get("page_name"))
+    for p in report.get("pages") or []:
+        if p.get("key") == k:
+            return {"name": p.get("name") or "", "url": p.get("url") or "",
+                    "status": p.get("status") or "", "negative": p.get("negative") or 0,
+                    "total": p.get("total") or 0}
+    # ไม่มีข้อมูลรายเพจ (รอบเพจเดียว / ผลเก่าก่อนมีฟีเจอร์นี้) → ใช้ค่าระดับรอบตามเดิม
+    return {"name": str(row.get("page_name") or ""), "url": str(row.get("page_url") or ""),
+            "status": "", "negative": 0, "total": 0}
+
+
 def owner_of(topics) -> str:
     """ทีมที่เป็นเจ้าของเรื่อง — ใช้ประเด็นแรกเป็นตัวตัดสิน (เรียงตามที่ classifier ให้มา)."""
     for t in topics or []:
@@ -49,12 +71,18 @@ def owner_of(topics) -> str:
     return "Community"
 
 
-def _headline(row: dict, trigger: str, severity: str) -> str:
-    """พาดหัวต้องบอกได้ใน 1 บรรทัดว่า 'ใครเป็นคนบอกว่าเรื่องนี้สำคัญ' — ระบบ (🚨) หรือคน (🔔)."""
+def _headline(row: dict, trigger: str, severity: str, page_name: str = "") -> str:
+    """พาดหัวต้องตอบ 2 อย่างใน 1 บรรทัด: **เรื่องนี้ของเพจไหน** และใครเป็นคนบอกว่าสำคัญ.
+
+    ชื่อเพจมาก่อน เพราะบน Discord (มือถือ/ในลิสต์ channel) คนเห็นแค่บรรทัดแรกก่อนตัดสินใจว่า
+    จะกดเข้าไปอ่านไหม — "คอมเมนต์เชิงลบแรง" เฉย ๆ เหมือนกันหมดทุกเพจ แยกไม่ออกว่าของใคร
+    """
+    pg = f"{page_name} — " if page_name else ""
     if trigger == "manual":
         ai = SENT_TH.get(row.get("ai_sentiment") if row.get("overridden") else row.get("sentiment"), "—")
-        return f"🔔 ทีมส่งเรื่องนี้เข้ามาเอง — ระบบอ่านเป็น “{ai}”"
-    return f"{ICON.get(severity, '🚨')} คอมเมนต์เชิงลบแรง — คนกดไลก์/ตอบกลับ {int(row.get('reach') or 0):,} ครั้ง"
+        return f"🔔 {pg}ทีมส่งเรื่องนี้เข้ามาเอง — ระบบอ่านเป็น “{ai}”"
+    return (f"{ICON.get(severity, '🚨')} {pg}คอมเมนต์เชิงลบแรง"
+            f" · คนกดไลก์/ตอบกลับ {int(row.get('reach') or 0):,} ครั้ง")
 
 
 def build_discord(row: dict, *, severity: str, reason: str, note: str, report: dict,
@@ -63,14 +91,25 @@ def build_discord(row: dict, *, severity: str, reason: str, note: str, report: d
     """ก้อนที่ยิงเข้า Discord webhook ได้ตรง ๆ (content + embeds)."""
     topics = topic_labels(row.get("topics"))
     owner = owner_of(row.get("topics"))
-    status = report.get("status", "NORMAL")
+    pg = page_of(row, report)
+    n_pages = len(report.get("pages") or [])
     links = []
     if row.get("comment_url"):
         links.append(f"[เปิดคอมเมนต์บน Facebook]({row['comment_url']})")
+    if pg["url"]:
+        links.append(f"[เปิดเพจ {pg['name']}]({pg['url']})")
     if dashboard_url:
         links.append(f"[เปิด Dashboard]({dashboard_url})")
 
-    fields = [
+    fields = []
+    # "เพจไหน" อยู่บนสุดและเป็น field แรกที่ตาเห็น — คนที่ดูแลหลายเพจต้องรู้ปลายทางก่อนอย่างอื่น
+    # โชว์เฉพาะตอนกวาดหลายเพจ · เฝ้าเพจเดียวอยู่แล้วการย้ำชื่อเพจทุกข้อความคือ noise เปล่า ๆ
+    if n_pages > 1 and pg["name"]:
+        fields.append({"name": "เพจ", "inline": True,
+                       "value": f"**{_cut(pg['name'], 100)}**"
+                                + (f"\nสถานะเพจนี้: {STATUS_TH.get(pg['status'], pg['status'])}"
+                                   if pg["status"] else "")})
+    fields += [
         {"name": "อารมณ์ที่ระบบให้", "value": SENT_TH.get(row.get("sentiment"), "—")
                                               + (" · ทีมแก้เอง" if row.get("overridden") else ""),
          "inline": True},
@@ -85,14 +124,20 @@ def build_discord(row: dict, *, severity: str, reason: str, note: str, report: d
     if links:
         fields.append({"name": "ลิงก์", "value": " · ".join(links), "inline": False})
 
+    # สถานะที่แปะข้างคอมเมนต์ต้องเป็นของ "เพจนั้น" — ของเดิมใช้สถานะรวมของทั้งรอบ ซึ่งรอบที่
+    # เพจ A ไหม้ คอมเมนต์ของเพจ B จะถูกส่งพร้อมป้าย "วิกฤต" ทั้งที่ B ปกติดี · ไม่มีข้อมูลรายเพจ
+    # (รอบเพจเดียว/ผลเก่า) ค่อย fallback ไปใช้สถานะรวมเหมือนเดิม
+    st = pg["status"] or report.get("status", "NORMAL")
+    where = pg["name"] or report.get("page_name") or page.get("page_name") or report.get("brand", "")
     embed = {
-        "title": _cut(_headline(row, trigger, severity), 250),
+        "title": _cut(_headline(row, trigger, severity, pg["name"] if n_pages > 1 else ""), 250),
         "description": f"> {_cut(row.get('text'), MAX_QUOTE)}\n— โดย **{_cut(row.get('author') or '—', 80)}**",
         "color": COLOR.get(severity, COLOR["medium"]),
         "fields": fields,
-        "footer": {"text": f"Crisis Radar · {report.get('page_name') or page.get('page_name') or report.get('brand', '')}"
-                           f" · สถานะเพจตอนนี้: {STATUS_TH.get(status, status)}"
-                           f" · ส่งต่อ: {owner}"},
+        "footer": {"text": f"Crisis Radar · {where}"
+                           f" · สถานะเพจนี้: {STATUS_TH.get(st, st)}"
+                           + (f" · รอบนี้กวาด {n_pages} เพจ" if n_pages > 1 else "")
+                           + f" · ส่งต่อ: {owner}"},
     }
     if row.get("created_at"):
         embed["timestamp"] = row["created_at"]      # เวลาของคอมเมนต์ ไม่ใช่เวลาที่ส่ง
@@ -110,6 +155,7 @@ def build_event(row: dict, *, trigger: str, severity: str, reason: str, report: 
     """ก้อนเต็มที่ส่งให้ n8n — ข้อมูลดิบ + ข้อความ Discord สำเร็จรูปในก้อนเดียว."""
     page = page or {}
     topics = list(row.get("topics") or [])
+    _pg = page_of(row, report)
     return {
         "event": EVENT,
         "version": VERSION,
@@ -118,8 +164,15 @@ def build_event(row: dict, *, trigger: str, severity: str, reason: str, report: 
         "reason": reason,
         "sent_at": now_ict().isoformat(timespec="seconds"),
         "brand": report.get("brand", ""),
-        "page": {"name": report.get("page_name") or page.get("page_name", ""),
-                 "url": page.get("page_url", "")},
+        # page = เพจของ "คอมเมนต์นี้" — n8n ต้องใช้ค่านี้ route เข้า channel ของแต่ละเพจ
+        # ของเดิมใส่ label ของทั้งรอบ ("7 เพจ (A, B, C…)") ซึ่ง route อะไรไม่ได้เลย
+        "page": {"name": _pg["name"] or report.get("page_name") or page.get("page_name", ""),
+                 "url": _pg["url"] or page.get("page_url", ""),
+                 "key": page_key(row.get("page_url"), row.get("page_name")),
+                 "status": _pg["status"],
+                 "total": _pg["total"], "negative": _pg["negative"]},
+        # ภาพรวมของทั้งรอบเก็บแยกไว้ ไม่ปนกับเพจของคอมเมนต์
+        "scan": {"label": report.get("page_name", ""), "pages": len(report.get("pages") or [])},
         "report": {
             "status": report.get("status", ""),
             "total": report.get("total", 0),
@@ -136,6 +189,8 @@ def build_event(row: dict, *, trigger: str, severity: str, reason: str, report: 
             "url": row.get("comment_url", ""),
             "profile_url": row.get("profile_url", ""),
             "post_title": row.get("post_title", ""),
+            "page_name": row.get("page_name", ""),
+            "page_url": row.get("page_url", ""),
             "sentiment": row.get("sentiment", ""),
             "ai_sentiment": row.get("ai_sentiment", "") or row.get("sentiment", ""),
             "overridden": bool(row.get("overridden")),

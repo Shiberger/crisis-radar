@@ -1185,6 +1185,102 @@ check("T24j ตั้งชื่อเพจให้อ่านออกแ�
       jobs.page_title("https://www.facebook.com/somepage/") == "somepage")
 
 
+# ---- T25: Discord = ช่องทางที่ต้องตัดสินใจทันที ต้องบอกได้ว่า "เพจไหน" ----
+# เว็บมีที่ให้ไล่ดูรายละเอียดเอง แต่ Discord ไม่มี — คนอ่านต้องตัดสินจากข้อความเดียวว่าจะไปที่ไหน
+# ของเดิมพาดหัวเป็น label ของทั้งรอบ ("3 เพจ") และแปะ "สถานะเพจตอนนี้" = สถานะรวม
+# ผลคือคอมเมนต์ของเพจที่ปกติดี ถูกส่งพร้อมป้าย "วิกฤต" ของเพจอื่น
+from src.notify import payload as _pl                    # noqa: E402
+from src.notify import digest as _dgp                     # noqa: E402
+
+_multi_report = {
+    "status": "CRISIS", "brand": "x", "page_name": "3 เพจ (A, B, C)",
+    "sentiment_mix": {"negative": 9}, "topic_trends": [], "alert_items": [],
+    "pages": [
+        {"key": "https://www.facebook.com/a", "name": "เพจ A", "url": "https://www.facebook.com/a",
+         "status": "CRISIS", "total": 10, "negative": 8, "alerts": 2},
+        {"key": "https://www.facebook.com/b", "name": "เพจ B", "url": "https://www.facebook.com/b",
+         "status": "NORMAL", "total": 10, "negative": 1, "alerts": 0},
+    ],
+    "comments": [
+        {"comment_id": "a1", "text": "เกมล่ม บั๊กเยอะมาก", "sentiment": "negative", "reach": 200,
+         "topics": ["bug/technical"], "page_name": "เพจ A", "page_url": "https://www.facebook.com/a"},
+        {"comment_id": "a2", "text": "เกมล่มอีกแล้ว บั๊ก", "sentiment": "negative", "reach": 150,
+         "topics": ["bug/technical"], "page_name": "เพจ A", "page_url": "https://www.facebook.com/a"},
+        {"comment_id": "a3", "text": "บั๊กเยอะ เล่นไม่ได้", "sentiment": "negative", "reach": 90,
+         "topics": ["bug/technical"], "page_name": "เพจ A", "page_url": "https://www.facebook.com/a"},
+        {"comment_id": "b1", "text": "เติมเงินแล้วของไม่เข้า", "sentiment": "negative", "reach": 5,
+         "topics": ["billing/price"], "page_name": "เพจ B", "page_url": "https://www.facebook.com/b"},
+    ],
+}
+_row_b = _multi_report["comments"][3]      # คอมเมนต์ของเพจ B ซึ่ง "ปกติ" ขณะที่ทั้งรอบ = วิกฤต
+_ev_b = _pl.build_event(_row_b, trigger="auto", severity="medium", reason="ทดสอบ",
+                        report=_multi_report)
+_emb_b = _ev_b["discord"]["embeds"][0]
+
+check("T25 พาดหัว alert ต้องขึ้นชื่อเพจ — Discord ไม่มีที่ให้ไล่ดูต่อว่าเรื่องนี้ของใคร",
+      "เพจ B" in _emb_b["title"], _emb_b["title"])
+
+check("T25b สถานะที่แปะข้างคอมเมนต์ต้องเป็นของเพจนั้น ไม่ใช่สถานะรวมของทั้งรอบ "
+      "(เพจ A ไหม้ ไม่ได้แปลว่าเพจ B วิกฤตไปด้วย)",
+      "สถานะเพจนี้: ปกติ" in _emb_b["footer"]["text"]
+      and "วิกฤต" not in _emb_b["footer"]["text"], _emb_b["footer"]["text"])
+
+check("T25c n8n ต้อง route รายเพจได้ — page ในก้อน event ต้องเป็นเพจของคอมเมนต์ ไม่ใช่ label ของทั้งรอบ",
+      _ev_b["page"]["name"] == "เพจ B" and _ev_b["page"]["url"] == "https://www.facebook.com/b"
+      and _ev_b["scan"]["pages"] == 2, json.dumps(_ev_b["page"], ensure_ascii=False))
+
+# เฝ้าเพจเดียว = ไม่มีอะไรให้สับสน การย้ำชื่อเพจทุกข้อความคือ noise เปล่า ๆ
+_ev_single = _pl.build_event(_multi_report["comments"][0], trigger="auto", severity="high",
+                             reason="ทดสอบ",
+                             report={**_multi_report, "pages": [], "page_name": "เพจเดียว"})
+check("T25d เฝ้าเพจเดียว → ข้อความหน้าตาเหมือนเดิม ไม่มี field เพจงอกมาให้รก",
+      all(f["name"] != "เพจ" for f in _ev_single["discord"]["embeds"][0]["fields"]))
+
+# ---- T25e-h: สรุปรายวันต้องบอกว่า "เพจไหนต้องดูก่อน" ----
+_dig = _dgp.build_event(_multi_report, page={}, prev=None,
+                        cfg={"dashboard_url": "", "roles": {}})
+_dfields = {f["name"]: f["value"] for f in _dig["discord"]["embeds"][0]["fields"]}
+
+check("T25e สรุปรายวันของหลายเพจต้องมี field 'เพจไหนต้องดูก่อน' — "
+      "ไม่งั้นอ่านแล้วยังต้องเปิด dashboard หาว่าเพจไหนอยู่ดี",
+      any("เพจไหนต้องดูก่อน" in k for k in _dfields), str(list(_dfields))[:200])
+
+check("T25f เพจที่ไม่ปกติต้องถูกดันขึ้นก่อนในลิสต์ (อ่านบรรทัดแรกก็รู้ว่าไปที่ไหน)",
+      next(v for k, v in _dfields.items() if "เพจไหนต้องดูก่อน" in k).splitlines()[0].find("เพจ A") > 0)
+
+# ใบสั่งงานที่รวมทุกเพจใช้ไม่ได้จริง — เพจที่กวาดพร้อมกันมักคนละเกม/คนละค่าย
+# ไม่มีใครโพสต์ประกาศเดียวลง 3 เพจคนละแบรนด์ได้
+check("T25g ใบสั่งงานต้องเจาะเพจที่ต้องสื่อสารก่อน ไม่ใช่รวมทุกเพจเป็นประกาศเดียว",
+      any("ต้องสื่อสารที่" in k and "เพจ A" in k for k in _dfields), str(list(_dfields))[:250])
+
+check("T25h ใบสั่งงานแยกรายเพจต้องส่งไปให้ n8n ด้วย (เปิด ticket แยกเพจได้)",
+      set(_dig["brief_by_page"]) == {"https://www.facebook.com/a", "https://www.facebook.com/b"})
+
+# ---- T26: โควตา alert ต่อรอบต้องไม่ถูกเพจเดียวกินหมด ----
+# เพจใหญ่ reach สูงเป็นปกติอยู่แล้ว ถ้าเรียงตาม reach แล้วตัด 5 อันแรก เพจนั้นจะกินโควตาทั้งรอบ
+# อีก 6 เพจเงียบสนิทบน Discord ทั้งที่มีของเข้าเกณฑ์ — อันตรายกว่าไม่มีระบบเตือน
+# เพราะทีมเชื่อว่า "เงียบ = ไม่มีเรื่อง"
+def _c_at(page: str, reach: int, cid: str) -> Classified:
+    c = Comment("facebook", "p/x", cid, "u", "เกมล่ม", datetime(2026, 7, 15, 14, 0), reach=reach,
+                page_name=page, page_url=f"https://www.facebook.com/{page}")
+    return Classified(c, "negative", 0.9)
+
+
+_loud = [_c_at("big", 900 - i, f"big{i}") for i in range(8)]      # เพจใหญ่ 8 คอมเมนต์แรง ๆ
+_quiet = [_c_at("small", 200, "small1"), _c_at("small", 190, "small2")]
+_picked = notify._spread(_loud + _quiet, 5)
+check("T26 โควตาต่อรอบต้องเกลี่ยให้ทุกเพจที่มีของเข้าเกณฑ์ — เพจเดียวกินหมดไม่ได้",
+      len({p.comment.page_name for p in _picked}) == 2 and len(_picked) == 5,
+      str([(p.comment.page_name, p.comment.reach) for p in _picked]))
+
+check("T26b เพจที่แรงกว่ายังได้ที่นั่งมากกว่า (เกลี่ย ไม่ใช่หารเท่า)",
+      sum(1 for p in _picked if p.comment.page_name == "big") > 
+      sum(1 for p in _picked if p.comment.page_name == "small"))
+
+check("T26c เพจเดียวเหมือนเดิม → ยังเรียงตาม reach แล้วตัดตามโควตาตรง ๆ (ของเก่าไม่พัง)",
+      [p.comment.comment_id for p in notify._spread(_loud, 3)] == ["big0", "big1", "big2"])
+
+
 # ---- output ----
 print("=" * 64)
 print("CRISIS RADAR — TEST RESULTS")

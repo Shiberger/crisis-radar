@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT))
 from src.classify import archive, lexicon, overrides   # noqa: E402
 from src.classify.pipeline import HybridClassifier    # noqa: E402
 from src.crisis import detector                        # noqa: E402
-from src.models import Classified                      # noqa: E402
+from src.models import Classified, page_key            # noqa: E402
 from src import notify                                 # noqa: E402
 from src.notify import brief                           # noqa: E402
 from src.sources.sample import SampleFacebookSource   # noqa: E402
@@ -397,12 +397,8 @@ UNKNOWN_PAGE = "ไม่ระบุเพจ"
 
 
 def _page_key(c: Classified) -> str:
-    """key จัดกลุ่มรายเพจ — ใช้ URL ก่อน (นิ่งกว่าชื่อ) ไม่มีค่อยใช้ชื่อ.
-
-    ต้องตรงกับ pkey() ฝั่งหน้าเว็บเป๊ะ ๆ ไม่งั้นสถานะรายเพจจะจับคู่กับกลุ่มในตารางไม่ติด
-    """
-    url = str(c.comment.page_url or "").strip().rstrip("/").lower()
-    return url or str(c.comment.page_name or "").strip().lower() or "-"
+    """key จัดกลุ่มรายเพจ — กติกาเดียวกับทุกที่ในระบบ (ดู models.page_key)."""
+    return page_key(c.comment.page_url, c.comment.page_name)
 
 
 def page_stats(items: list[Classified]) -> list[dict]:

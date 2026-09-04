@@ -234,7 +234,7 @@ def build(result: dict) -> dict:
     if lead["share"] >= LEAD_SHARE:
         focus = "concentrated"
         headline = f"ขอโทษ/ชี้แจงเรื่อง “{lead['label']}” เรื่องเดียวก่อน"
-        why = (f"เรื่องนี้กินความไม่พอใจ {lead['share']:.0f}% ของทั้งรอบ "
+        why = (f"เรื่องนี้กินความไม่พอใจ {lead['share']:.0f}% "
                f"({lead['negative']} คอมเมนต์) — พูดเรื่องเดียวครอบคลุมคนส่วนใหญ่ได้")
     elif second and pair >= PAIR_SHARE and second["share"] >= SECOND_MIN:
         focus = "multiple"

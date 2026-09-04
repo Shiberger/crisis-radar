@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 
+from ..models import page_key
 from ..timeutil import now_ict
 from . import alerts, brief as brief_mod
 from .payload import COLOR, MAX_FIELD, SENT_TH, STATUS_TH, _cut, owner_of, topic_labels
@@ -63,7 +64,7 @@ def top_negative(result: dict, limit: int) -> list[dict]:
     return rows[:limit]
 
 
-def _line(row: dict) -> str:
+def _line(row: dict, show_page: bool = False) -> str:
     reach = int(row.get("reach") or 0)
     text = _cut(row.get("text"), 150)
     url = row.get("comment_url") or ""
@@ -71,7 +72,10 @@ def _line(row: dict) -> str:
     # ติ๊กถูกให้ตัวที่เด้งไปแล้ว — ทีมจะได้ไม่ต้องเดาว่านี่ของใหม่หรือของที่เพิ่งคุยกันไป
     seen = " ✅ แจ้งแล้ว" if row.get("alerted_at") else ""
     topics = " · ".join(topic_labels(row.get("topics"))[:2])
-    return f"**{reach:,}** ไลก์+ตอบกลับ · {topics or 'ไม่ระบุประเด็น'}{seen}\n{head}"
+    # กวาดหลายเพจ = "3 อันดับแรก" อาจมาจากคนละเพจกันหมด ถ้าไม่บอกว่าอันไหนของใคร
+    # ทีมจะอ่านทั้งก้อนเป็นเรื่องเดียวกัน แล้วสรุปผิดว่าเพจเดียวมีปัญหาหลายเรื่อง
+    pg = f"`{_cut(row.get('page_name'), 40)}` · " if show_page and row.get("page_name") else ""
+    return f"{pg}**{reach:,}** ไลก์+ตอบกลับ · {topics or 'ไม่ระบุประเด็น'}{seen}\n{head}"
 
 
 # "ขอโทษได้ไหม" เป็นคำถามแรกที่ทีมถามเสมอ — ตอบให้ชัดตั้งแต่บรรทัดแรก อย่าให้ต้องตีความเอง
@@ -119,6 +123,56 @@ def brief_fields(b: dict) -> list[dict]:
     return out
 
 
+def pages_field(result: dict) -> dict | None:
+    """"เพจไหนต้องดูก่อน" — field ที่ทำให้สรุปรายวันของหลายเพจใช้ตัดสินใจได้จริง.
+
+    ไม่มีอันนี้ พาดหัวจะบอกได้แค่ "3 เพจ · สถานะ วิกฤต" ซึ่งอ่านแล้วยังต้องเปิด dashboard
+    อยู่ดีเพื่อหาว่าเพจไหน — เท่ากับ Discord ทำหน้าที่ได้แค่ "เตือนว่ามีเรื่อง" ไม่ได้ช่วยตัดสินใจ
+
+    คืน None เมื่อเฝ้าเพจเดียว (พาดหัวบอกชื่อเพจอยู่แล้ว การใส่ตารางอีกชั้นคือ noise)
+    """
+    pages = result.get("pages") or []
+    if len(pages) < 2:
+        return None
+    lines = []
+    for p in pages:      # เรียงมาจาก build_result แล้ว: วิกฤต → เฝ้าระวัง → ปกติ
+        st = p.get("status", "")
+        share = f"{round(p['negative'] * 100 / p['total'])}%" if p.get("total") else "—"
+        lines.append(f"{STATUS_ICON.get(st, '•')} **{p.get('name', '—')}** — "
+                     f"ลบ {p.get('negative', 0):,}/{p.get('total', 0):,} ({share})"
+                     + (f" · {p['alerts']} สัญญาณ" if p.get("alerts") else ""))
+    hot = sum(1 for p in pages if p.get("status") in ("CRISIS", "WATCH"))
+    name = f"เพจไหนต้องดูก่อน ({hot} จาก {len(pages)} เพจต้องสนใจ)" if hot \
+        else f"ทุกเพจปกติ ({len(pages)} เพจ)"
+    return {"name": name, "inline": False, "value": _cut("\n".join(lines), MAX_FIELD)}
+
+
+def brief_for(result: dict, pg: dict) -> dict:
+    """ใบสั่งงานของ "เพจเดียว" — คิดจากคอมเมนต์ของเพจนั้นล้วน ๆ.
+
+    จำเป็นเพราะเพจที่กวาดพร้อมกันมักเป็นคนละเกม/คนละค่าย (HOF, Combo, iHAVECPU) —
+    ใบสั่งงานที่รวม 3 เพจจะบอกว่า "ขอโทษเรื่องบั๊กก่อน 49% ของทั้งรอบ" ซึ่งเอาไปใช้ไม่ได้เลย
+    เพราะไม่มีเพจไหนมีหน้าตาแบบนั้นจริง และไม่มีใครโพสต์ประกาศเดียวลง 3 เพจคนละแบรนด์ได้
+
+    brief.build อ่านแค่ result["comments"] จึงส่งเฉพาะคอมเมนต์ของเพจนั้นเข้าไปได้ตรง ๆ
+    """
+    k = pg.get("key")
+    rows = [c for c in (result.get("comments") or [])
+            if page_key(c.get("page_url"), c.get("page_name")) == k]
+    return brief_mod.build({"comments": rows})
+
+
+def lead_page(result: dict) -> dict | None:
+    """เพจที่ต้องสื่อสารก่อน — วิกฤต/เฝ้าระวังตัวแรก (pages เรียงมาให้แล้ว).
+
+    คืน None ตอนเฝ้าเพจเดียว หรือตอนไม่มีเพจไหนผิดปกติเลย (ไม่ต้องเจาะจงว่าเพจไหน)
+    """
+    pages = result.get("pages") or []
+    if len(pages) < 2:
+        return None
+    return next((p for p in pages if p.get("status") in ("CRISIS", "WATCH")), None)
+
+
 def build_discord(result: dict, *, page: dict, prev: dict | None, top: list[dict],
                   dashboard_url: str, role_id: str = "") -> dict:
     status = result.get("status", "NORMAL")
@@ -134,10 +188,27 @@ def build_discord(result: dict, *, page: dict, prev: dict | None, top: list[dict
         {"name": "คนคอมเมนต์", "value": f"{int(result.get('unique_authors') or 0):,}", "inline": True},
     ]
 
+    # "เพจไหนต้องดูก่อน" มาก่อนใบสั่งงาน — คำถามแรกของคนที่ดูแลหลายเพจคือ "ไปที่ไหน"
+    # ตอบ "พูดว่าอะไร" ก่อนบอก "ที่ไหน" ทำให้ต้องอ่านย้อนกลับ ซึ่งบน Discord แทบไม่มีใครทำ
+    pf = pages_field(result)
+    if pf:
+        fields.append(pf)
+
     # ใบสั่งงานอยู่บนสุดถัดจากตัวเลข — เป็นส่วนเดียวที่ตอบว่า "แล้วต้องทำอะไร"
     # ถ้าวางไว้ท้ายข้อความ คนจะอ่านรายการคอมเมนต์ดิบก่อนแล้วสรุปเอง ซึ่งคือสิ่งที่ tool นี้ควรตัดออก
-    for f in brief_fields(brief_mod.build(result)):
-        fields.append(f)
+    # กวาดหลายเพจ → สั่งงานเจาะเพจที่ต้องสื่อสารก่อน ไม่ใช่รวมทุกเพจเป็นประกาศเดียว (ดู brief_for)
+    lead = lead_page(result)
+    bfields = brief_fields(brief_for(result, lead) if lead else brief_mod.build(result))
+    if lead and bfields:
+        bfields[0]["name"] = f"🎯 ต้องสื่อสารที่ **{_cut(lead['name'], 60)}** ก่อน"
+        rest = [p for p in (result.get("pages") or [])
+                if p.get("status") in ("CRISIS", "WATCH") and p.get("key") != lead.get("key")]
+        if rest:
+            # เพจอื่นที่ไม่ปกติต้องมีประกาศของตัวเอง — ห้ามให้เข้าใจว่าใบสั่งงานนี้ครอบทุกเพจ
+            bfields[0]["value"] = _cut(
+                bfields[0]["value"] + "\n\n⚠️ อีก " + str(len(rest)) + " เพจต้องสื่อสารแยกกัน: "
+                + " · ".join(p.get("name", "") for p in rest[:3]), MAX_FIELD)
+    fields += bfields
 
     trends = [t for t in (result.get("topic_trends") or []) if t.get("negative")][:3]
     if trends:
@@ -148,9 +219,10 @@ def build_discord(result: dict, *, page: dict, prev: dict | None, top: list[dict
                            + ("  🆕 เพิ่งโผล่" if t.get("is_emerging") else "")
                            for t in trends), MAX_FIELD)})
 
+    multi = len(result.get("pages") or []) > 1
     if top:
         fields.append({"name": f"คอมเมนต์ลบที่คนเห็นเยอะสุด ({len(top)} อันดับแรก)", "inline": False,
-                       "value": _cut("\n\n".join(_line(r) for r in top), MAX_FIELD)})
+                       "value": _cut("\n\n".join(_line(r, show_page=multi) for r in top), MAX_FIELD)})
     else:
         fields.append({"name": "คอมเมนต์ลบที่ต้องดู", "value": "ไม่มีเลยรอบนี้ — เพจปกติ",
                        "inline": False})
@@ -232,6 +304,11 @@ def build_event(result: dict, *, page: dict | None = None, prev: dict | None = N
             "source": result.get("source", ""),
             "dashboard_url": cfg["dashboard_url"],
         },
+        # รายเพจแบบดิบ — n8n เอาไปแตกเป็นข้อความต่อเพจ / เปิด ticket เฉพาะเพจที่ไม่ปกติได้
+        "pages": [{"key": p.get("key"), "name": p.get("name"), "url": p.get("url"),
+                   "status": p.get("status"), "total": p.get("total"),
+                   "negative": p.get("negative"), "alerts": p.get("alerts")}
+                  for p in (result.get("pages") or [])],
         "previous": prev or {},
         "topics": [{"topic": t.get("topic"), "label": t.get("label"), "negative": t.get("negative"),
                     "owner": t.get("owner"), "is_emerging": bool(t.get("is_emerging"))}
@@ -247,6 +324,10 @@ def build_event(result: dict, *, page: dict | None = None, prev: dict | None = N
         "routing": {"owner": owner_of([t.get("topic") for t in (result.get("topic_trends") or [])]),
                     "role_id": role_id},
         "brief": brief_mod.build(result),
+        # ใบสั่งงานแยกรายเพจ — n8n เอาไปเปิด ticket / ส่งเข้า channel ของแต่ละเพจได้ตรง ๆ
+        # (ตัวบนเป็นภาพรวมทั้งรอบ ซึ่งใช้ได้จริงเฉพาะตอนเฝ้าเพจเดียว)
+        "brief_by_page": {p["key"]: brief_for(result, p) for p in (result.get("pages") or [])}
+                         if len(result.get("pages") or []) > 1 else {},
         "discord": build_discord(result, page=page, prev=prev, top=top,
                                  dashboard_url=cfg["dashboard_url"], role_id=role_id),
     }
