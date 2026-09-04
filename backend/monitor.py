@@ -88,9 +88,7 @@ def config() -> dict:
     pages = list(t.get("monitor_pages") or [])
     if not pages and t.get("page_url"):
         pages = [t["page_url"]]
-    named = {pg["url"].rstrip("/").lower(): pg["name"]
-             for g in (t.get("page_presets") or []) for pg in g["pages"]}
-    labels = [named.get(u.rstrip("/").lower()) or u.rstrip("/").rsplit("/", 1)[-1] for u in pages]
+    labels = [jobs.page_label([u]) for u in pages]
     return {
         "enabled": enabled,
         "source": source,
@@ -99,10 +97,8 @@ def config() -> dict:
         "max_comments": _int_env("MONITOR_MAX_COMMENTS", 30),
         "days": max(0, _int_env("MONITOR_DAYS", 0)),
         "always": _truthy(os.environ.get("MONITOR_ALWAYS", "")),
-        # page_name/page_url = ตัวแทน 1 ค่าสำหรับที่ที่โชว์ได้ทีละอัน (ของเดิมเรียกใช้อยู่)
-        "page_name": (labels[0] if len(labels) == 1 else
-                      f"{len(labels)} เพจ ({', '.join(labels[:3])}{'…' if len(labels) > 3 else ''})")
-                     or t.get("page_name", ""),
+        # page_name = ชื่อที่เอาไปโชว์ได้ทีละค่า — jobs.page_label ตัดสินให้ (เพจเดียว/หลายเพจ)
+        "page_name": jobs.page_label(pages) or t.get("page_name", ""),
         "page_url": pages[0] if pages else t.get("page_url", ""),
         "page_urls": pages,
         "page_labels": labels,

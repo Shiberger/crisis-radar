@@ -912,6 +912,28 @@ check("T23i ใบสั่งงานอยู่เหนือรายก�
       and "✅ ควรพูดแบบนี้" in _names and "❌ ห้ามพูดแบบนี้" in _names,
       " → ".join(_names[3:6]))
 
+# พาดหัวต้องบอกว่ากวาดเพจไหนจริง ๆ — เฝ้า 7 เพจแล้วพาดหัวเป็นชื่อเพจเดียว ทีมจะเข้าใจผิด
+# ว่าดราม่าอยู่เพจนั้นเพจเดียว แล้วไปตามผิดเพจ
+_ev7 = _dg.build_event({**_conc, "status": "CRISIS", "total": 9, "brand": "x",
+                        "sentiment_mix": {"negative": 9}, "topic_trends": [], "alert_items": [],
+                        "page_name": "7 เพจ (A, B, C…)"},
+                       page={"page_name": "เพจเดียวใน targets.json"}, prev=None,
+                       cfg={"dashboard_url": "", "roles": {}})
+check("T23l พาดหัวสรุปต้องเป็นเพจที่กวาดรอบนั้นจริง ไม่ใช่ค่าคงที่ใน targets.json",
+      "7 เพจ" in _ev7["discord"]["embeds"][0]["title"],
+      _ev7["discord"]["embeds"][0]["title"])
+
+check("T23m เฝ้าเพจเดียวเหมือนเดิม → ยังใช้ชื่อจาก targets.json ได้ (ของเก่าไม่พัง)",
+      "เพจเดียวใน targets.json" in _dg.build_event(
+          {**_conc, "status": "NORMAL", "total": 9, "brand": "x", "sentiment_mix": {},
+           "topic_trends": [], "alert_items": []},
+          page={"page_name": "เพจเดียวใน targets.json"}, prev=None,
+          cfg={"dashboard_url": "", "roles": {}})["discord"]["embeds"][0]["title"])
+
+check("T23n ตั้งชื่อเพจใช้ helper ตัวเดียวกันทั้ง monitor และรายงาน (ไม่แตกเป็น 2 ชุด)",
+      jobs.page_label(["https://www.facebook.com/a", "https://www.facebook.com/b"]).startswith("2 เพจ")
+      and jobs.page_label(["https://www.facebook.com/a"]) == "a")
+
 check("T23j ก้อนดิบที่ส่งให้ n8n ต้องมีใบสั่งงานด้วย (route/เปิด Jira ต่อได้ไม่ต้องแกะข้อความ)",
       _ev["brief"]["focus"] == "concentrated")
 

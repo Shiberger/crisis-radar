@@ -131,6 +131,28 @@ def monitor_page_urls(cfg: dict | None = None) -> list[str]:
     return _dedup_urls(_clean_fb_urls([str(u).strip() for u in urls]))[:MAX_PAGES]
 
 
+def page_label(urls: list[str], cfg: dict | None = None) -> str:
+    """ชื่อที่เอาไปโชว์แทน "เพจที่ตรวจรอบนี้" — เพจเดียวใช้ชื่อเพจ หลายเพจบอกจำนวน + ตัวอย่าง.
+
+    ต้องมี เพราะทุกที่ที่โชว์ชื่อเพจเคยอ่านจาก targets.json ตัวเดียว (page_name) ซึ่งเป็น
+    ค่าคงที่ — พอเฝ้าหลายเพจ ข้อความที่ส่งเข้า Discord จะพาดหัวว่าเป็นเพจเดียวทั้งที่กวาด 7 เพจ
+    ทีมอ่านแล้วเข้าใจผิดว่าดราม่าอยู่เพจนั้นเพจเดียว
+    """
+    if cfg is None:
+        try:
+            cfg = json.loads(TARGETS_FILE.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            cfg = {}
+    named = {pg["url"].rstrip("/").lower(): pg["name"]
+             for g in page_presets(cfg) for pg in g["pages"]}
+    labels = [named.get(u.rstrip("/").lower()) or u.rstrip("/").rsplit("/", 1)[-1] for u in urls]
+    if not labels:
+        return str(cfg.get("page_name") or "")
+    if len(labels) == 1:
+        return labels[0]
+    return f"{len(labels)} เพจ ({', '.join(labels[:3])}{'…' if len(labels) > 3 else ''})"
+
+
 def get_targets() -> dict:
     """ค่าตั้งต้นสำหรับฟอร์มหน้าเว็บ — URL เพจ/โพสต์ + รายชื่อเพจที่ติ๊กเลือกได้."""
     try:
@@ -330,21 +352,23 @@ def run_pipeline(params: dict, log=print) -> dict:
     notify.apply(classified)     # คอมเมนต์ที่เคยแจ้ง Discord แล้วต้องไม่ถูกแจ้งซ้ำรอบนี้
 
     log("ตรวจจับ crisis (spike detection)…")
-    result = build_result(classified, source=source,
-                          engine=clf.engine, llm_on=clf.llm_on)
+    scanned = page_label([str(u) for u in (params.get("page_urls") or [])
+                          if str(u).strip()] or ([params["page_url"]] if params.get("page_url") else []))
+    result = build_result(classified, source=source, engine=clf.engine, llm_on=clf.llm_on,
+                          page_name=scanned)
 
     # เคสที่ "ลบและแรง" ตั้งแต่แรก ไม่ต้องรอให้มีคนเปิดหน้าเว็บมาเห็น — เด้งเข้า Discord เลย
     # (เคสที่ AI อ่านพลาด ทีมกดแจ้งเองได้จากหน้าเว็บ ดู server.py /api/alert)
     if notify.dispatch_auto(classified, result, page=get_targets(), log=log):
         result = build_result(classified, source=source, generated_at=result["generated_at"],
-                              engine=clf.engine, llm_on=clf.llm_on)
+                              engine=clf.engine, llm_on=clf.llm_on, page_name=scanned)
 
     log(f"เสร็จ — สถานะ {result['status']} · alert {len(result['alerts'])} รายการ")
     return result
 
 
 def build_result(items: list[Classified], source: str, generated_at: str = "",
-                 engine: str = "", llm_on: bool = False) -> dict:
+                 engine: str = "", llm_on: bool = False, page_name: str = "") -> dict:
     """ตรวจ crisis จาก label ปัจจุบัน แล้วประกอบก้อนผลที่หน้าเว็บใช้.
 
     แยกออกมาเพราะถูกเรียก 2 ทาง: หลัง scrape รอบใหม่ · และตอนทีมแก้ label/กดอ่านแล้ว
@@ -373,6 +397,7 @@ def build_result(items: list[Classified], source: str, generated_at: str = "",
     # ชั้นลึกสุดที่ใช้จริงในรอบนี้ — หน้าเว็บใช้ตัดสินว่าจะเขียนป้ายว่า "AI" หรือ "กฎออฟไลน์"
     result["engine"] = engine
     result["llm_on"] = llm_on
+    result["page_name"] = page_name
     # ใบสั่งงาน "ต้องพูดเรื่องไหน พูดยังไง" — คิดจากผลชุดนี้ตรง ๆ จึงต้องคิดใหม่ทุกครั้งที่
     # ทีมแก้ label/กดอ่านแล้ว (ซึ่งเรียก build_result อยู่แล้ว) ไม่งั้นคำแนะนำจะค้างของเก่า
     result["brief"] = brief.build(result)
@@ -397,7 +422,8 @@ def recompute(result: dict) -> dict:
     return build_result(items, source=result.get("source", "sample"),
                         generated_at=result.get("generated_at", ""),
                         # label ชุดนี้ถูกจัดโดย engine เดิม — การกดแก้ label ไม่ได้เรียก engine ใหม่
-                        engine=result.get("engine", ""), llm_on=bool(result.get("llm_on")))
+                        engine=result.get("engine", ""), llm_on=bool(result.get("llm_on")),
+                        page_name=result.get("page_name", ""))
 
 
 def _run(job_id: str, params: dict) -> None:

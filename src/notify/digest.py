@@ -164,7 +164,9 @@ def build_discord(result: dict, *, page: dict, prev: dict | None, top: list[dict
         fields.append({"name": "ดูทั้งหมด", "value": f"[เปิด Dashboard]({dashboard_url})",
                        "inline": False})
 
-    page_name = page.get("page_name") or result.get("brand", "")
+    # result["page_name"] = เพจที่กวาดรอบนั้นจริง · page["page_name"] = ค่าคงที่ใน targets.json
+    # ต้องเอาตัวแรกก่อน ไม่งั้นสรุปของ 7 เพจจะพาดหัวเป็นชื่อเพจเดียว ทีมอ่านแล้วเข้าใจผิดว่าดราม่าอยู่เพจนั้น
+    page_name = result.get("page_name") or page.get("page_name") or result.get("brand", "")
     embed = {
         "title": f"{STATUS_ICON.get(status, '📊')} สรุปประจำวัน — {page_name} · "
                  f"สถานะ {STATUS_TH.get(status, status)}",

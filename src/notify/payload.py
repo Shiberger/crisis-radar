@@ -90,7 +90,7 @@ def build_discord(row: dict, *, severity: str, reason: str, note: str, report: d
         "description": f"> {_cut(row.get('text'), MAX_QUOTE)}\n— โดย **{_cut(row.get('author') or '—', 80)}**",
         "color": COLOR.get(severity, COLOR["medium"]),
         "fields": fields,
-        "footer": {"text": f"Crisis Radar · {page.get('page_name') or report.get('brand', '')}"
+        "footer": {"text": f"Crisis Radar · {report.get('page_name') or page.get('page_name') or report.get('brand', '')}"
                            f" · สถานะเพจตอนนี้: {STATUS_TH.get(status, status)}"
                            f" · ส่งต่อ: {owner}"},
     }
@@ -118,7 +118,8 @@ def build_event(row: dict, *, trigger: str, severity: str, reason: str, report: 
         "reason": reason,
         "sent_at": now_ict().isoformat(timespec="seconds"),
         "brand": report.get("brand", ""),
-        "page": {"name": page.get("page_name", ""), "url": page.get("page_url", "")},
+        "page": {"name": report.get("page_name") or page.get("page_name", ""),
+                 "url": page.get("page_url", "")},
         "report": {
             "status": report.get("status", ""),
             "total": report.get("total", 0),
