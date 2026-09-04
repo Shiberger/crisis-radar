@@ -218,10 +218,15 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
             )
             lead = topic_counter.most_common(1)
             lead_topic = lead[0][0] if lead else ""
+            # baseline ที่เกือบศูนย์ (เพจที่ปกติแทบไม่มีคอมเมนต์ลบ) หารแล้วได้ตัวเลขเว่อร์ —
+            # "แรงกว่าปกติ 95 เท่า" จากคอมเมนต์ลบ 2 อัน อ่านแล้วไม่น่าเชื่อถือและโดนจับผิดได้ทันที
+            # เคสนั้นบอกตรง ๆ ว่า "ปกติแทบไม่มีเลย" ซึ่งเป็นข้อมูลที่ตรงกว่าและยังชี้ว่าผิดปกติจริง
             times = severity / baseline if baseline else 0
+            how = (f"แรงกว่าปกติ {times:.0f} เท่า" if baseline >= 1
+                   else "ทั้งที่ปกติช่วงนี้แทบไม่มีคอมเมนต์ลบเลย")
             items_out.append(AlertItem(
                 kind="spike", level="high",
-                title=f"คอมเมนต์ลบพุ่งผิดปกติช่วง {start:%H:%M} น. — แรงกว่าปกติ {times:.0f} เท่า",
+                title=f"คอมเมนต์ลบพุ่งผิดปกติช่วง {start:%H:%M} น. — {how}",
                 detail=f"ชั่วโมงนี้มีคอมเมนต์ลบ {len(negs)} จาก {len(group)} คอมเมนต์ · "
                        f"เรื่องที่คนบ่นมากสุดคือ "
                        f"{TOPIC_LABELS.get(lead_topic, lead_topic) or 'ทั่วไป'}",

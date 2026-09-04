@@ -760,6 +760,11 @@ check("T20 เพจที่ปกติไม่มีคอมเมนต์
       _rep.status == "CRISIS" and any(b.is_spike for b in _rep.buckets),
       "ของเดิมบังคับ baseline > 0 → เพจเงียบไม่มีวันเข้าเงื่อนไข spike แม้แต่ครั้งเดียว")
 
+_titles = [a.title for a in _rep.alert_items if a.kind == "spike"]
+check("T20g baseline เกือบศูนย์ ต้องไม่โฆษณาเป็น 'แรงกว่าปกติ 95 เท่า' จากคอมเมนต์ลบไม่กี่อัน",
+      _titles and "เท่า" not in _titles[0] and "แทบไม่มีคอมเมนต์ลบเลย" in _titles[0],
+      _titles[0] if _titles else "ไม่มี spike")
+
 check("T20b คอมเมนต์ลบลอย ๆ อันเดียวต้องไม่กลายเป็น CRISIS (MIN_SEVERITY กันไว้)",
       _det.detect(_clf.classify_all(_calm + [_mk(99, "เกมล่ม", 1, 2)])).status == "NORMAL")
 
@@ -791,6 +796,43 @@ check("T20f ตั้งขนาด bucket จาก env ได้ และข
 del os.environ["CRISIS_BUCKET_MIN"]
 importlib.reload(_det)
 
+
+# ---- T22: หน้าเว็บต้องเรียก "ชั้นลึกสุด" ตามที่ใช้จริง ----
+# ปัญหาเดิม: ป้ายเขียนว่า "AI อ่านซ้ำ" ทุกครั้งที่คอมเมนต์ผ่านชั้นที่ 3 ไม่ว่าชั้นนั้นเป็นอะไร
+# พอปิด LLM ไว้ หน้าเว็บจึงโฆษณาว่ามี AI อ่าน 151 คอมเมนต์ ทั้งที่ไม่มี request ออกไปเลยสักครั้ง
+_off = HybridClassifier(llm=OfflineHeuristicLLM())
+check("T22 ปิด LLM → รายงานบอกว่าชั้นลึกสุดไม่ใช่ AI",
+      _off.llm_on is False and "กฎออฟไลน์" in _off.engine, _off.engine)
+
+_res_off = jobs.build_result(_off.classify_all(SampleFacebookSource(FIXTURE).fetch()),
+                            source="sample", engine=_off.engine, llm_on=_off.llm_on)
+check("T22b engine/llm_on ต้องไปถึงหน้าเว็บพร้อมผล ไม่ใช่รู้กันแค่ใน log",
+      _res_off["llm_on"] is False and _res_off["engine"] == _off.engine,
+      f"engine='{_res_off['engine']}' · escalated {_res_off['escalated_count']} คอมเมนต์")
+
+
+class _FakeClaude(OfflineHeuristicLLM):
+    label = "Claude claude-haiku-4-5"
+
+
+_on = HybridClassifier(llm=_FakeClaude())
+_on.llm = _FakeClaude()
+check("T22c เปิด LLM จริง → llm_on=True และโชว์ชื่อโมเดล",
+      jobs.build_result([], source="sample", engine=_on.engine,
+                        llm_on=True)["engine"] == "Claude claude-haiku-4-5")
+
+# กดแก้ label = คิดรายงานใหม่จากคอมเมนต์ชุดเดิม ไม่ได้เรียก engine ใหม่ → ชื่อ engine ต้องคงเดิม
+# ถ้าหล่นหาย ป้ายบนหน้าเว็บจะเด้งกลับไปเป็น "AI อ่านซ้ำ" ทุกครั้งที่ทีมกดแก้ label
+_recomputed = jobs.recompute(_res_off)
+check("T22d กดแก้ label แล้วชื่อ engine ต้องไม่หล่นหาย (ป้ายต้องไม่เด้งกลับเป็น AI)",
+      _recomputed["engine"] == _off.engine and _recomputed["llm_on"] is False)
+
+_html = (ROOT / "backend" / "static" / "index.html").read_text(encoding="utf-8")
+# นับเฉพาะ string literal ที่ถูกเรนเดอร์จริง (คอมเมนต์อธิบายโค้ดไม่นับ)
+_lit = _html.count("'AI อ่านซ้ำ'")
+check("T22e ทุกที่ที่เขียนคำว่า 'AI อ่านซ้ำ' ต้องเช็ก llm_on ก่อนเสมอ",
+      _lit == 1 and "DATA.llm_on?'AI อ่านซ้ำ':'กฎอ่านซ้ำ'" in _html,
+      f"string literal {_lit} ที่ · อยู่หลังเงื่อนไข llm_on ทั้งหมด")
 
 # ---- T21: เพจที่เฝ้า "ชั่วคราว" ต้องหมดอายุเอง ----
 # ค่า Apify คิดต่อเพจต่อรอบ — เปิดเฝ้า 7 เพจตอนพรีเซ้นท์แล้วลืมปิด = เครดิตหมดกลางเดือน

@@ -433,7 +433,7 @@ tr.arch td.txt{color:var(--ink2)}
 <!-- ═══ กล่องแก้ label ที่ AI ทายพลาด ═══ -->
 <dialog id="fixDlg" aria-labelledby="fixTitle">
   <div class="bd">
-    <h3 id="fixTitle">แก้ผลที่ AI อ่าน</h3>
+    <h3 id="fixTitle">แก้ผลที่ระบบอ่าน</h3>
     <div class="sub">ที่แก้ไว้จะถูกใช้คิดสถานะใหม่ทันที และจำไว้ใช้ในรอบตรวจถัดไปด้วย</div>
     <div class="quote" id="fixText"></div>
     <div class="qmeta" id="fixMeta"></div>
@@ -446,7 +446,7 @@ tr.arch td.txt{color:var(--ink2)}
   </div>
   <div class="ft">
     <button class="run" id="fixSave" style="padding:10px 22px;font-size:14.5px">บันทึก</button>
-    <button class="ghost hidden" id="fixReset">คืนค่าที่ AI ทาย</button>
+    <button class="ghost hidden" id="fixReset">คืนค่าที่ระบบทาย</button>
     <span class="grow"></span>
     <button class="ghost" id="fixCancel">ยกเลิก</button>
     <div id="fixErr" class="hidden"></div>
@@ -454,7 +454,7 @@ tr.arch td.txt{color:var(--ink2)}
 </dialog>
 
 <!-- ═══ กล่องแจ้งคอมเมนต์เข้า Discord (ส่งผ่าน n8n) ═══
-     ระบบแจ้งเองเฉพาะคอมเมนต์ที่ "ลบและแรง" — เคสที่ AI ให้เป็นกลาง/บวกทั้งที่เป็นเรื่อง
+     ระบบแจ้งเองเฉพาะคอมเมนต์ที่ "ลบและแรง" — เคสที่ระบบให้เป็นกลาง/บวกทั้งที่เป็นเรื่อง
      คนที่นั่งดูต้องดันเข้า Discord เองได้จากตรงนี้ ไม่ต้องไปก็อปแปะเอง                        -->
 <dialog id="alertDlg" aria-labelledby="alertTitle">
   <div class="bd">
@@ -464,7 +464,7 @@ tr.arch td.txt{color:var(--ink2)}
     <div class="qmeta" id="alertMeta"></div>
     <div class="staleflag hidden" id="alertPrev" style="margin-top:12px;display:inline-block"></div>
     <span class="lbl">บอกทีมหน่อยว่าทำไมต้องดูอันนี้ (ไม่บังคับ — จะแนบไปในข้อความ Discord ด้วย)</span>
-    <input id="alertNote" maxlength="300" placeholder="เช่น AI อ่านเป็นกลาง แต่คนนี้กำลังชวนคนอื่นไปรีวิว 1 ดาว">
+    <input id="alertNote" maxlength="300" placeholder="เช่น ระบบอ่านเป็นกลาง แต่คนนี้กำลังชวนคนอื่นไปรีวิว 1 ดาว">
   </div>
   <div class="ft">
     <button class="run" id="alertSend" style="padding:10px 22px;font-size:14.5px">ส่งเข้า Discord</button>
@@ -650,10 +650,10 @@ tr.arch td.txt{color:var(--ink2)}
     <section class="card" id="explorer">
       <header><div><h2>อ่านคอมเมนต์จริง</h2>
         <div class="sub">ค้นหา กรอง และเรียงลำดับได้ · คลิกชื่อประเด็นเพื่อกรองเฉพาะเรื่องนั้น<br>
-          <b>AI อ่านผิดได้</b> — โดยเฉพาะมุกตลก/ประชด · กดที่ <b>ป้ายอารมณ์</b> ในตารางเพื่อแก้อารมณ์และประเด็นเอง
+          <b>ระบบอ่านผิดได้</b> — โดยเฉพาะมุกตลก/ประชด · กดที่ <b>ป้ายอารมณ์</b> ในตารางเพื่อแก้อารมณ์และประเด็นเอง
           แล้วระบบจะคิดสถานะให้ใหม่ทันที<br>
           อ่าน/จัดการคอมเมนต์ไหนแล้ว กด <b>“✓ อ่านแล้ว”</b> — ย้ายเข้าคลัง ไม่ขึ้นบนหน้านี้อีก
-          และรอบตรวจถัดไปไม่ต้องส่งเข้า AI ซ้ำ<br>
+          และรอบตรวจถัดไปไม่ต้องวิเคราะห์ซ้ำ<br>
           <span id="alertHint"></span></div></div></header>
       <div class="activebar hidden" id="activeBar"></div>
       <div class="seg" id="viewSeg" style="margin-bottom:13px">
@@ -687,11 +687,11 @@ tr.arch td.txt{color:var(--ink2)}
     <section class="card how">
       <header><div><h2>ระบบตัดสินยังไง</h2></div></header>
       <ol>
-        <li><b>อ่านทุกคอมเมนต์</b> แล้วจัดว่าเป็นบวก/กลาง/ลบ พร้อมจับว่าพูดถึงเรื่องอะไร (บั๊ก ราคา ของรางวัล ฯลฯ) — คอมเมนต์ที่กำกวมหรือประชด จะถูกส่งให้ AI อ่านซ้ำอีกชั้น</li>
+        <li><b>อ่านทุกคอมเมนต์</b> แล้วจัดว่าเป็นบวก/กลาง/ลบ พร้อมจับว่าพูดถึงเรื่องอะไร (บั๊ก ราคา ของรางวัล ฯลฯ) — คอมเมนต์ที่กำกวมหรือประชด จะถูกส่งให้<span id="deepName">ชั้นลึกสุด</span>อ่านซ้ำอีกชั้น</li>
         <li><b>เทียบกับ “ปกติของเพจนี้”</b> ไม่ได้ดูแค่ว่าคอมเมนต์ลบเยอะไหม แต่ดูว่าชั่วโมงนี้ลบพุ่งกว่าชั่วโมงก่อน ๆ กี่เท่า และคอมเมนต์นั้นมีคนไลก์/ตอบกลับมากแค่ไหน</li>
         <li><b>เตือนเมื่อผิดปกติจริง</b> ทั้งกรณีพุ่งทั้งเพจ กรณีเรื่องใดเรื่องหนึ่งมาแรงขึ้นมาใหม่ และกรณีคอมเมนต์ลบเดี่ยว ๆ ที่คนแห่มากดไลก์ — พร้อมบอกว่าทีมไหนควรรับเรื่อง</li>
-        <li><b>คนตัดสินทับ AI ได้</b> ถ้า AI อ่านผิด (เช่น มุกตลกถูกนับเป็นคำบ่น) กดแก้ที่ป้ายอารมณ์ในตารางได้เลย — ระบบจะคิดสถานะใหม่ทันที และ<b>จำไว้ใช้ในรอบตรวจถัดไป</b>ด้วย ไม่ต้องแก้ซ้ำ</li>
-        <li><b>เรื่องด่วนเด้งเข้า Discord เอง</b> คอมเมนต์เชิงลบที่คนเห็นเยอะเกินเกณฑ์ จะถูกส่งเข้า channel ของทีมทันทีตั้งแต่รอบตรวจ (ผ่าน n8n) ไม่ต้องรอให้มีคนเปิดหน้านี้ — ส่วนเคสที่ <b>AI อ่านเป็น “กลาง/บวก” แต่คนอ่านออกว่าเป็นเรื่อง</b> กด “🔔 แจ้ง Discord” ที่แถวนั้นส่งเองได้ · คอมเมนต์เดิมไม่ถูกส่งซ้ำ</li>
+        <li><b>คนตัดสินทับระบบได้</b> ถ้าระบบอ่านผิด (เช่น มุกตลกถูกนับเป็นคำบ่น) กดแก้ที่ป้ายอารมณ์ในตารางได้เลย — ระบบจะคิดสถานะใหม่ทันที และ<b>จำไว้ใช้ในรอบตรวจถัดไป</b>ด้วย ไม่ต้องแก้ซ้ำ</li>
+        <li><b>เรื่องด่วนเด้งเข้า Discord เอง</b> คอมเมนต์เชิงลบที่คนเห็นเยอะเกินเกณฑ์ จะถูกส่งเข้า channel ของทีมทันทีตั้งแต่รอบตรวจ (ผ่าน n8n) ไม่ต้องรอให้มีคนเปิดหน้านี้ — ส่วนเคสที่ <b>ระบบอ่านเป็น “กลาง/บวก” แต่คนอ่านออกว่าเป็นเรื่อง</b> กด “🔔 แจ้ง Discord” ที่แถวนั้นส่งเองได้ · คอมเมนต์เดิมไม่ถูกส่งซ้ำ</li>
         <li><b>อ่านแล้ว = จัดการแล้ว</b> คอมเมนต์ที่กด “✓ อ่านแล้ว” จะย้ายเข้าคลังและ<b>ไม่ถูกนับในสถานะอีก</b> — สถานะข้างบนจึงหมายถึง “ของที่ยังไม่ได้จัดการ” เสมอ · จำนวนในคลังแสดงคู่กันไว้ตลอด และเอากลับได้ทุกเมื่อ</li>
       </ol>
       <div class="foot-note" id="methodFoot"></div>
@@ -726,6 +726,11 @@ const fmtFull=iso=>{const p=P(iso);return p?`${p.d} ${MONTHS[p.mo-1]} ${p.h}:${p
 const bkey=(iso,mins)=>{const m=/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(iso||'');
   if(!m)return'';const b=mins||60, t=Math.floor((+m[2]*60 + +m[3])/b)*b;
   return `${m[1]}T${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`;};
+
+/* ชื่อ "ชั้นลึกสุด" ที่ใช้จัด label จริงในรอบนี้ — ต้องอ่านจากผล ไม่ใช่ hardcode ว่า "AI"
+   เพราะชั้นนี้สลับได้ระหว่าง Claude กับกฎออฟไลน์ (env LLM) · หน้าเว็บที่เขียนว่า "AI อ่านซ้ำ"
+   ตอนที่ปิด LLM ไว้ = บอกผู้ใช้ว่ามีโมเดลอ่าน 151 คอมเมนต์ทั้งที่ไม่มี request ออกไปเลย */
+const deepLayer=r=>(r&&r.llm_on)?(r.engine||'AI'):'กฎออฟไลน์';
 
 /* ═══════════════════════════ theme ═══════════════════════════ */
 const savedTheme=localStorage.getItem('cr-theme');
@@ -881,7 +886,7 @@ $('#runBtn').onclick=()=>run();
 /* ═══════════════════════════ run + progress ═══════════════════════════ */
 const STEPS=[
   {k:'fetch',   t:'ดึงคอมเมนต์จากแหล่งข้อมูล'},
-  {k:'classify',t:'ให้ AI อ่านและจัดอารมณ์/ประเด็น'},
+  {k:'classify',t:'จัดอารมณ์และประเด็นให้ทุกคอมเมนต์'},
   {k:'detect',  t:'ตรวจหาช่วงที่ผิดปกติ'},
   {k:'done',    t:'สรุปผลและจัดหน้ารายงาน'},
 ];
@@ -981,6 +986,8 @@ const TLabel=t=>(DATA&&DATA.topic_labels&&DATA.topic_labels[t])||t;
 function render(r,opts={}){
   const keep=!!opts.keep&&!!DATA;
   DATA=r;
+  // คำอธิบาย "ระบบทำอะไร" ต้องเรียกชั้นลึกสุดตามที่รอบนี้ใช้จริง ไม่ใช่เขียน "AI" ค้างไว้
+  const dn=$('#deepName');if(dn)dn.textContent=deepLayer(r);
   if(!keep){
     FILT={view:'active',sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50};
     $('#search').value='';$('#topicFilter').value='';$('#sortBy').value='reach';
@@ -1001,7 +1008,7 @@ function render(r,opts={}){
     `เกณฑ์ที่ใช้ตอนนี้: เตือนเมื่อความแรงของชั่วโมงนั้นเกินค่าปกติ ${r.thresholds?.spike_factor??2.5} เท่า `
    +`(และมีน้ำหนักอย่างน้อย ${r.thresholds?.min_severity??30}) · คอมเมนต์ลบที่มีไลก์+ตอบกลับตั้งแต่ `
    +`${r.thresholds?.viral_reach??150} ขึ้นไป ถือว่ากระจายวงกว้าง`
-   +(r.override_count?` · รายงานนี้ใช้คำตัดสินที่ทีมแก้เอง ${nf(r.override_count)} คอมเมนต์ (ทับผลของ AI)`:'');
+   +(r.override_count?` · รายงานนี้ใช้คำตัดสินที่ทีมแก้เอง ${nf(r.override_count)} คอมเมนต์ (ทับผลที่ระบบทาย)`:'');
   if(opts.scroll!==false)$('#verdict').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
@@ -1096,11 +1103,15 @@ function renderVerdict(r){
 
   let sum,act;
   if(spike){
-    const times=spike.baseline?Math.round(spike.severity/spike.baseline):0;
+    // baseline < 1 = เพจนี้ปกติแทบไม่มีคอมเมนต์ลบ — หารแล้วได้ "95 เท่า" จากคอมเมนต์ลบ 2 อัน
+    // ซึ่งฟังดูเว่อร์จนเสียความน่าเชื่อถือ · เคสนั้นบอกตรง ๆ ว่าปกติไม่มีเลย ตรงกว่าและแรงพอ ๆ กัน
+    // (ต้องตรงกับข้อความฝั่ง server ใน detector.py — ทั้งสองที่อ่านจาก baseline ตัวเดียวกัน)
+    const times=spike.baseline>=1?Math.round(spike.severity/spike.baseline):0;
     const lead=(r.alert_items||[]).find(a=>a.kind==='spike');
     sum=`คอมเมนต์ลบ<b>พุ่งผิดปกติ</b>ช่วง <b>${esc(spike.start)} น.</b> — ชั่วโมงนั้นมีคอมเมนต์ลบ `
        +`${spike.negative} จาก ${spike.total} คอมเมนต์`
-       +(times>1?` แรงกว่าช่วงปกติราว ${nf(times)} เท่า`:'')
+       +(times>1?` แรงกว่าช่วงปกติราว ${nf(times)} เท่า`
+                :` <b>ทั้งที่ปกติช่วงนี้แทบไม่มีคอมเมนต์ลบเลย</b>`)
        +(top?` · เรื่องที่คนบ่นมากสุดคือ “${esc(top.label)}”`:'');
     act=`แจ้ง <b>${esc(lead?.owner||top?.owner||'ทีมที่เกี่ยวข้อง')}</b> ให้ตรวจสอบทันที `
        +`· เตรียมข้อความชี้แจงในเพจ · กลับมาตรวจซ้ำอีกครั้งใน 1 ชั่วโมง`;
@@ -1213,8 +1224,9 @@ function renderSentiment(r){
       <span class="pc" style="color:${SENT[k].c}">${p}%</span>
       <span class="ct">${nf(n)} รายการ</span></button>`;}).join('');
   $('#sentiment').innerHTML=`<div class="stack">${stack}</div><div class="slist">${rows}</div>
-    <div class="foot-note">🤖 มี <b>${nf(r.escalated_count||0)}</b> คอมเมนต์ที่กำกวมหรือเข้าข่ายประชด
-      ถูกส่งให้ AI อีกชั้นอ่านซ้ำเพื่อความแม่นยำ (${Math.round((r.escalated_count||0)/tot*100)}% ของทั้งหมด)</div>`;
+    <div class="foot-note">${r.llm_on?'🤖':'📐'} มี <b>${nf(r.escalated_count||0)}</b> คอมเมนต์ที่กำกวมหรือเข้าข่ายประชด
+      ถูกส่งให้<b>${esc(deepLayer(r))}</b>อ่านซ้ำอีกชั้น (${Math.round((r.escalated_count||0)/tot*100)}% ของทั้งหมด)${
+      r.llm_on?'':' — ชั้น AI ปิดอยู่ ผลชั้นนี้มาจากกฎที่เขียนไว้ ไม่ใช่โมเดลภาษา'}</div>`;
   $('#sentiment').querySelectorAll('.srow').forEach(b=>b.onclick=()=>{
     FILT.sent=FILT.sent===b.dataset.s?'all':b.dataset.s;FILT.limit=50;
     renderSentiment(DATA);renderChips();renderTable();
@@ -1299,7 +1311,8 @@ function renderTimeline(){
   const tip=$('#tip');
   $('#plot').querySelectorAll('.col').forEach(col=>{
     const b=bs[+col.dataset.i];
-    const times=b.baseline?` (แรงกว่าค่าปกติตอนนั้น ${(b.severity/b.baseline).toFixed(1)} เท่า)`:'';
+    const times=b.baseline>=1?` (แรงกว่าค่าปกติตอนนั้น ${(b.severity/b.baseline).toFixed(1)} เท่า)`
+             :(b.negative?' (ปกติช่วงนี้แทบไม่มีคอมเมนต์ลบเลย)':'');
     col.onmousemove=ev=>{
       tip.innerHTML=`<b>${esc(fmtDay(b.start_iso||''))} ${esc(b.start)} น.</b><br>`
         +`คอมเมนต์ทั้งหมด ${nf(b.total)} · เชิงลบ <b style="color:#ff8a80">${nf(b.negative)}</b><br>`
@@ -1388,7 +1401,7 @@ function renderTable(){
   $('#rows').innerHTML=shown.map(c=>{
     const s=SENT[c.sentiment], ai=SENT[c.ai_sentiment];
     const fixed=c.overridden
-      ? `<span class="fixbadge" title="AI ทายว่า “${esc(ai?ai.t:'—')}” · ทีมแก้เป็น “${esc(s.t)}”">แก้เอง</span>` : '';
+      ? `<span class="fixbadge" title="ระบบทายว่า “${esc(ai?ai.t:'—')}” · ทีมแก้เป็น “${esc(s.t)}”">แก้เอง</span>` : '';
     const who=c.profile_url?`<a href="${esc(c.profile_url)}" target="_blank" rel="noopener">${hl(c.author,FILT.q)}</a>`:hl(c.author,FILT.q);
     const link=c.comment_url?`<a href="${esc(c.comment_url)}" target="_blank" rel="noopener" title="เปิดคอมเมนต์จริงบน Facebook" style="color:var(--muted)">↗</a>`:'';
     const topics=(c.topics||[]).map(t=>`<span class="topic" data-t="${esc(t)}" title="กดเพื่อกรองเฉพาะเรื่องนี้">${esc(TLabel(t))}</span>`).join('')
@@ -1396,19 +1409,19 @@ function renderTable(){
     const long=(c.text||'').length>150;
     const read=c.archived
       ? `<button class="readbtn undo" data-unread="${esc(c.comment_id)}" title="เอากลับไปหน้า “ยังไม่ได้อ่าน” — จะกลับมานับในสถานะด้วย">↩ เอากลับ</button>`
-      : `<button class="readbtn" data-read="${esc(c.comment_id)}" title="อ่าน/จัดการแล้ว — ย้ายเข้าคลัง จะไม่ขึ้นบนหน้านี้อีก และรอบตรวจหน้าไม่ต้องส่งเข้า AI ซ้ำ">✓ อ่านแล้ว</button>`;
+      : `<button class="readbtn" data-read="${esc(c.comment_id)}" title="อ่าน/จัดการแล้ว — ย้ายเข้าคลัง จะไม่ขึ้นบนหน้านี้อีก และรอบตรวจหน้าไม่ต้องวิเคราะห์ซ้ำ">✓ อ่านแล้ว</button>`;
     // เคสที่ AI ให้เป็น "กลาง/บวก" ระบบจะไม่แจ้งเองเลย — ปุ่มนี้คือทางที่คนดันเรื่องเข้า Discord ได้ทันที
     const ping=c.alerted_at
       ? `<button class="alertbtn done" data-ping="${esc(c.comment_id)}" title="แจ้งเข้า Discord แล้วเมื่อ ${esc(fmtFull(c.alerted_at))} · กดอีกครั้งถ้าต้องการส่งซ้ำ">✓ แจ้งแล้ว</button>`
-      : `<button class="alertbtn" data-ping="${esc(c.comment_id)}" title="ส่งคอมเมนต์นี้เข้า Discord ของทีมทันที (ผ่าน n8n) — ใช้ตอน AI อ่านพลาด หรือเรื่องนี้ต้องมีคนรับเดี๋ยวนี้">🔔 แจ้ง Discord</button>`;
+      : `<button class="alertbtn" data-ping="${esc(c.comment_id)}" title="ส่งคอมเมนต์นี้เข้า Discord ของทีมทันที (ผ่าน n8n) — ใช้ตอนระบบอ่านพลาด หรือเรื่องนี้ต้องมีคนรับเดี๋ยวนี้">🔔 แจ้ง Discord</button>`;
     return `<tr class="s-${c.sentiment}${c.archived?' arch':''}">
       <td class="when"><b>${esc(fmtTime(c.created_at))}</b>${esc(fmtDay(c.created_at))}</td>
       <td class="who" title="${esc(c.author)}">${who}</td>
       <td class="txt ${long?'clamp':''}"><span class="t">${hl(c.text,FILT.q)}</span>${
-        c.escalated_to_llm?'<span class="aibadge" title="คอมเมนต์นี้กำกวม/อาจเป็นการประชด จึงส่งให้ AI อ่านซ้ำอีกชั้น">AI อ่านซ้ำ</span>':''}${
+        c.escalated_to_llm?`<span class="aibadge" title="คอมเมนต์นี้กำกวม/อาจเป็นการประชด จึงส่งให้${esc(deepLayer(DATA))}อ่านซ้ำอีกชั้น">${DATA&&DATA.llm_on?'AI อ่านซ้ำ':'กฎอ่านซ้ำ'}</span>`:''}${
         long?'<br><button class="more">อ่านต่อ</button>':''}</td>
       <td><button class="tag tagbtn" data-fix="${esc(c.comment_id)}"
-        title="AI อ่านผิด? กดเพื่อแก้อารมณ์/ประเด็นของคอมเมนต์นี้เอง"
+        title="ระบบอ่านผิด? กดเพื่อแก้อารมณ์/ประเด็นของคอมเมนต์นี้เอง"
         style="color:${s.c};background:color-mix(in srgb,${s.c} 13%,transparent)"><span class="dot" style="background:${s.c}"></span>${s.t}</button>${fixed}</td>
       <td>${topics}</td>
       <td class="rch"><span class="tnum">${nf(c.reach)}</span><span class="rbar"><i style="width:${(c.reach/maxReach*100).toFixed(0)}%;background:${c.sentiment==='negative'?'var(--neg)':'var(--muted)'}"></i></span></td>

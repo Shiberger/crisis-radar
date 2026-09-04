@@ -41,8 +41,18 @@ class HybridClassifier:
 
     @property
     def engine(self) -> str:
-        """ชื่อที่เอาไปโชว์ใน log — ต้องอ่านรู้เรื่องสำหรับคนที่ไม่ใช่ dev ด้วย."""
+        """ชื่อที่เอาไปโชว์ใน log/หน้าเว็บ — ต้องอ่านรู้เรื่องสำหรับคนที่ไม่ใช่ dev ด้วย."""
         return getattr(self.llm, "label", None) or getattr(self.llm, "name", "unknown")
+
+    @property
+    def llm_on(self) -> bool:
+        """ชั้นที่ 3 เป็น Claude จริงหรือกฎออฟไลน์.
+
+        ต้องส่งค่านี้ออกไปถึงหน้าเว็บ ไม่ใช่รู้กันแค่ใน log: ป้ายบนคอมเมนต์เคยเขียนว่า
+        "AI อ่านซ้ำ" ทุกครั้งที่คอมเมนต์ผ่านชั้นที่ 3 ไม่ว่าชั้นนั้นจะเป็นอะไร — พอปิด LLM
+        ไว้ หน้าเว็บจึงโฆษณาว่ามี AI อ่าน 151 คอมเมนต์ทั้งที่ไม่มี request ออกไปเลยสักครั้ง
+        """
+        return not isinstance(self.llm, OfflineHeuristicLLM)
 
     def classify_one(self, c: Comment) -> Classified:
         return self.classify_all([c])[0]

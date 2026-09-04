@@ -311,11 +311,12 @@ def run_pipeline(params: dict, log=print) -> dict:
         log(f"ข้าม {len(known)} คอมเมนต์ที่ทีมอ่านแล้ว — ไม่เรียก AI ซ้ำ")
 
     clf = HybridClassifier(log=log)
-    log(f"จัด sentiment + topic ด้วย AI ({len(fresh)} คอมเมนต์ใหม่) · ชั้นที่สอง: {clf.engine}…")
+    deep = "AI (Claude)" if clf.llm_on else "กฎออฟไลน์"     # log ต้องเรียกชั้นที่ 3 ตามที่มันเป็นจริง
+    log(f"จัด sentiment + topic ({len(fresh)} คอมเมนต์ใหม่) · ชั้นลึกสุด: {clf.engine}…")
     classified = clf.classify_all(fresh) + archive.rehydrate(known)
     st = clf.stats
     log(f"วิเคราะห์เสร็จ · ชั้นแรกตัดสินเอง {st['total'] - st['gated'] - st['to_llm']} · "
-        f"กฎเพิ่มเติม {st['gated']} · ส่งเข้า AI {st['to_llm']} เคส")
+        f"กฎเพิ่มเติม {st['gated']} · ส่งเข้า{deep} {st['to_llm']} เคส")
     # โชว์ค่าใช้จ่ายจริงต่อรอบ — ตัวเลขนี้คือสิ่งที่ต้องดูตอนตัดสินใจปรับ interval/เพดาน
     if hasattr(clf.llm, "usage_line") and clf.llm.usage["requests"]:
         log(f"ค่าใช้จ่าย AI รอบนี้: {clf.llm.usage_line()}")
@@ -328,18 +329,21 @@ def run_pipeline(params: dict, log=print) -> dict:
     notify.apply(classified)     # คอมเมนต์ที่เคยแจ้ง Discord แล้วต้องไม่ถูกแจ้งซ้ำรอบนี้
 
     log("ตรวจจับ crisis (spike detection)…")
-    result = build_result(classified, source=source)
+    result = build_result(classified, source=source,
+                          engine=clf.engine, llm_on=clf.llm_on)
 
     # เคสที่ "ลบและแรง" ตั้งแต่แรก ไม่ต้องรอให้มีคนเปิดหน้าเว็บมาเห็น — เด้งเข้า Discord เลย
     # (เคสที่ AI อ่านพลาด ทีมกดแจ้งเองได้จากหน้าเว็บ ดู server.py /api/alert)
     if notify.dispatch_auto(classified, result, page=get_targets(), log=log):
-        result = build_result(classified, source=source, generated_at=result["generated_at"])
+        result = build_result(classified, source=source, generated_at=result["generated_at"],
+                              engine=clf.engine, llm_on=clf.llm_on)
 
     log(f"เสร็จ — สถานะ {result['status']} · alert {len(result['alerts'])} รายการ")
     return result
 
 
-def build_result(items: list[Classified], source: str, generated_at: str = "") -> dict:
+def build_result(items: list[Classified], source: str, generated_at: str = "",
+                 engine: str = "", llm_on: bool = False) -> dict:
     """ตรวจ crisis จาก label ปัจจุบัน แล้วประกอบก้อนผลที่หน้าเว็บใช้.
 
     แยกออกมาเพราะถูกเรียก 2 ทาง: หลัง scrape รอบใหม่ · และตอนทีมแก้ label/กดอ่านแล้ว
@@ -365,6 +369,9 @@ def build_result(items: list[Classified], source: str, generated_at: str = "") -
     result["override_count"] = sum(1 for c in active if c.overridden)
     result["archived_count"] = len(items) - len(active)
     result["alert_sent_count"] = sum(1 for c in active if c.alerted_at)
+    # ชั้นลึกสุดที่ใช้จริงในรอบนี้ — หน้าเว็บใช้ตัดสินว่าจะเขียนป้ายว่า "AI" หรือ "กฎออฟไลน์"
+    result["engine"] = engine
+    result["llm_on"] = llm_on
     return result
 
 
@@ -384,7 +391,9 @@ def recompute(result: dict) -> dict:
     archive.sync(items)
     notify.apply(items)      # ป้าย "แจ้ง Discord แล้ว" ต้องอยู่ครบหลังคิดรายงานใหม่
     return build_result(items, source=result.get("source", "sample"),
-                        generated_at=result.get("generated_at", ""))
+                        generated_at=result.get("generated_at", ""),
+                        # label ชุดนี้ถูกจัดโดย engine เดิม — การกดแก้ label ไม่ได้เรียก engine ใหม่
+                        engine=result.get("engine", ""), llm_on=bool(result.get("llm_on")))
 
 
 def _run(job_id: str, params: dict) -> None:
