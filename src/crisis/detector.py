@@ -10,6 +10,7 @@ Alert เมื่อ: severity > baseline * SPIKE_FACTOR  และ  severity >
 """
 from __future__ import annotations
 
+import os
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -17,11 +18,36 @@ from datetime import datetime, timedelta
 from ..classify.lexicon import TOPIC_LABELS
 from ..models import Classified
 
+def _env(key: str, default: float) -> float:
+    """เกณฑ์ทุกตัวปรับได้จาก env — ปรับจูนตอนพรีเซ้นท์/ตอนเพจแตกได้โดยไม่ต้อง deploy ใหม่."""
+    try:
+        return float(str(os.environ.get(key, "")).strip() or default)
+    except ValueError:
+        return default
+
+
 SPIKE_FACTOR = 2.5
-MIN_SEVERITY = 30
-VIRAL_REACH = 150
-BUCKET_MINUTES = 60
-MIN_TOPIC_SEVERITY = 20     # ประเด็นย่อยเล็กกว่า → เกณฑ์ต่ำกว่า spike รวม
+# เกณฑ์เหล่านี้เคยตั้งจาก "ข้อมูลตัวอย่าง" ซึ่งเป็นวันที่เพจแตก (reach หลักร้อย) พอเอามาใช้กับ
+# วันปกติของเพจจริงจึงไม่มีวันเข้าเงื่อนไข — วัดจากคอมเมนต์จริง 542 อันของเพจได้ว่า
+#   reach: p50=1 · p90=21 · p95=49 · p99=156
+# ตั้งที่ 150 = ระดับ p99 → คอมเมนต์ 1 ใน 100 เท่านั้นที่มีสิทธิ์ ซึ่งในรอบตรวจที่ได้มา
+# วันละ ~12 คอมเมนต์ แปลว่าไม่มีวันเด้งเลย · ย้ายมาที่ระดับ p95 ให้ระบบเห็นของจริงได้
+MIN_SEVERITY = _env("CRISIS_MIN_SEVERITY", 8)      # severity ต่ำสุดที่ยอมเรียกว่า spike
+VIRAL_REACH = int(_env("CRISIS_VIRAL_REACH", 50))  # คอมเมนต์ลบเดี่ยวที่ถือว่ากระจายวงกว้าง
+MIN_TOPIC_SEVERITY = _env("CRISIS_MIN_TOPIC_SEVERITY", 5)   # ประเด็นย่อยเล็กกว่า → เกณฑ์ต่ำกว่า
+
+# ── ขนาดช่วงเวลา (bucket) ────────────────────────────────────────────────────
+# เคยลองให้เลือกขนาดเองตาม "ช่วงเวลาที่ข้อมูลกิน" แล้ววัดกับวิกฤตจริงเดือน ก.พ. (508 คอมเมนต์)
+# ได้ผลแย่ลง: ชุดข้อมูลจริงมีคอมเมนต์เก่าติดมาไม่กี่อัน span เลยกลายเป็น 43 วัน → เลือก bucket
+# รายวัน → ดราม่าที่ระเบิดภายในไม่กี่ชั่วโมงถูกเกลี่ยจนไม่เหลือ spike (CRISIS กลายเป็น WATCH)
+# สรุป: รายชั่วโมงคงที่ทนกับข้อมูลจริงได้ดีกว่า · ปรับได้จาก env ถ้าเจอเพจที่จังหวะต่างไป
+BUCKET_MINUTES = int(_env("CRISIS_BUCKET_MIN", 60))
+
+# คอมเมนต์ไวรัลกี่อันที่ยกขึ้นมาเป็น alert เดี่ยว ๆ — ที่เหลือรวบเป็นบรรทัดเดียว
+# ทำไมต้องมีเพดาน: รายการนี้ไม่เคยถูกจำกัด ตอนเกณฑ์อยู่ที่ p99 เลยมีอันเดียวเสมอจนไม่มีใครเห็นปัญหา
+# พอลดเกณฑ์มาที่ p95 วันที่เพจแตกจริงจะได้ alert 15 บรรทัดรวด ซึ่งอ่านไม่ไหวและกลบ spike/emerging
+# ที่สำคัญกว่า — alert ที่เยอะเกินอ่าน มีค่าเท่ากับไม่มี alert
+VIRAL_ALERT_MAX = 3
 
 # ประเด็น → ทีมที่เป็นเจ้าของเรื่อง (ใช้ route alert ให้ถึงคนแก้จริง ไม่ใช่แค่ทีม Community)
 TOPIC_OWNER = {
@@ -32,6 +58,7 @@ TOPIC_OWNER = {
     "content/event": "Content / Event",
     "rewards/redeem": "Marketing (แคมเปญ/โค้ด) + CS",
 }
+
 
 
 @dataclass
@@ -89,14 +116,22 @@ class CrisisReport:
     total: int
     topic_trends: list[TopicStat] = field(default_factory=list)
     alert_items: list[AlertItem] = field(default_factory=list)
+    bucket_minutes: int = BUCKET_MINUTES     # ขนาดที่ "เลือกให้ข้อมูลชุดนี้" ไม่ใช่ค่าคงที่
 
 
-def _bucket_key(ts: datetime) -> datetime:
-    m = (ts.minute // BUCKET_MINUTES) * BUCKET_MINUTES
-    return ts.replace(minute=m, second=0, microsecond=0)
+def _bucket_key(ts: datetime, mins: int = BUCKET_MINUTES) -> datetime:
+    """ปัดเวลาลงหาขอบ bucket โดยนับจากเที่ยงคืนของวันนั้น.
+
+    ปัดจากเที่ยงคืน (ไม่ใช่ปัดแค่นาที) เพราะ bucket ใหญ่กว่า 1 ชม. ต้องปัดชั่วโมงด้วย —
+    ของเดิมปัดเฉพาะ .minute จึงใช้ได้แค่ bucket ที่เล็กกว่าชั่วโมงเท่านั้น
+    """
+    day = ts.replace(hour=0, minute=0, second=0, microsecond=0)
+    n = int((ts - day).total_seconds() // 60) // mins
+    return day + timedelta(minutes=n * mins)
 
 
-def _topic_trends(items: list[Classified], ordered_keys: list[datetime]) -> list[TopicStat]:
+def _topic_trends(items: list[Classified], ordered_keys: list[datetime],
+                  mins: int = BUCKET_MINUTES) -> list[TopicStat]:
     """แยก severity รายประเด็นต่อช่วงเวลา → บอกว่าประเด็นไหน 'กำลังมาแรง' ตอนนี้.
 
     ทำไมต้องมี: spike รวมมองคอมเมนต์ลบทุกประเด็นกองเดียวกัน — เวลาเซิร์ฟล่ม (severity หลักพัน)
@@ -108,7 +143,7 @@ def _topic_trends(items: list[Classified], ordered_keys: list[datetime]) -> list
     counts: Counter[str] = Counter()
 
     for it in negs:
-        b = _bucket_key(it.comment.created_at)
+        b = _bucket_key(it.comment.created_at, mins)
         for t in it.topics:
             per_topic[t][b] += 1 + it.comment.reach
             counts[t] += 1
@@ -140,9 +175,10 @@ def _topic_trends(items: list[Classified], ordered_keys: list[datetime]) -> list
 
 
 def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
+    mins = BUCKET_MINUTES
     buckets_map: dict[datetime, list[Classified]] = defaultdict(list)
     for it in items:
-        buckets_map[_bucket_key(it.comment.created_at)].append(it)
+        buckets_map[_bucket_key(it.comment.created_at, mins)].append(it)
 
     ordered = sorted(buckets_map.items())
     stats: list[BucketStat] = []
@@ -154,8 +190,15 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
         negs = [g for g in group if g.sentiment == "negative"]
         severity = sum(1 + g.comment.reach for g in negs)
 
-        baseline = (sum(severities_so_far) / len(severities_so_far)) if len(severities_so_far) >= 2 else 0.0
-        is_spike = baseline > 0 and severity > baseline * SPIKE_FACTOR and severity >= MIN_SEVERITY
+        # ต้องมีอย่างน้อย 2 ช่วงก่อนหน้า ถึงจะรู้ว่า "ปกติ" ของเพจนี้หน้าตายังไง
+        have_history = len(severities_so_far) >= 2
+        baseline = (sum(severities_so_far) / len(severities_so_far)) if have_history else 0.0
+        # baseline = 0 (เพจที่ปกติไม่มีคอมเมนต์ลบเลย) ต้องนับเป็น spike ได้ด้วย —
+        # ของเดิมบังคับ baseline > 0 ทำให้เพจเงียบ ๆ ที่อยู่ดี ๆ มีคนบ่นรัวกัน "ไม่มีวัน" เตือน
+        # ทั้งที่ 0 → หลายคอมเมนต์ในชั่วโมงเดียว คือสัญญาณที่ชัดที่สุดเท่าที่จะมีได้
+        # MIN_SEVERITY เป็นตัวกันไม่ให้คอมเมนต์ลบลอย ๆ อันเดียวกลายเป็น CRISIS
+        is_spike = (have_history and severity >= MIN_SEVERITY
+                    and (severity > baseline * SPIKE_FACTOR if baseline > 0 else True))
 
         topic_counter: Counter[str] = Counter()
         for g in negs:
@@ -189,7 +232,7 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
         severities_so_far.append(severity)
 
     # ประเด็นที่กำลังมาแรง (แยกต่อ topic — ไม่ให้ดราม่าเล็กถูกกลบด้วยดราม่าใหญ่)
-    trends = _topic_trends(items, [k for k, _ in ordered])
+    trends = _topic_trends(items, [k for k, _ in ordered], mins)
     for t in trends:
         if t.is_emerging:
             alerts.append(
@@ -209,7 +252,7 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
         [it for it in items if it.sentiment == "negative" and it.comment.reach >= VIRAL_REACH],
         key=lambda x: x.comment.reach, reverse=True,
     )
-    for v in viral:
+    for v in viral[:VIRAL_ALERT_MAX]:
         alerts.append(
             f"🔥 คอมเมนต์ลบไวรัล reach {v.comment.reach} ({', '.join(v.topics) or 'ทั่วไป'}): "
             f"\"{v.comment.text[:60]}...\""
@@ -220,8 +263,23 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
             title=f"คอมเมนต์ลบ 1 อันกำลังกระจายวงกว้าง (คนกดไลก์/ตอบกลับ {v.comment.reach} ครั้ง)",
             detail=f"“{v.comment.text[:90]}{'…' if len(v.comment.text) > 90 else ''}” — โดย {v.comment.author}",
             owner=TOPIC_OWNER.get(vt, "Community"),
-            topic=vt, bucket_iso=_bucket_key(v.comment.created_at).isoformat(),
+            topic=vt, bucket_iso=_bucket_key(v.comment.created_at, mins).isoformat(),
             comment_id=v.comment.comment_id,
+        ))
+
+    # ที่เหลือรวบเป็นบรรทัดเดียว — ยังบอกว่ามีอีกเท่าไร (ตัวเลขคือสิ่งที่บอกว่า "หนักแค่ไหน")
+    # แต่ไม่กินพื้นที่จนกลบ alert ประเภทอื่น · รายตัวยังกดดูครบบนหน้าเว็บได้เหมือนเดิม
+    rest = viral[VIRAL_ALERT_MAX:]
+    if rest:
+        top_rest = ", ".join(str(v.comment.reach) for v in rest[:5])
+        alerts.append(f"🔥 มีคอมเมนต์ลบไวรัลอีก {len(rest)} อัน (reach {top_rest}"
+                      f"{'…' if len(rest) > 5 else ''}) — ดูทั้งหมดบนหน้าเว็บ")
+        items_out.append(AlertItem(
+            kind="viral", level="medium",
+            title=f"มีคอมเมนต์ลบที่กระจายวงกว้างอีก {len(rest)} อัน",
+            detail=f"เกินเกณฑ์ไวรัล (reach ≥ {VIRAL_REACH}) รวมทั้งหมด {len(viral)} อันในรอบนี้ "
+                   f"· ยกมาแสดงแยก {VIRAL_ALERT_MAX} อันที่แรงสุด",
+            owner="Community",
         ))
 
     # สรุปภาพรวม
@@ -237,6 +295,7 @@ def detect(items: list[Classified], brand: str = "talesrunner") -> CrisisReport:
     )
 
     return CrisisReport(
+        bucket_minutes=mins,
         brand=brand,
         status=status,
         buckets=stats,
@@ -281,7 +340,7 @@ def report_to_dict(rep: CrisisReport) -> dict:
              "severity": round(b.severity, 1), "baseline": b.baseline, "is_spike": b.is_spike}
             for b in rep.buckets
         ],
-        "bucket_minutes": BUCKET_MINUTES,
+        "bucket_minutes": rep.bucket_minutes,
         "thresholds": {"spike_factor": SPIKE_FACTOR, "min_severity": MIN_SEVERITY,
                        "viral_reach": VIRAL_REACH},
     }

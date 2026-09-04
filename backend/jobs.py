@@ -14,7 +14,7 @@ import os
 import sys
 import threading
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -86,6 +86,32 @@ def page_presets(cfg: dict) -> list[dict]:
     return out
 
 
+def _extra_pages_active(cfg: dict) -> tuple[list[str], str]:
+    """เพจที่เฝ้า 'ชั่วคราว' ที่ยังไม่หมดอายุ + วันหมดอายุ (ว่าง = ไม่ได้ตั้ง/หมดแล้ว).
+
+    ทำไมต้องมีวันหมดอายุ ไม่ปล่อยให้ไปลบเอาทีหลัง: ค่า Apify คิด **ต่อเพจต่อรอบ** —
+    เปิดเฝ้า 7 เพจไว้ตอนพรีเซ้นท์แล้วลืมปิด = เครดิตหมดกลางเดือน แล้วระบบจะเงียบไปเฉย ๆ
+    ซึ่งแยกไม่ออกจาก "เพจไม่มีดราม่า" · ให้มันเลิกเองตรงเวลาปลอดภัยกว่าพึ่งความจำ
+
+    เทียบด้วย "วันตามเวลาไทย" ไม่ใช่ UTC — ไม่งั้นเที่ยงคืนบ้านเราจะยังไม่หมดอายุอีก 7 ชม.
+    """
+    until = str(os.environ.get("MONITOR_PAGES_EXTRA_UNTIL", "").strip()
+                or cfg.get("monitor_pages_extra_until") or "").strip()
+    extra = list(cfg.get("monitor_pages_extra") or [])
+    if not (until and extra):
+        return [], ""
+    # ต้องตรวจรูปแบบก่อนเทียบ — เทียบ string ตรง ๆ ไม่ได้ เพราะวันที่พิมพ์ผิด (เช่นภาษาไทย)
+    # มี codepoint สูงกว่าตัวเลขทุกตัว ผลคือ "ยังไม่หมดอายุ" ตลอดกาล = จ่าย Apify ไปเรื่อย ๆ
+    # อ่านวันไม่ออก = ถือว่าหมดอายุ (ฝั่งที่ปลอดภัยกว่าคือ "ไม่จ่ายเพิ่ม")
+    try:
+        datetime.strptime(until, "%Y-%m-%d")
+    except ValueError:
+        return [], ""
+    if now_ict().strftime("%Y-%m-%d") > until:
+        return [], until
+    return [str(u).strip() for u in extra], until
+
+
 def monitor_page_urls(cfg: dict | None = None) -> list[str]:
     """เพจที่ตัวเฝ้าอัตโนมัติต้องตรวจทุกรอบ — env ทับไฟล์ได้ (เปลี่ยนบน Render โดยไม่ต้อง deploy).
 
@@ -97,8 +123,10 @@ def monitor_page_urls(cfg: dict | None = None) -> list[str]:
         except (OSError, json.JSONDecodeError):
             cfg = {}
     raw = os.environ.get("MONITOR_PAGE_URLS", "").strip()
-    urls = ([u for u in raw.replace(",", "\n").split("\n")] if raw
-            else list(cfg.get("monitor_pages") or []))
+    if raw:
+        urls = raw.replace(",", "\n").split("\n")
+    else:
+        urls = list(cfg.get("monitor_pages") or []) + _extra_pages_active(cfg)[0]
     return _dedup_urls(_clean_fb_urls([str(u).strip() for u in urls]))[:MAX_PAGES]
 
 
@@ -113,7 +141,8 @@ def get_targets() -> dict:
             "page_url": (page or {}).get("url", ""),
             "post_urls": cfg.get("post_urls", []),
             "page_presets": page_presets(cfg),
-            "monitor_pages": monitor_page_urls(cfg)}
+            "monitor_pages": monitor_page_urls(cfg),
+            "monitor_extra_until": _extra_pages_active(cfg)[1]}
 
 
 def _clean_fb_urls(raw) -> list[str]:

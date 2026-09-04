@@ -719,10 +719,13 @@ const P=iso=>{const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso||'');
 const fmtTime=iso=>{const p=P(iso);return p?`${p.h}:${p.mi}`:'';};
 const fmtDay =iso=>{const p=P(iso);return p?`${p.d} ${MONTHS[p.mo-1]}`:'';};
 const fmtFull=iso=>{const p=P(iso);return p?`${p.d} ${MONTHS[p.mo-1]} ${p.h}:${p.mi} น.`:'';};
-// key ของช่วงเวลา (bucket) — ตัดนาทีลงตามขนาด bucket ที่ backend ใช้จริง
+/* key ของช่วงเวลา (bucket) — ต้องปัดแบบเดียวกับ _bucket_key() ฝั่ง server เป๊ะ ๆ
+   ไม่งั้นปุ่ม "กดดูคอมเมนต์ช่วงนี้" จะกรองคนละขอบกับแท่งที่กด แล้วได้ผลลัพธ์ว่าง
+   ปัดจากเที่ยงคืนของวันนั้น (ไม่ใช่ปัดแค่นาที) เพราะ bucket โตเกิน 1 ชม. ได้ — ของเดิม
+   ปัดเฉพาะนาที พอ bucket = 180 นาทีขึ้นไป ชั่วโมงไม่ถูกปัด key จึงไม่ตรงกับ server */
 const bkey=(iso,mins)=>{const m=/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/.exec(iso||'');
-  if(!m)return'';const mm=Math.floor(+m[3]/(mins||60))*(mins||60);
-  return `${m[1]}T${m[2]}:${String(mm).padStart(2,'0')}`;};
+  if(!m)return'';const b=mins||60, t=Math.floor((+m[2]*60 + +m[3])/b)*b;
+  return `${m[1]}T${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`;};
 
 /* ═══════════════════════════ theme ═══════════════════════════ */
 const savedTheme=localStorage.getItem('cr-theme');

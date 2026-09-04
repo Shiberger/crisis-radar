@@ -732,6 +732,103 @@ check("T19f ส่ง page_id เป็น str เดี่ยวยังทำ
 jobs.TARGETS_FILE = _real_targets_file
 
 
+# ---- T20: เกณฑ์ crisis ที่ปรับให้ตรงกับข้อมูลจริงของเพจ ----
+# ที่มา: วัด reach จากคอมเมนต์จริง 542 อัน → p50=1 p90=21 p95=49 p99=156
+# เกณฑ์เดิม (VIRAL_REACH=150) = ระดับ p99 · ในรอบตรวจที่ได้วันละ ~12 คอมเมนต์ = ไม่มีวันเด้ง
+# หลักฐาน: alerts_sent บนโปรดักชันมีแต่ trigger=manual ไม่มี auto สักอันตั้งแต่เปิดใช้
+from datetime import timedelta as _td                  # noqa: E402
+from src.classify.llm import OfflineHeuristicLLM       # noqa: E402
+from src.crisis import detector as _det                # noqa: E402
+from src.models import Comment as _Cmt                 # noqa: E402
+from src.timeutil import now_ict as _now               # noqa: E402
+
+_N = _now().replace(minute=0, second=0, microsecond=0)
+
+
+def _mk(i, text, hours_ago, reach):
+    return _Cmt(comment_id=f"t20-{i}", platform="facebook", source_id="p", author=f"a{i}",
+                text=text, created_at=_N - _td(hours=hours_ago), reach=reach)
+
+
+_clf = HybridClassifier(llm=OfflineHeuristicLLM())
+# เพจเงียบ: ปกติมีแต่คอมเมนต์ชม (severity 0 ทุกช่วง) แล้วอยู่ดี ๆ มีคนบ่นบั๊กรัวในชั่วโมงเดียว
+_calm = [_mk(i, "ขอบคุณค่า อีเวนต์สนุกดี", 40 - i * 3, i % 4) for i in range(8)]
+_burst = [_mk(100 + i, "เกมล่มเข้าไม่ได้ แก้ที", 1, r) for i, r in enumerate([6, 4, 3, 2, 1])]
+
+_rep = _det.detect(_clf.classify_all(_calm + _burst))
+check("T20 เพจที่ปกติไม่มีคอมเมนต์ลบเลย ต้องเตือนได้เมื่อมีคนบ่นรัวในชั่วโมงเดียว",
+      _rep.status == "CRISIS" and any(b.is_spike for b in _rep.buckets),
+      "ของเดิมบังคับ baseline > 0 → เพจเงียบไม่มีวันเข้าเงื่อนไข spike แม้แต่ครั้งเดียว")
+
+check("T20b คอมเมนต์ลบลอย ๆ อันเดียวต้องไม่กลายเป็น CRISIS (MIN_SEVERITY กันไว้)",
+      _det.detect(_clf.classify_all(_calm + [_mk(99, "เกมล่ม", 1, 2)])).status == "NORMAL")
+
+check("T20c เพจปกติดี ไม่มีคอมเมนต์ลบ → NORMAL ไม่มี alert",
+      _det.detect(_clf.classify_all(_calm)).status == "NORMAL")
+
+# เพดาน alert ไวรัล: ลดเกณฑ์ลงมาที่ p95 แล้ววันที่เพจแตกจะมีคอมเมนต์เข้าเกณฑ์สิบกว่าอัน
+# ถ้าปล่อยให้ออกทุกอัน spike/emerging จะถูกดันตกท้ายรายการจนไม่มีใครเห็น
+_viral = [_mk(200 + i, "เกมพังมาก เล่นไม่ได้เลย", 2, 60 + i * 10) for i in range(9)]
+_rv = _det.detect(_clf.classify_all(_calm + _viral))
+_kinds = [a.kind for a in _rv.alert_items]
+check("T20d คอมเมนต์ไวรัลเยอะ → ยกมาแสดง 3 อัน + รวบที่เหลือเป็นบรรทัดเดียว",
+      _kinds.count("viral") == _det.VIRAL_ALERT_MAX + 1 and len(_viral) == 9,
+      f"ไวรัล 9 อัน → alert {_kinds.count('viral')} บรรทัด (ไม่ใช่ 9)")
+
+check("T20e บรรทัดรวบต้องบอกจำนวนที่เหลือจริง ไม่ใช่ซ่อนเงียบ ๆ",
+      any("อีก 6 อัน" in a.title for a in _rv.alert_items if a.kind == "viral"))
+
+# ขนาด bucket ที่รายงานออกไป ต้องเป็นค่าที่ใช้คำนวณจริง — หน้าเว็บใช้ค่านี้ปัดขอบช่วงเวลา
+# ให้ตรงกับ server ตอนกดปุ่ม "ดูคอมเมนต์ช่วงนี้" ถ้าไม่ตรงจะกดแล้วได้รายการว่าง
+os.environ["CRISIS_BUCKET_MIN"] = "180"
+importlib.reload(_det)
+_r3 = _det.report_to_dict(_det.detect(_clf.classify_all(_calm + _burst)))
+_starts = {b["start"] for b in _r3["buckets"]}
+check("T20f ตั้งขนาด bucket จาก env ได้ และขอบช่วงถูกปัดตามนั้นจริง (ไม่ใช่ปัดแค่นาที)",
+      _r3["bucket_minutes"] == 180 and all(s.endswith(":00") and int(s[:2]) % 3 == 0
+                                           for s in _starts),
+      f"ขอบช่วงที่ได้: {sorted(_starts)}")
+del os.environ["CRISIS_BUCKET_MIN"]
+importlib.reload(_det)
+
+
+# ---- T21: เพจที่เฝ้า "ชั่วคราว" ต้องหมดอายุเอง ----
+# ค่า Apify คิดต่อเพจต่อรอบ — เปิดเฝ้า 7 เพจตอนพรีเซ้นท์แล้วลืมปิด = เครดิตหมดกลางเดือน
+# แล้วระบบเงียบไปเฉย ๆ ซึ่งแยกไม่ออกจาก "เพจไม่มีดราม่า" → ต้องเลิกเองตรงเวลา
+_tmp_cfg = {
+    "targets": [{"type": "page", "name": "หลัก", "url": "https://www.facebook.com/main"}],
+    "monitor_pages": ["https://www.facebook.com/main"],
+    "monitor_pages_extra": ["https://www.facebook.com/extra1",
+                            "https://www.facebook.com/extra2"],
+}
+_tf = Path(tempfile.mkdtemp(prefix="crisis-radar-exp-")) / "targets.json"
+jobs.TARGETS_FILE = _tf
+
+_today = _now().strftime("%Y-%m-%d")
+_yesterday = (_now() - _td(days=1)).strftime("%Y-%m-%d")
+
+_tf.write_text(json.dumps({**_tmp_cfg, "monitor_pages_extra_until": _today},
+                          ensure_ascii=False), encoding="utf-8")
+check("T21 วันสุดท้ายนับรวม — วันนี้ยังเฝ้าเพจชั่วคราวอยู่ครบ",
+      len(jobs.monitor_page_urls()) == 3, f"{len(jobs.monitor_page_urls())} เพจ")
+
+_tf.write_text(json.dumps({**_tmp_cfg, "monitor_pages_extra_until": _yesterday},
+                          ensure_ascii=False), encoding="utf-8")
+check("T21b พ้นวันแล้วเลิกเองโดยไม่ต้องมีใครกลับมาลบ — เหลือเฉพาะเพจประจำ",
+      jobs.monitor_page_urls() == ["https://www.facebook.com/main"])
+
+_tf.write_text(json.dumps({**_tmp_cfg, "monitor_pages_extra_until": "พิมพ์มั่ว"},
+                          ensure_ascii=False), encoding="utf-8")
+check("T21c ตั้งวันหมดอายุผิดรูปแบบ → ถือว่าหมดอายุ (ฝั่งที่ไม่จ่ายเพิ่มปลอดภัยกว่า)",
+      jobs.monitor_page_urls() == ["https://www.facebook.com/main"])
+
+_tf.write_text(json.dumps(_tmp_cfg, ensure_ascii=False), encoding="utf-8")
+check("T21d ไม่ตั้งวันหมดอายุ = ไม่เปิดเพจชั่วคราวเลย (ต้องตั้งใจถึงจะจ่ายเพิ่ม)",
+      jobs.monitor_page_urls() == ["https://www.facebook.com/main"])
+
+jobs.TARGETS_FILE = _real_targets_file
+
+
 # ---- T17: state ถาวร (Supabase) — ของที่ห้ามหายตอน container restart ----
 # ทำไมต้องมีเทสนี้: บน Render free tier ไฟล์ใน data/ หายทุกครั้งที่ container restart
 # ผลคือทีมโดนแจ้ง Discord เรื่องเดิมซ้ำ และ label ที่ทีมแก้เองหายเกลี้ยง

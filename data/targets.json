@@ -3,47 +3,95 @@
   "brand": "talesrunner",
   "page_id": "thehof.talesrunner",
   "page_name": "TalesRunner Thailand (Official / thehof)",
-  "exclude_authors": ["Tales Runner", "IDRLAB", "idrlab", "HOF"],
-
+  "exclude_authors": [
+    "Tales Runner",
+    "IDRLAB",
+    "idrlab",
+    "HOF"
+  ],
   "_page_presets": "เพจที่ทีมดูแลอยู่ — โผล่เป็นตัวเลือกติ๊กได้บนหน้าเว็บ (เลือกหลายเพจในรอบเดียวได้) ไม่ต้องจำ/วางลิงก์เอง. เพิ่มเพจใหม่ = เพิ่มบรรทัดในนี้ ไม่ต้องแก้โค้ด. ยังวางลิงก์เพจนอกรายการเองได้เหมือนเดิม.",
   "page_presets": [
     {
       "group": "HOF (Hall Of Fame)",
       "pages": [
-        {"name": "Warz TH", "url": "https://www.facebook.com/thehof.warzth"},
-        {"name": "TalesRunner Thailand", "url": "https://www.facebook.com/thehof.talesrunner"},
-        {"name": "Zelfur", "url": "https://www.facebook.com/TheZelfur"}
+        {
+          "name": "Warz TH",
+          "url": "https://www.facebook.com/thehof.warzth"
+        },
+        {
+          "name": "TalesRunner Thailand",
+          "url": "https://www.facebook.com/thehof.talesrunner"
+        },
+        {
+          "name": "Zelfur",
+          "url": "https://www.facebook.com/TheZelfur"
+        }
       ]
     },
     {
       "group": "Combo Interactive",
       "pages": [
-        {"name": "Combo CBM", "url": "https://www.facebook.com/combo.cbm"},
-        {"name": "Combo CBPC", "url": "https://www.facebook.com/combo.cbpc"},
-        {"name": "NATZ ceogamer", "url": "https://www.facebook.com/NATZceogamer"}
+        {
+          "name": "Combo CBM",
+          "url": "https://www.facebook.com/combo.cbm"
+        },
+        {
+          "name": "Combo CBPC",
+          "url": "https://www.facebook.com/combo.cbpc"
+        },
+        {
+          "name": "NATZ ceogamer",
+          "url": "https://www.facebook.com/NATZceogamer"
+        }
       ]
     },
     {
       "group": "iHAVECPU",
       "pages": [
-        {"name": "iHAVEFiLM (ฟิล์มกระจกกันรอย)", "url": "https://www.facebook.com/iHAVEFiLM"}
+        {
+          "name": "iHAVEFiLM (ฟิล์มกระจกกันรอย)",
+          "url": "https://www.facebook.com/iHAVEFiLM"
+        }
       ]
     }
   ],
-
   "_monitor_pages": "เพจที่ 'ตัวเฝ้าอัตโนมัติ' ตรวจให้เองทุกรอบ (ไม่ต้องมีคนกด). ว่างไว้ = ใช้เพจแรกใน targets[] เหมือนเดิม. ค่า Apify คิดแยกต่อเพจต่อรอบ — ใส่เยอะ = จ่ายเยอะ. env MONITOR_PAGE_URLS ทับค่านี้ได้ (คั่นด้วย , หรือขึ้นบรรทัดใหม่).",
   "monitor_pages": [
     "https://www.facebook.com/thehof.talesrunner"
   ],
-
+  "_monitor_pages_extra": "เพจที่เฝ้า 'ชั่วคราว' — ใช้ตอนพรีเซ้นท์/ทดสอบ แล้วอยากให้เลิกเองโดยไม่ต้องกลับมาลบ. ระบบจะรวมเพจพวกนี้เข้ากับ monitor_pages เฉพาะวันที่ยังไม่เกิน monitor_pages_extra_until (วันสุดท้ายนับรวม เวลาไทย) พ้นวันนั้นเที่ยงคืนจะกลับไปเฝ้าเฉพาะ monitor_pages เอง. เหตุผล: ค่า Apify คิดต่อเพจต่อรอบ ลืมปิดทิ้งไว้ = เครดิตหมดกลางเดือนแล้วระบบเงียบไปเฉย ๆ.",
+  "monitor_pages_extra": [
+    "https://www.facebook.com/thehof.warzth",
+    "https://www.facebook.com/TheZelfur",
+    "https://www.facebook.com/combo.cbm",
+    "https://www.facebook.com/combo.cbpc",
+    "https://www.facebook.com/NATZceogamer",
+    "https://www.facebook.com/iHAVEFiLM"
+  ],
+  "monitor_pages_extra_until": "2026-09-04",
   "post_urls": [
     "https://www.facebook.com/share/p/17gB7HTXch/",
     "https://www.facebook.com/share/p/17Kn4iXpZ2/",
     "https://www.facebook.com/share/p/1camdLMTfS/"
   ],
   "targets": [
-    {"type": "page",  "name": "TalesRunner Thailand (thehof)", "url": "https://www.facebook.com/thehof.talesrunner", "private": false},
-    {"type": "group", "name": "TalesRunner TH Group",           "url": "https://www.facebook.com/groups/talesrunnerthgroup", "private": true},
-    {"type": "group", "name": "TalesRunner Group (id)",         "url": "https://www.facebook.com/groups/1024366639073240/", "private": true}
+    {
+      "type": "page",
+      "name": "TalesRunner Thailand (thehof)",
+      "url": "https://www.facebook.com/thehof.talesrunner",
+      "private": false
+    },
+    {
+      "type": "group",
+      "name": "TalesRunner TH Group",
+      "url": "https://www.facebook.com/groups/talesrunnerthgroup",
+      "private": true
+    },
+    {
+      "type": "group",
+      "name": "TalesRunner Group (id)",
+      "url": "https://www.facebook.com/groups/1024366639073240/",
+      "private": true
+    }
   ]
 }

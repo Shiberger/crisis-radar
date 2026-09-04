@@ -42,8 +42,8 @@ services:
       # --- โหมดเฝ้าเพจอัตโนมัติ (เปิดเว็บมาเห็นสถานะเลย ไม่ต้องกดปุ่ม) ---
       # ตรวจใหม่เมื่อมีคนเปิดหน้าเว็บและผลล่าสุดเก่าเกิน interval — อย่างมาก 1 รอบต่อ interval
       # ไม่ตั้ง MONITOR_ALWAYS เพราะ free tier หลับหลังไม่มีคนใช้ 15 นาที (thread เบื้องหลังตายอยู่ดี)
-      - key: MONITOR_INTERVAL_MIN # 2 ชม. — free tier ของ Apify รับรายชั่วโมงไม่ไหว (ดู README)
-        value: "120"
+      - key: MONITOR_INTERVAL_MIN # ต้อง < 24 ชม. ไม่งั้นสรุป 09:00 ของ n8n เจอ "ยังไม่ถึงรอบ"
+        value: "600"                # แล้วส่งข้อมูลเมื่อวานเข้า Discord (เกิดขึ้นจริง 2/9/2026)
       - key: MONITOR_MAX_POSTS # เพดานโพสต์ต่อรอบ — ตัวคุมค่าใช้จ่ายหลัก
         value: "5"
       # โชว์เฉพาะคอมเมนต์ใน 7 วันล่าสุด — ลดงานอย่างเดียว ไม่เพิ่มค่าใช้จ่าย
@@ -65,7 +65,7 @@ services:
       - key: N8N_WEBHOOK_SECRET # ส่งไปกับ header X-Crisis-Radar-Token ให้ n8n ตรวจก่อนรับ
         sync: false
       - key: ALERT_MIN_REACH # คอมเมนต์ลบที่ไลก์+ตอบกลับถึงเท่านี้ = แจ้งเองทันที
-        value: "150"
+        value: "20"          # p90 ของ reach จริงบนเพจ · เดิม 150 = p99 → auto-alert ไม่เคยเด้งเลย
       - key: ALERT_MAX_PER_RUN # กันข้อความท่วม Discord จนทีมปิดแจ้งเตือน
         value: "5"
       # ลิงก์กลับ dashboard ที่แนบไปในข้อความ — ใส่ URL จริงของ service นี้หลัง deploy รอบแรก
