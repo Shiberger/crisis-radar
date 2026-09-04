@@ -342,7 +342,7 @@ td.rch{white-space:nowrap;width:104px}
 td.rch .tnum{display:block;font-weight:640}
 .rbar{display:block;height:5px;border-radius:3px;background:var(--inset);margin-top:4px;overflow:hidden}
 .rbar i{display:block;height:100%;background:var(--muted);border-radius:3px}
-td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.post{color:var(--muted);font-size:12.5px;max-width:165px}
 .tag{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:640;padding:3px 10px;
   border-radius:999px;white-space:nowrap}
 .tag .dot{width:7px;height:7px;border-radius:50%}
@@ -352,6 +352,50 @@ td.post{color:var(--muted);font-size:12.5px;max-width:140px;overflow:hidden;text
 .aibadge{font-size:10.5px;color:var(--muted);border:1px solid var(--border2);border-radius:5px;
   padding:0 5px;margin-left:6px;white-space:nowrap;cursor:help}
 .count{color:var(--muted);font-size:13px;margin-top:13px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+/* ───────── แยกรายเพจ (รอบที่กวาดหลายเพจในครั้งเดียว) ─────────
+   ยอดรวมก้อนเดียวตอบไม่ได้ว่า "ต้องไปดูเพจไหนก่อน" — พอ 7 เพจกองรวมกัน คอมเมนต์ลบ 40 อัน
+   อาจเป็นเพจเดียวที่ไฟไหม้ หรือกระจายเพจละ 6 ซึ่งคนละเรื่องกันโดยสิ้นเชิง                */
+.pgwrap{border:1px solid var(--border);border-radius:var(--r-sm);background:var(--inset);
+  padding:13px 13px 14px;margin-bottom:14px}
+.pghead{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;margin-bottom:11px;font-size:12.5px;color:var(--muted)}
+.pghead b{font-size:13.5px;color:var(--ink);font-weight:680}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(218px,1fr));gap:9px}
+.pgcard{position:relative;text-align:left;background:var(--surface);border:1px solid var(--border2);
+  border-radius:10px;padding:11px 12px;cursor:pointer;font:inherit;color:var(--ink);display:block;
+  border-left:3px solid var(--pc,var(--border2))}
+.pgcard:hover{border-color:var(--muted);border-left-color:var(--pc,var(--muted))}
+.pgcard.on{border-color:var(--accent);border-left-color:var(--pc,var(--accent));
+  background:color-mix(in srgb,var(--accent) 8%,var(--surface));box-shadow:0 0 0 1px var(--accent) inset}
+.pgcard .nm{display:block;font-weight:680;font-size:13.5px;line-height:1.35;margin-bottom:5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pgcard .st{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--pc,var(--muted));
+  text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.pgcard .st i{width:7px;height:7px;border-radius:50%;background:var(--pc,var(--muted));display:block}
+.pgcard .num{font-size:12.5px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.pgcard .num b{font-weight:700;color:var(--ink)}
+.pgcard .nbar{display:block;height:5px;border-radius:3px;background:var(--inset);margin:7px 0 6px;overflow:hidden}
+.pgcard .nbar i{display:block;height:100%;background:var(--neg);border-radius:3px}
+.pgcard .tp{display:block;font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pgcard .go{position:absolute;top:9px;right:9px;color:var(--muted);font-size:12px;text-decoration:none}
+.pgcard .go:hover{color:var(--accent)}
+
+/* หัวกลุ่มในตาราง — บอกว่าแถวข้างล่างนี้เป็นของเพจไหน ตอนดูรวมทุกเพจ */
+tr.grp td{background:var(--inset);padding:8px 13px;border-bottom:1px solid var(--border2);
+  border-top:1px solid var(--border)}
+tr.grp:hover td{background:var(--inset)}
+tr.grp:first-child td{border-top:0}
+.grph{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.grph .gdot{width:8px;height:8px;border-radius:50%;flex:none}
+.grph b{font-size:13.5px;color:var(--ink);font-weight:680}
+.grph .gmeta{font-variant-numeric:tabular-nums}
+/* ป้ายเพจในแถว — ต้องติดอยู่กับตัวคอมเมนต์ด้วย ไม่ใช่มีแค่หัวกลุ่ม เพราะพอกรอง/ค้นหา
+   หรือเลื่อนยาว ๆ หัวกลุ่มจะหลุดจอไปแล้ว คนอ่านแถวเดี่ยว ๆ ต้องยังรู้ว่าเป็นเพจไหน */
+.pgtag{display:block;font-weight:640;color:var(--ink2);font-size:11.5px;margin-bottom:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pgtag::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--rc,var(--border2));margin-right:5px;vertical-align:1px}
+.ptitle{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* ───────────────────────── how it works ───────────────────────── */
 .how{background:none;border:1px dashed var(--border2);box-shadow:none}
@@ -677,7 +721,14 @@ tr.arch td.txt{color:var(--ink2)}
           แล้วระบบจะคิดสถานะให้ใหม่ทันที<br>
           อ่าน/จัดการคอมเมนต์ไหนแล้ว กด <b>“✓ อ่านแล้ว”</b> — ย้ายเข้าคลัง ไม่ขึ้นบนหน้านี้อีก
           และรอบตรวจถัดไปไม่ต้องวิเคราะห์ซ้ำ<br>
-          <span id="alertHint"></span></div></div></header>
+          <span id="pageHint"></span><span id="alertHint"></span></div></div></header>
+      <div class="pgwrap hidden" id="pgWrap">
+        <div class="pghead"><b>รอบนี้กวาด <span id="pgCount"></span></b>
+          <span id="pgLead"></span>
+          <span class="grow"></span>
+          <span>กดการ์ดเพื่อดูเฉพาะเพจนั้น</span></div>
+        <div class="pgrid" id="pgGrid"></div>
+      </div>
       <div class="activebar hidden" id="activeBar"></div>
       <div class="seg" id="viewSeg" style="margin-bottom:13px">
         <button data-v="active" class="on">ยังไม่ได้อ่าน <span id="cntActive" class="tnum"></span></button>
@@ -686,7 +737,9 @@ tr.arch td.txt{color:var(--ink2)}
       <div class="tools">
         <div id="sentChips" style="display:flex;gap:8px;flex-wrap:wrap"></div>
         <button class="chip hidden" id="readAllBtn"></button>
+        <button class="chip hidden" id="groupBtn" title="สลับระหว่าง “แยกหัวข้อตามเพจ” กับ “เรียงรวมทุกเพจในลิสต์เดียว”"></button>
         <span class="grow"></span>
+        <select id="pageFilter" class="hidden" aria-label="กรองตามเพจ"><option value="">ทุกเพจ</option></select>
         <select id="topicFilter" aria-label="กรองตามประเด็น"><option value="">ทุกประเด็น</option></select>
         <select id="sortBy" aria-label="เรียงลำดับ">
           <option value="reach">คนเห็นเยอะสุดก่อน</option>
@@ -699,7 +752,7 @@ tr.arch td.txt{color:var(--ink2)}
         <table>
           <thead><tr>
             <th>เวลา</th><th>ผู้คอมเมนต์</th><th>ข้อความ</th><th>อารมณ์</th><th>ประเด็น</th>
-            <th>ไลก์+ตอบกลับ</th><th>อยู่ใต้โพสต์</th><th>จัดการ</th>
+            <th>ไลก์+ตอบกลับ</th><th id="thPost">อยู่ใต้โพสต์</th><th>จัดการ</th>
           </tr></thead>
           <tbody id="rows"></tbody>
         </table>
@@ -770,8 +823,12 @@ $('#printBtn').onclick=()=>window.print();
 /* ═══════════════════════════ state ═══════════════════════════ */
 let SRC='facebook', SCOPE='page', DAYS=7, DATA=null, NEED_PASS=false, TLMODE='count';
 // view: 'active' = ยังไม่ได้อ่าน (ค่าเริ่มต้น — คือสิ่งที่ทีมต้องจัดการ) · 'archive' = อ่านแล้ว
-let FILT={view:'active',sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50};
+let FILT={view:'active',sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50,page:''};
+// จัดกลุ่มแถวตามเพจ (เปิดเองเมื่อรอบนี้มีหลายเพจ) — ปิดได้ถ้าอยากเห็นอันดับรวมข้ามเพจล้วน ๆ
+let GROUPBY=true;
 const inView=c=>FILT.view==='archive'?!!c.archived:!c.archived;
+// ขอบเขตเพจที่ผู้ใช้เลือก — ว่าง = ทุกเพจ (pkey นิยามอยู่ในส่วน "แยกรายเพจ" ข้างล่าง)
+const inPage=c=>!FILT.page||pkey(c)===FILT.page;
 
 /* โหมดของหน้าเว็บ
    'monitor' = ผลที่โชว์อยู่มาจากตัวเฝ้าเพจอัตโนมัติ (ค่าเริ่มต้น — ไม่ต้องกดอะไร)
@@ -1012,7 +1069,7 @@ function render(r,opts={}){
   // คำอธิบาย "ระบบทำอะไร" ต้องเรียกชั้นลึกสุดตามที่รอบนี้ใช้จริง ไม่ใช่เขียน "AI" ค้างไว้
   const dn=$('#deepName');if(dn)dn.textContent=deepLayer(r);
   if(!keep){
-    FILT={view:'active',sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50};
+    FILT={view:'active',sent:'all',topic:'',bucket:'',q:'',sort:'reach',limit:50,page:''};
     $('#search').value='';$('#topicFilter').value='';$('#sortBy').value='reach';
   }
   $('#results').classList.remove('hidden');$('#welcome').classList.add('hidden');
@@ -1020,7 +1077,7 @@ function render(r,opts={}){
 
   paintStatus();
   renderVerdict(r);renderKpis(r);renderBrief(r.brief);renderAlerts(r);renderSentiment(r);renderTopics(r);
-  renderTimeline();renderTopicFilter(r);renderChips();renderTable();
+  renderTimeline();renderPages();renderTopicFilter(r);renderChips();renderTable();
   if(keep){
     // renderTopicFilter สร้าง <option> ใหม่ทั้งชุด → ค่าที่เลือกไว้หลุด ต้องใส่กลับ
     $('#search').value=FILT.q;$('#sortBy').value=FILT.sort;$('#topicFilter').value=FILT.topic;
@@ -1260,9 +1317,9 @@ function renderAlerts(r){
   $('#alerts').querySelectorAll('[data-alert]').forEach(btn=>btn.onclick=()=>{
     const a=sorted[+btn.dataset.alert];
     FILT.sent='negative';FILT.topic=a.topic||'';FILT.bucket=a.kind==='spike'?(a.bucket_iso||''):'';
-    FILT.q='';FILT.sort='reach';FILT.limit=50;
+    FILT.q='';FILT.sort='reach';FILT.limit=50;FILT.page='';   // alert คิดจากทุกเพจรวมกัน
     $('#search').value='';$('#topicFilter').value=FILT.topic;$('#sortBy').value='reach';
-    renderChips();renderTable();renderTimeline();
+    renderPages();renderChips();renderTable();renderTimeline();
     $('#explorer').scrollIntoView({behavior:'smooth',block:'start'});
   });
 }
@@ -1386,17 +1443,114 @@ function renderTimeline(){
   });
 }
 
+/* ─── แยกรายเพจ ───────────────────────────────────────────────────────────────
+   รอบเดียวกวาดได้หลายเพจ (ดู jobs._fetch_facebook) → ตารางคอมเมนต์รวมของทุกเพจไว้ที่เดียว
+   ถ้าไม่บอกว่าแถวไหนของเพจไหน คนอ่านจะเอาคำบ่นของเพจ A ไปแก้ที่เพจ B
+   key ต้องคิดแบบเดียวกับฝั่ง server (jobs._page_key) เป๊ะ ๆ ไม่งั้น status ของเพจจะจับคู่ไม่ติด */
+const pkey=c=>String(c.page_url||'').trim().replace(/\/+$/,'').toLowerCase()
+  ||String(c.page_name||'').trim().toLowerCase()||'-';
+const PSTAT={CRISIS:['วิกฤต','var(--neg)'],WATCH:['เฝ้าระวัง','var(--warn)'],NORMAL:['ปกติ','var(--pos)']};
+
+/* สรุปรายเพจจากคอมเมนต์ชุดที่ส่งเข้ามา — เอา status ที่ server คิดไว้ (detector รายเพจ) มาทาบ
+   นับเองฝั่งนี้เพราะต้องเปลี่ยนตาม view (ยังไม่ได้อ่าน/คลัง) ซึ่ง server ส่งมาแค่ชุดเดียว */
+function pageGroups(cs){
+  const meta={};(DATA.pages||[]).forEach(p=>meta[p.key]=p);
+  const m=new Map();
+  cs.forEach(c=>{
+    const k=pkey(c);
+    if(!m.has(k))m.set(k,{key:k,name:c.page_name||(meta[k]||{}).name||'ไม่ระบุเพจ',
+      url:c.page_url||(meta[k]||{}).url||'',status:(meta[k]||{}).status||'',
+      total:0,negative:0,severity:0,topics:{}});
+    const g=m.get(k);g.total++;
+    if(c.sentiment==='negative'){g.negative++;g.severity+=1+(c.reach||0);
+      (c.topics||[]).forEach(t=>g.topics[t]=(g.topics[t]||0)+1);}
+  });
+  const rank={CRISIS:0,WATCH:1,NORMAL:2};
+  return [...m.values()].sort((a,b)=>(rank[a.status]??9)-(rank[b.status]??9)
+    ||b.severity-a.severity||b.total-a.total);
+}
+/* เพจทั้งหมดใน view ปัจจุบัน — ไม่ผูกกับตัวกรองอื่น เพื่อให้ "แผนที่เพจ" นิ่ง ไม่กระพริบตามที่กรอง */
+const viewPages=()=>pageGroups(DATA.comments.filter(inView));
+
+function renderPages(){
+  const gs=viewPages(), multi=gs.length>1;
+  $('#pgWrap').classList.toggle('hidden',!multi);
+  $('#pageFilter').classList.toggle('hidden',!multi);
+  $('#groupBtn').classList.toggle('hidden',!multi);
+  $('#thPost').textContent=multi?'เพจ / โพสต์':'อยู่ใต้โพสต์';
+  $('#pageHint').innerHTML=multi
+    ?`รอบนี้กวาด <b>${nf(gs.length)} เพจ</b> — ตารางข้างล่างมีคอมเมนต์ของทุกเพจรวมกัน
+      จึงติดป้ายชื่อเพจไว้ทุกแถว และแยกหัวข้อให้ · กดการ์ดเพจด้านบนเพื่อดูทีละเพจ<br>`:'';
+  if(!multi){FILT.page='';return;}
+
+  $('#pgCount').textContent=`${nf(gs.length)} เพจ`;
+  const hot=gs.filter(g=>g.status==='CRISIS'||g.status==='WATCH');
+  $('#pgLead').innerHTML=hot.length
+    ? `· <b style="color:var(--neg)">${esc(hot.map(g=>g.name).slice(0,3).join(', '))}</b>`
+      +`${hot.length>3?` และอีก ${hot.length-3}`:''} ต้องดูก่อน`
+    : '· ยังไม่มีเพจไหนผิดปกติ';
+
+  const total=gs.reduce((n,g)=>n+g.total,0), tneg=gs.reduce((n,g)=>n+g.negative,0);
+  const card=(g)=>{
+    const [st,col]=PSTAT[g.status]||['—','var(--muted)'];
+    const share=g.total?Math.round(g.negative/g.total*100):0;
+    const tps=Object.entries(g.topics).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([t])=>TLabel(t));
+    return `<div class="pgcard${FILT.page===g.key?' on':''}" data-pg="${esc(g.key)}" style="--pc:${col}"
+      role="button" tabindex="0" aria-pressed="${FILT.page===g.key}"
+      title="${esc(g.name)} — ${nf(g.total)} คอมเมนต์ · ลบ ${nf(g.negative)} (${share}%)">
+      ${g.url?`<a class="go" href="${esc(g.url)}" target="_blank" rel="noopener"
+        title="เปิดเพจนี้บน Facebook">↗</a>`:''}
+      <span class="st" title="สถานะของเพจนี้คิดจากคอมเมนต์ของเพจนี้ล้วน ๆ — เทียบกับ “ปกติของเพจนี้เอง” ไม่ได้เทียบข้ามเพจ · เพจที่คนบ่นเป็นปกติอยู่แล้วจึงไม่ขึ้นวิกฤต ส่วนเพจที่ปกติเงียบ แล้วอยู่ ๆ มีคนบ่นรัว ๆ จะขึ้นวิกฤตทันที"><i></i>${esc(st)}</span>
+      <span class="nm">${esc(g.name)}</span>
+      <span class="num"><b>${nf(g.total)}</b> คอมเมนต์ · ลบ <b style="color:${g.negative?'var(--neg)':'inherit'}">${nf(g.negative)}</b> (${share}%)</span>
+      <span class="nbar"><i style="width:${share}%"></i></span>
+      <span class="tp">${tps.length?'ประเด็น: '+esc(tps.join(', ')):'ยังไม่มีประเด็นที่จับได้'}</span></div>`;
+  };
+  const allShare=total?Math.round(tneg/total*100):0;
+  $('#pgGrid').innerHTML=`<div class="pgcard${FILT.page?'':' on'}" data-pg="" style="--pc:var(--accent)"
+      role="button" tabindex="0" aria-pressed="${!FILT.page}" title="ดูคอมเมนต์ของทุกเพจรวมกัน">
+      <span class="st"><i></i>รวมทุกเพจ</span>
+      <span class="nm">ทุกเพจ (${nf(gs.length)})</span>
+      <span class="num"><b>${nf(total)}</b> คอมเมนต์ · ลบ <b>${nf(tneg)}</b> (${allShare}%)</span>
+      <span class="nbar"><i style="width:${allShare}%"></i></span>
+      <span class="tp">${FILT.page?'กดเพื่อเลิกกรองเพจ':'กำลังดูรวมอยู่'}</span></div>`
+    +gs.map(card).join('');
+  $('#pgGrid').querySelectorAll('[data-pg]').forEach(b=>{
+    // ลิงก์ "เปิดเพจ ↗" ในการ์ด ต้องไม่ไปกรองเพจไปด้วย
+    b.onclick=e=>{if(e.target.closest('a'))return;selectPage(b.dataset.pg);};
+    b.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectPage(b.dataset.pg);}};
+  });
+
+  $('#pageFilter').innerHTML=`<option value="">ทุกเพจ (${nf(total)})</option>`
+    +gs.map(g=>`<option value="${esc(g.key)}">${esc(g.name)} (${nf(g.total)})</option>`).join('');
+  $('#pageFilter').value=FILT.page;
+  if($('#pageFilter').value!==FILT.page)FILT.page='';   // เพจนั้นไม่มีคอมเมนต์ใน view นี้
+
+  $('#groupBtn').classList.toggle('on',GROUPBY&&!FILT.page);
+  $('#groupBtn').classList.toggle('hidden',!!FILT.page);
+  $('#groupBtn').textContent=GROUPBY?'🗂 แยกตามเพจ':'🗂 รวมเป็นลิสต์เดียว';
+}
+function selectPage(k){
+  FILT.page=(FILT.page===k?'':k);FILT.limit=50;
+  renderPages();renderTopicFilter(DATA);renderChips();renderTable();
+}
+$('#pageFilter').onchange=e=>{FILT.page=e.target.value;FILT.limit=50;
+  renderPages();renderTopicFilter(DATA);renderChips();renderTable();};
+$('#groupBtn').onclick=()=>{GROUPBY=!GROUPBY;renderPages();renderTable();};
+
 /* ─── explorer ─── */
 function renderTopicFilter(r){
   // ดึงจากคอมเมนต์ "ทุกอารมณ์" ไม่ใช่เฉพาะเชิงลบ — ไม่งั้นกรองประเด็นที่ยังไม่เป็นดราม่าไม่ได้
   // แต่ต้องอยู่ใน view ปัจจุบัน ไม่งั้นเลือกประเด็นแล้วได้ตารางว่าง
-  const all={};(r.comments||[]).filter(inView).forEach(c=>(c.topics||[]).forEach(t=>all[t]=(all[t]||0)+1));
+  const all={};(r.comments||[]).filter(inView).filter(inPage)
+    .forEach(c=>(c.topics||[]).forEach(t=>all[t]=(all[t]||0)+1));
   $('#topicFilter').innerHTML='<option value="">ทุกประเด็น</option>'+
     Object.entries(all).sort((a,b)=>b[1]-a[1])
       .map(([t,n])=>`<option value="${esc(t)}">${esc(TLabel(t))} (${n})</option>`).join('');
 }
 function renderChips(){
-  const cs=DATA.comments.filter(inView),cnt=s=>s==='all'?cs.length:cs.filter(c=>c.sentiment===s).length;
+  const cs=DATA.comments.filter(inView).filter(inPage),
+        cnt=s=>s==='all'?cs.length:cs.filter(c=>c.sentiment===s).length;
   const defs=[['all','ทั้งหมด'],['negative','เชิงลบ'],['neutral','กลาง ๆ'],['positive','เชิงบวก']];
   $('#sentChips').innerHTML=defs.map(([k,l])=>
     `<button class="chip ${FILT.sent===k?'on':''}" data-s="${k}">${l}<span class="c">${nf(cnt(k))}</span></button>`).join('');
@@ -1405,6 +1559,8 @@ function renderChips(){
 }
 function renderActiveBar(shown,total){
   const parts=[];
+  if(FILT.page){const g=viewPages().find(p=>p.key===FILT.page);
+    parts.push(['page',`เพจ: ${g?g.name:FILT.page}`]);}
   if(FILT.sent!=='all')parts.push(['sent',`อารมณ์: ${SENT[FILT.sent].t}`]);
   if(FILT.topic)parts.push(['topic',`เรื่อง: ${TLabel(FILT.topic)}`]);
   if(FILT.bucket)parts.push(['bucket',`ช่วงเวลา: ${fmtFull(FILT.bucket)}`]);
@@ -1417,9 +1573,10 @@ function renderActiveBar(shown,total){
     +`<span class="grow"></span><button class="linkbtn" data-clr="all">ล้างตัวกรองทั้งหมด</button>`;
   bar.querySelectorAll('[data-clr]').forEach(b=>b.onclick=()=>{
     const k=b.dataset.clr;
-    if(k==='all')FILT={...FILT,sent:'all',topic:'',bucket:'',q:''};
+    if(k==='all')FILT={...FILT,sent:'all',topic:'',bucket:'',q:'',page:''};
     else if(k==='sent')FILT.sent='all';else if(k==='q')FILT.q='';else FILT[k]='';
     $('#search').value=FILT.q;$('#topicFilter').value=FILT.topic;
+    renderPages();renderTopicFilter(DATA);
     renderChips();renderSentiment(DATA);renderTopics(DATA);renderTimeline();renderTable();});
 }
 function hl(text,q){
@@ -1430,7 +1587,7 @@ function hl(text,q){
 /* คอมเมนต์ที่ตรงกับ view + ตัวกรองทั้งหมด — ใช้ร่วมกับปุ่ม "อ่านแล้วทั้งหมด" ให้เห็นตรงกับที่เห็นบนจอ */
 function filteredComments(){
   const mins=DATA.bucket_minutes||60;
-  let cs=DATA.comments.filter(inView);
+  let cs=DATA.comments.filter(inView).filter(inPage);
   if(FILT.sent!=='all')cs=cs.filter(c=>c.sentiment===FILT.sent);
   if(FILT.topic)cs=cs.filter(c=>(c.topics||[]).includes(FILT.topic));
   if(FILT.bucket){const k=bkey(FILT.bucket,mins);cs=cs.filter(c=>bkey(c.created_at,mins)===k);}
@@ -1454,7 +1611,9 @@ function renderTable(){
 
   const maxReach=Math.max(1,...DATA.comments.map(c=>c.reach));
   const shown=cs.slice(0,FILT.limit);
-  $('#rows').innerHTML=shown.map(c=>{
+  const pgs=viewPages(), multi=pgs.length>1;
+  const pstat={};pgs.forEach(g=>pstat[g.key]=g);
+  const row=c=>{
     const s=SENT[c.sentiment], ai=SENT[c.ai_sentiment];
     const fixed=c.overridden
       ? `<span class="fixbadge" title="ระบบทายว่า “${esc(ai?ai.t:'—')}” · ทีมแก้เป็น “${esc(s.t)}”">แก้เอง</span>` : '';
@@ -1481,9 +1640,33 @@ function renderTable(){
         style="color:${s.c};background:color-mix(in srgb,${s.c} 13%,transparent)"><span class="dot" style="background:${s.c}"></span>${s.t}</button>${fixed}</td>
       <td>${topics}</td>
       <td class="rch"><span class="tnum">${nf(c.reach)}</span><span class="rbar"><i style="width:${(c.reach/maxReach*100).toFixed(0)}%;background:${c.sentiment==='negative'?'var(--neg)':'var(--muted)'}"></i></span></td>
-      <td class="post" title="${esc(c.post_title||'')}">${esc(c.post_title||'—')}</td>
-      <td class="act"><div class="act-in">${read}${link}${ping}</div></td></tr>`;}).join('')
-    ||`<tr><td colspan="8" class="empty emptybox">${emptyText()}</td></tr>`;
+      <td class="post" title="${esc((multi&&c.page_name?c.page_name+' — ':'')+(c.post_title||'ไม่ทราบโพสต์'))}">${
+        multi?`<span class="pgtag" style="--rc:${(PSTAT[(pstat[pkey(c)]||{}).status]||[0,'var(--border2)'])[1]}"
+          >${esc(c.page_name||'ไม่ระบุเพจ')}</span>`:''}<span class="ptitle">${esc(c.post_title||'—')}</span></td>
+      <td class="act"><div class="act-in">${read}${link}${ping}</div></td></tr>`;};
+
+  /* จัดกลุ่มตามเพจ: ตัดจำนวนที่แสดงก่อน แล้วค่อยแบ่งกลุ่ม — "แสดง 50 จาก 200" จึงยังหมายถึง
+     50 อันดับแรกตามที่เรียงไว้จริง ๆ ไม่ใช่ 50 อันแรกของเพจแรกอย่างเดียว */
+  const grouped=multi&&GROUPBY&&!FILT.page;
+  let body='';
+  if(grouped){
+    const seen=new Map();
+    shown.forEach(c=>{const k=pkey(c);if(!seen.has(k))seen.set(k,[]);seen.get(k).push(c);});
+    body=pgs.filter(g=>seen.has(g.key)).map(g=>{
+      const rs=seen.get(g.key), neg=rs.filter(c=>c.sentiment==='negative').length;
+      const [st,col]=PSTAT[g.status]||['—','var(--muted)'];
+      return `<tr class="grp"><td colspan="8"><div class="grph">
+          <span class="gdot" style="background:${col}"></span><b>${esc(g.name)}</b>
+          <span class="gmeta">สถานะเพจนี้: <b style="color:${col};font-size:12.5px"
+            title="สถานะของเพจนี้คิดจากคอมเมนต์ของเพจนี้ล้วน ๆ — เทียบกับ “ปกติของเพจนี้เอง” ไม่ได้เทียบข้ามเพจ · เพจที่คนบ่นเป็นปกติอยู่แล้วจึงไม่ขึ้นวิกฤต ส่วนเพจที่ปกติเงียบ แล้วอยู่ ๆ มีคนบ่นรัว ๆ จะขึ้นวิกฤตทันที">${esc(st)}</b>
+            · แสดง ${nf(rs.length)} จาก ${nf(g.total)} คอมเมนต์ของเพจนี้${neg?` · ลบ ${nf(neg)}`:''}</span>
+          <span class="grow"></span>
+          <button class="linkbtn" data-only="${esc(g.key)}">ดูเฉพาะเพจนี้ →</button>
+          ${g.url?`<a class="linkbtn" href="${esc(g.url)}" target="_blank" rel="noopener">เปิดเพจ ↗</a>`:''}
+        </div></td></tr>`+rs.map(row).join('');}).join('');
+  }else body=shown.map(row).join('');
+  $('#rows').innerHTML=body||`<tr><td colspan="8" class="empty emptybox">${emptyText()}</td></tr>`;
+  $('#rows').querySelectorAll('[data-only]').forEach(b=>b.onclick=()=>selectPage(b.dataset.only));
 
   $('#rows').querySelectorAll('.more').forEach(b=>b.onclick=()=>{
     const td=b.closest('td');td.classList.toggle('clamp');
@@ -1497,8 +1680,9 @@ function renderTable(){
   $('#rows').querySelectorAll('[data-ping]').forEach(b=>b.onclick=()=>openAlert(b.dataset.ping));
 
   const more=cs.length-shown.length;
+  const scope=FILT.page?(pgs.find(g=>g.key===FILT.page)||{}).name:'';
   $('#count').innerHTML=`<span>แสดง <b>${nf(shown.length)}</b> จาก ${nf(cs.length)} คอมเมนต์`
-      +(arch?' ในคลัง':'')+`</span>`
+      +(arch?' ในคลัง':'')+(scope?` ของเพจ <b>${esc(scope)}</b>`:multi?` (รวม ${nf(pgs.length)} เพจ)`:'')+`</span>`
     +(!arch&&DATA.archived_count?`<span style="color:var(--muted)">· อีก <b>${nf(DATA.archived_count)}</b> `
       +`อยู่ในคลัง (ไม่ถูกนับในสถานะ)</span>`:'')
     +(DATA.alert_sent_count?`<span style="color:var(--muted)">· แจ้งเข้า Discord แล้ว `
@@ -1687,7 +1871,7 @@ $('#alertCancel').onclick=()=>$('#alertDlg').close();
 function emptyText(){
   if(FILT.view==='archive')
     return '<b>ยังไม่มีคอมเมนต์ในคลัง</b>กด “✓ อ่านแล้ว” ที่แถวไหนก็ได้ เพื่อเก็บออกจากหน้านี้';
-  const filtered=FILT.sent!=='all'||FILT.topic||FILT.bucket||FILT.q;
+  const filtered=FILT.sent!=='all'||FILT.topic||FILT.bucket||FILT.q||FILT.page;
   if(filtered)
     return 'ไม่พบคอมเมนต์ที่ตรงกับเงื่อนไข<br>'
       +'<button class="linkbtn" onclick="document.querySelector(\'[data-clr=all]\')?.click()">ล้างตัวกรองทั้งหมด</button>';
@@ -1699,6 +1883,7 @@ function emptyText(){
 $('#viewSeg').onclick=e=>{
   const b=e.target.closest('button');if(!b||b.dataset.v===FILT.view)return;
   FILT.view=b.dataset.v;FILT.limit=50;FILT.bucket='';
+  renderPages();          // เคลียร์ FILT.page ให้เองถ้าเพจนั้นไม่มีคอมเมนต์ใน view ใหม่
   renderTopicFilter(DATA);$('#topicFilter').value=FILT.topic;
   if($('#topicFilter').value!==FILT.topic)FILT.topic='';   // ประเด็นนั้นไม่มีใน view นี้
   renderChips();renderTable();

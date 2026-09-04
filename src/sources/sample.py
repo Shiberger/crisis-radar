@@ -25,6 +25,10 @@ class SampleFacebookSource:
     def fetch(self, since: Optional[datetime] = None) -> list[Comment]:
         raw = json.loads(self.fixture_path.read_text(encoding="utf-8"))
         page_id = raw.get("page_id", "unknown")
+        # ป้ายเพจของทั้งไฟล์ — ใช้เป็น fallback ให้คอมเมนต์ที่ไม่ได้ติดป้ายมาเอง
+        # (ไฟล์เก่าที่ดึงไว้ก่อนมีฟีเจอร์นี้ + ข้อมูลตัวอย่าง ซึ่งเป็นเพจเดียวอยู่แล้ว)
+        file_page = str(raw.get("page") or "").strip()
+        file_url = str(raw.get("page_url") or "").strip()
         out: list[Comment] = []
         for c in raw["comments"]:
             ts = datetime.fromisoformat(c["created_at"])
@@ -46,6 +50,8 @@ class SampleFacebookSource:
                     comment_url=c.get("comment_url", ""),
                     profile_url=c.get("profile_url", ""),
                     post_title=c.get("post_title", ""),
+                    page_name=str(c.get("page_name") or "").strip() or file_page,
+                    page_url=str(c.get("page_url") or "").strip() or file_url,
                 )
             )
         return out

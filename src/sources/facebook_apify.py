@@ -85,11 +85,27 @@ def _comment_id(item: dict, post_id: str) -> str:
     return "c_" + hashlib.sha1(raw).hexdigest()[:10]
 
 
-def map_comment_item(it: dict, post_id: str) -> dict:
+def page_slug(url: str) -> str:
+    """ชื่อเพจที่อยู่ใน URL (facebook.com/<slug>/...) — ใช้เป็น id ของเพจเวลาไม่มีชื่อจริง.
+
+    ต้องมี เพราะ post_id ของเดิมเป็น "page_1, page_2…" นับใหม่ทุกเพจ → กวาด 3 เพจแล้ว
+    โพสต์แรกของทั้ง 3 เพจได้ id เดียวกันหมด คอมเมนต์จึงถูกยำรวมจนแยกเพจไม่ออก
+    """
+    try:
+        path = url.split("/", 3)[3] if url.count("/") >= 3 else ""
+    except IndexError:
+        return ""
+    slug = path.split("?")[0].split("/")[0].strip()
+    return slug or ""
+
+
+def map_comment_item(it: dict, post_id: str, page_name: str = "", page_url: str = "") -> dict:
     """แปลง 1 item จาก Facebook Comments Scraper → fixture schema (ใช้ร่วมทั้ง live + import)."""
     return {
         "comment_id": _comment_id(it, post_id),
         "post_id": post_id,
+        "page_name": page_name,
+        "page_url": page_url,
         "author": _pick(it, "profileName", "name", "authorName", "profile", default="unknown"),
         "text": _pick(it, "text", "message", "commentText", default=""),
         "created_at": _parse_date(_pick(it, "date", "createdTime", "time", "timestamp")),
@@ -318,12 +334,14 @@ class ApifyFacebookScraper:
         """เอาเฉพาะ URL (ตัวเรียกเดิมที่ไม่สนใจเวลาโพสต์)."""
         return [p["url"] for p in self.get_posts(target_url, max_posts, log=log)]
 
-    def get_comments(self, post_url: str, post_id: str, max_comments: int) -> list[dict]:
+    def get_comments(self, post_url: str, post_id: str, max_comments: int,
+                     page_name: str = "", page_url: str = "") -> list[dict]:
         # input ขั้นต่ำ (ตรงกับฟอร์ม: Facebook URLs = startUrls, Results amount = resultsLimit)
         run_input: dict = {"startUrls": [{"url": post_url}], "resultsLimit": max_comments}
         if self.cookies:
             run_input["cookies"] = self.cookies
-        out = [map_comment_item(it, post_id) for it in self._run(COMMENTS_ACTOR, run_input)]
+        out = [map_comment_item(it, post_id, page_name, page_url)
+               for it in self._run(COMMENTS_ACTOR, run_input)]
         return [c for c in out if c["text"].strip()]
 
     def scrape_post_urls(self, post_urls: list[str], max_comments: int, log=print) -> list[dict]:
@@ -334,7 +352,11 @@ class ApifyFacebookScraper:
         """
         comments: list[dict] = []
         for i, url in enumerate(post_urls, 1):
-            cs = self.get_comments(url, f"post_{i}", max_comments)
+            # โหมดเจาะโพสต์ก็ข้ามเพจได้ (วางลิงก์โพสต์ของคนละเพจในช่องเดียว) — เพจต้นทาง
+            # จึงต้องอ่านจาก URL ของโพสต์นั้น ไม่ใช่เดาว่าเป็นเพจหลักใน targets.json
+            slug = page_slug(url)
+            cs = self.get_comments(url, f"post_{i}", max_comments,
+                                   page_name=slug, page_url=f"https://www.facebook.com/{slug}" if slug else "")
             comments += cs
             log(f"    - โพสต์ {i}/{len(post_urls)}: {len(cs)} คอมเมนต์")
         return comments
@@ -376,9 +398,13 @@ class ApifyFacebookScraper:
         post_urls = [p["url"] for p in posts]
         log(f"  [apify] เจอ {len(post_urls)} โพสต์ → ดึงคอมเมนต์…")
         comments: list[dict] = []
+        # id ของโพสต์ต้องมี slug เพจนำหน้า ไม่งั้น "โพสต์ที่ 1" ของทุกเพจได้ id ชนกันหมด
+        pslug = page_slug(target["url"]) or target["type"]
+        pname = str(target.get("name") or "").strip() or pslug
         for i, url in enumerate(post_urls, 1):
-            pid = f"{target['type']}_{i}"
-            cs = self.get_comments(url, pid, max_comments)
+            pid = f"{pslug}_{i}"
+            cs = self.get_comments(url, pid, max_comments,
+                                   page_name=pname, page_url=target["url"])
             comments += cs
             log(f"    - โพสต์ {i}/{len(post_urls)}: {len(cs)} คอมเมนต์")
 

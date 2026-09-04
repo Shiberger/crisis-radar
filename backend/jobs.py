@@ -131,6 +131,29 @@ def monitor_page_urls(cfg: dict | None = None) -> list[str]:
     return _dedup_urls(_clean_fb_urls([str(u).strip() for u in urls]))[:MAX_PAGES]
 
 
+def page_names(cfg: dict | None = None) -> dict[str, str]:
+    """map: url (normalize แล้ว) → ชื่อเพจที่ทีมตั้งไว้ใน page_presets."""
+    if cfg is None:
+        try:
+            cfg = json.loads(TARGETS_FILE.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            cfg = {}
+    return {pg["url"].rstrip("/").lower(): pg["name"]
+            for g in page_presets(cfg) for pg in g["pages"]}
+
+
+def page_title(url: str, cfg: dict | None = None) -> str:
+    """ชื่อเพจเดียวที่เอาไปโชว์ได้ — ไม่รู้จักก็ใช้ slug ท้าย URL แทน URL ยาว ๆ.
+
+    ต้องแยกออกมาเพราะตอนติดป้าย "คอมเมนต์นี้มาจากเพจไหน" ผู้ใช้ต้องอ่านออกว่าเป็นเพจอะไร
+    การโชว์ https://www.facebook.com/thehof.warzth เต็ม ๆ ในตารางทำให้คอลัมน์บวมและอ่านยาก
+    """
+    u = str(url or "").strip()
+    if not u:
+        return ""
+    return page_names(cfg).get(u.rstrip("/").lower()) or u.rstrip("/").rsplit("/", 1)[-1].split("?")[0]
+
+
 def page_label(urls: list[str], cfg: dict | None = None) -> str:
     """ชื่อที่เอาไปโชว์แทน "เพจที่ตรวจรอบนี้" — เพจเดียวใช้ชื่อเพจ หลายเพจบอกจำนวน + ตัวอย่าง.
 
@@ -143,9 +166,7 @@ def page_label(urls: list[str], cfg: dict | None = None) -> str:
             cfg = json.loads(TARGETS_FILE.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             cfg = {}
-    named = {pg["url"].rstrip("/").lower(): pg["name"]
-             for g in page_presets(cfg) for pg in g["pages"]}
-    labels = [named.get(u.rstrip("/").lower()) or u.rstrip("/").rsplit("/", 1)[-1] for u in urls]
+    labels = [page_title(u, cfg) for u in urls]
     if not labels:
         return str(cfg.get("page_name") or "")
     if len(labels) == 1:
@@ -238,7 +259,7 @@ def _fetch_facebook(params: dict, log=print):
         raise ValueError(f"ใส่เพจได้มากสุด {MAX_PAGES} เพจต่อรอบ (ใส่มา {len(custom_pages)}) "
                          f"— ค่า Apify คิดต่อเพจ ถ้าต้องการมากกว่านี้ให้แบ่งเป็นหลายรอบ")
     if custom_pages:
-        targets = [{"type": "page", "name": u, "url": u} for u in custom_pages]
+        targets = [{"type": "page", "name": page_title(u, cfg), "url": u} for u in custom_pages]
 
     cookies = None
     cpath = os.environ.get("FB_COOKIES_JSON")
@@ -286,7 +307,12 @@ def _fetch_facebook(params: dict, log=print):
     if dropped:
         log(f"กรอง admin/โฆษณา (เช่น IDRLAB) ออก {dropped} รายการ")
 
-    live = {"page": cfg.get("page_name"), "page_id": cfg.get("page_id"),
+    # "page" ในไฟล์ live เป็นแค่ fallback ให้คอมเมนต์ที่ไม่ได้ติดป้ายเพจมาเอง — ต้องเป็นเพจที่
+    # กวาดรอบนี้จริง ไม่ใช่ page_name คงที่ใน targets.json (ซึ่งเป็นเพจเดียวเสมอ)
+    scanned_urls = [t["url"] for t in targets if t.get("url")]
+    live = {"page": page_label(scanned_urls, cfg) or cfg.get("page_name"),
+            "page_url": scanned_urls[0] if len(scanned_urls) == 1 else "",
+            "page_id": cfg.get("page_id"),
             "brand": cfg["brand"], "comments": comments}
     live_path = ROOT / "data" / f"facebook_live_{cfg['brand']}.json"
     # monitor กับ manual job อาจดึงพร้อมกัน → กันเขียนไฟล์ทับกันกลางคัน
@@ -367,6 +393,61 @@ def run_pipeline(params: dict, log=print) -> dict:
     return result
 
 
+UNKNOWN_PAGE = "ไม่ระบุเพจ"
+
+
+def _page_key(c: Classified) -> str:
+    """key จัดกลุ่มรายเพจ — ใช้ URL ก่อน (นิ่งกว่าชื่อ) ไม่มีค่อยใช้ชื่อ.
+
+    ต้องตรงกับ pkey() ฝั่งหน้าเว็บเป๊ะ ๆ ไม่งั้นสถานะรายเพจจะจับคู่กับกลุ่มในตารางไม่ติด
+    """
+    url = str(c.comment.page_url or "").strip().rstrip("/").lower()
+    return url or str(c.comment.page_name or "").strip().lower() or "-"
+
+
+def page_stats(items: list[Classified]) -> list[dict]:
+    """สรุปแยกรายเพจ — รอบที่กวาดหลายเพจต้องตอบให้ได้ว่า "เดือดที่เพจไหน" ไม่ใช่แค่ยอดรวม.
+
+    status ของแต่ละเพจคิดด้วย detector ตัวเดียวกับหน้ารวม แต่ป้อนเฉพาะคอมเมนต์ของเพจนั้น
+    → เป็นสถานะของเพจนั้นจริง ๆ · ห้ามเอาสถานะรวมมาแปะทุกการ์ด เพราะเพจเดียวที่เดือด
+    จะทำให้อีก 6 เพจดูเหมือนกำลังวิกฤตไปด้วย แล้วทีมจะไล่ผิดที่
+
+    นับจาก items ที่ส่งเข้ามาเท่านั้น (ผู้เรียกส่งเฉพาะที่ยังไม่ได้อ่าน) — ให้ตรงกับสถานะรวม
+    ซึ่งไม่นับคอมเมนต์ในคลัง
+    """
+    groups: dict[str, list[Classified]] = {}
+    for c in items:
+        groups.setdefault(_page_key(c), []).append(c)
+
+    out = []
+    for key, gs in groups.items():
+        negs = [g for g in gs if g.sentiment == "negative"]
+        rep = detector.detect(gs, brand=(gs[0].comment.brand or "talesrunner"))
+        topics: dict[str, int] = {}
+        for g in negs:
+            for t in g.topics:
+                topics[t] = topics.get(t, 0) + 1
+        out.append({
+            "key": key,
+            "name": next((g.comment.page_name for g in gs if g.comment.page_name), "") or UNKNOWN_PAGE,
+            "url": next((g.comment.page_url for g in gs if g.comment.page_url), ""),
+            "total": len(gs),
+            "negative": len(negs),
+            "neutral": sum(1 for g in gs if g.sentiment == "neutral"),
+            "positive": sum(1 for g in gs if g.sentiment == "positive"),
+            "severity": sum(1 + g.comment.reach for g in negs),
+            "status": rep.status,
+            "alerts": len(rep.alert_items),
+            "max_reach": max((g.comment.reach for g in negs), default=0),
+            "last_at": max((g.comment.created_at for g in gs)).isoformat(),
+            "top_topics": sorted(topics.items(), key=lambda kv: -kv[1])[:3],
+        })
+    # เรียงตาม "ต้องดูก่อน": วิกฤต → เฝ้าระวัง → ปกติ แล้วค่อยตามความแรง
+    rank = {"CRISIS": 0, "WATCH": 1, "NORMAL": 2}
+    out.sort(key=lambda p: (rank.get(p["status"], 9), -p["severity"], -p["total"]))
+    return out
+
+
 def build_result(items: list[Classified], source: str, generated_at: str = "",
                  engine: str = "", llm_on: bool = False, page_name: str = "") -> dict:
     """ตรวจ crisis จาก label ปัจจุบัน แล้วประกอบก้อนผลที่หน้าเว็บใช้.
@@ -398,6 +479,8 @@ def build_result(items: list[Classified], source: str, generated_at: str = "",
     result["engine"] = engine
     result["llm_on"] = llm_on
     result["page_name"] = page_name
+    # แยกรายเพจให้หน้าเว็บโชว์ว่าอันไหนของเพจไหน (นับเฉพาะที่ยังไม่ได้อ่าน เท่ากับสถานะรวม)
+    result["pages"] = page_stats(active)
     # ใบสั่งงาน "ต้องพูดเรื่องไหน พูดยังไง" — คิดจากผลชุดนี้ตรง ๆ จึงต้องคิดใหม่ทุกครั้งที่
     # ทีมแก้ label/กดอ่านแล้ว (ซึ่งเรียก build_result อยู่แล้ว) ไม่งั้นคำแนะนำจะค้างของเก่า
     result["brief"] = brief.build(result)

@@ -1106,6 +1106,85 @@ os.environ["STATE_BACKEND"] = "file"
 state.invalidate()
 
 
+# ---- T24: กวาดหลายเพจในรอบเดียว → ต้องแยกออกว่าคอมเมนต์ไหนของเพจไหน ----
+# ก่อนหน้านี้คอมเมนต์ไม่มีป้ายเพจติดมาเลย: หน้าเว็บเอาเสียงของ 7 เพจมากองรวมกัน คนอ่านแล้ว
+# เอาคำบ่นของเพจ A ไปแก้ที่เพจ B ได้สบาย ๆ · และ post_id เดิมนับใหม่ทุกเพจ ("page_1, page_2…")
+# ทำให้โพสต์แรกของทุกเพจได้ id ชนกันหมด จนแยกกลุ่มไม่ออกแม้จะอยากแยก
+_pg_fixture = {
+    "page": "ค่าสำรองระดับไฟล์", "page_id": "multi", "brand": "talesrunner",
+    "comments": [
+        {"comment_id": "m1", "post_id": "warzth_1", "author": "u1", "text": "เกมล่มอีกแล้ว เซ็งมาก",
+         "created_at": "2026-07-15T10:00:00+07:00", "reach": 40,
+         "page_name": "Warz TH", "page_url": "https://www.facebook.com/thehof.warzth"},
+        {"comment_id": "m2", "post_id": "warzth_1", "author": "u2", "text": "เติมเงินแล้วของไม่เข้า",
+         "created_at": "2026-07-15T10:30:00+07:00", "reach": 30,
+         "page_name": "Warz TH", "page_url": "https://www.facebook.com/thehof.warzth"},
+        {"comment_id": "m3", "post_id": "talesrunner_1", "author": "u3", "text": "สนุกมากครับ ชอบเลย",
+         "created_at": "2026-07-15T11:00:00+07:00", "reach": 5,
+         "page_name": "TalesRunner Thailand", "page_url": "https://www.facebook.com/thehof.talesrunner"},
+        # ไม่ติดป้ายมา (ไฟล์เก่าที่ดึงไว้ก่อนมีฟีเจอร์นี้) → ต้อง fallback ไปค่าระดับไฟล์ ไม่ใช่ค่าว่าง
+        {"comment_id": "m4", "post_id": "old_1", "author": "u4", "text": "อัปเดตกี่โมงครับ",
+         "created_at": "2026-07-15T11:30:00+07:00", "reach": 1},
+    ],
+}
+_pgf = Path(tempfile.mkdtemp(prefix="crisis-radar-pages-")) / "multi.json"
+_pgf.write_text(json.dumps(_pg_fixture, ensure_ascii=False), encoding="utf-8")
+_pg_comments = SampleFacebookSource(_pgf).fetch()
+
+check("T24 คอมเมนต์ต้องรู้ว่าตัวเองมาจากเพจไหน (ไม่งั้นรายงานรวมแยกเพจไม่ได้เลย)",
+      [c.page_name for c in _pg_comments[:3]] == ["Warz TH", "Warz TH", "TalesRunner Thailand"],
+      str([c.page_name for c in _pg_comments[:3]]))
+
+check("T24b คอมเมนต์ที่ไม่มีป้ายเพจ (ไฟล์เก่า) ต้องได้ค่าสำรองระดับไฟล์ ไม่ใช่ค่าว่าง",
+      _pg_comments[3].page_name == "ค่าสำรองระดับไฟล์", _pg_comments[3].page_name)
+
+_pg_items = [Classified(c, "negative" if "เซ็ง" in c.text or "ไม่เข้า" in c.text else "positive", 0.9)
+             for c in _pg_comments]
+_pg_stats = jobs.page_stats(_pg_items)
+_by_name = {p["name"]: p for p in _pg_stats}
+
+check("T24c สรุปรายเพจต้องแยกตามเพจจริง ไม่ใช่ยำรวมเป็นก้อนเดียว",
+      len(_pg_stats) == 3 and _by_name["Warz TH"]["total"] == 2
+      and _by_name["Warz TH"]["negative"] == 2
+      and _by_name["TalesRunner Thailand"]["negative"] == 0,
+      str([(p["name"], p["total"], p["negative"]) for p in _pg_stats]))
+
+check("T24d เพจที่เดือดต้องถูกดันขึ้นก่อนเพจที่เงียบ (ทีมเปิดมาเห็นอันที่ต้องรีบก่อน)",
+      _pg_stats[0]["name"] == "Warz TH", _pg_stats[0]["name"])
+
+check("T24e ทุกเพจต้องมีสถานะของตัวเอง — เอาสถานะรวมมาแปะทุกการ์ดไม่ได้ "
+      "(เพจเดียวที่ไฟไหม้จะทำให้อีก 6 เพจดูเหมือนวิกฤตไปด้วย)",
+      all(p["status"] in ("NORMAL", "WATCH", "CRISIS") for p in _pg_stats)
+      and _by_name["TalesRunner Thailand"]["status"] == "NORMAL",
+      str({p["name"]: p["status"] for p in _pg_stats}))
+
+# key คือสิ่งเดียวที่ผูกการ์ดรายเพจ (ที่ server คิด) เข้ากับกลุ่มแถวในตาราง (ที่ JS คิด)
+# คิดคนละแบบเมื่อไหร่ = การ์ดโชว์สถานะเพจ A ทับกลุ่มแถวของเพจ B
+check("T24f key ของเพจต้องมาจาก URL แบบ normalize แล้ว (ตรงกับ pkey() ฝั่งหน้าเว็บ)",
+      _by_name["Warz TH"]["key"] == "https://www.facebook.com/thehof.warzth",
+      _by_name["Warz TH"]["key"])
+
+check("T24g build_result ต้องส่ง pages มาให้หน้าเว็บด้วย ไม่งั้นหน้าเว็บไม่มีสถานะรายเพจจะโชว์",
+      len(jobs.build_result(_pg_items, source="sample").get("pages", [])) == 3)
+
+# คอมเมนต์ในคลังไม่ถูกนับในสถานะรวม → สรุปรายเพจก็ต้องไม่นับ ไม่งั้นการ์ดกับตารางพูดคนละเลข
+_pg_items[0].archived = True
+check("T24h คอมเมนต์ที่ทีมกด 'อ่านแล้ว' ต้องหายจากสรุปรายเพจด้วย (ให้ตรงกับสถานะรวม)",
+      {p["name"]: p["total"] for p in jobs.build_result(_pg_items, source="sample")["pages"]}
+      .get("Warz TH") == 1)
+_pg_items[0].archived = False
+
+# post_id ที่ชนกันข้ามเพจคือต้นเหตุที่ทำให้แยกเพจไม่ออกตั้งแต่แรก
+from src.sources.facebook_apify import page_slug   # noqa: E402
+check("T24i slug เพจอ่านออกจาก URL ได้ (เอาไปนำหน้า post_id กัน id ชนข้ามเพจ)",
+      page_slug("https://www.facebook.com/thehof.warzth") == "thehof.warzth"
+      and page_slug("https://www.facebook.com/combo.cbm/posts/123") == "combo.cbm",
+      page_slug("https://www.facebook.com/thehof.warzth"))
+
+check("T24j ตั้งชื่อเพจให้อ่านออกแทน URL ยาว ๆ (ป้ายในตารางต้องเป็นชื่อ ไม่ใช่ลิงก์)",
+      jobs.page_title("https://www.facebook.com/somepage/") == "somepage")
+
+
 # ---- output ----
 print("=" * 64)
 print("CRISIS RADAR — TEST RESULTS")
