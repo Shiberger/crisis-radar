@@ -1450,6 +1450,12 @@ function renderTimeline(){
 const pkey=c=>String(c.page_url||'').trim().replace(/\/+$/,'').toLowerCase()
   ||String(c.page_name||'').trim().toLowerCase()||'-';
 const PSTAT={CRISIS:['วิกฤต','var(--neg)'],WATCH:['เฝ้าระวัง','var(--warn)'],NORMAL:['ปกติ','var(--pos)']};
+/* กลุ่มของคอมเมนต์ที่บอกไม่ได้ว่ามาจากเพจไหน — ต้องอธิบายตัวเองได้ว่า "ทำไมไม่รู้" และ
+   "จะหายไปเมื่อไหร่" ไม่งั้นมันดูเหมือนบั๊กค้างอยู่บนหน้าจอตลอดไป (ดู jobs.backfill_pages) */
+const UNKNOWN_PG='ไม่ระบุเพจ';
+const UNKNOWN_WHY='คอมเมนต์กลุ่มนี้ถูกดึงมาก่อนที่ระบบจะติดป้ายเพจให้ และลิงก์ของมันเป็น '
+  +'reel/วิดีโอ ซึ่งไม่มีชื่อเพจอยู่ใน URL จึงกู้ย้อนหลังไม่ได้ — '
+  +'รอบตรวจถัดไปจะติดป้ายให้เองตั้งแต่ตอนดึง กลุ่มนี้จะหายไปเอง';
 
 /* สรุปรายเพจจากคอมเมนต์ชุดที่ส่งเข้ามา — เอา status ที่ server คิดไว้ (detector รายเพจ) มาทาบ
    นับเองฝั่งนี้เพราะต้องเปลี่ยนตาม view (ยังไม่ได้อ่าน/คลัง) ซึ่ง server ส่งมาแค่ชุดเดียว */
@@ -1497,14 +1503,17 @@ function renderPages(){
     const tps=Object.entries(g.topics).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([t])=>TLabel(t));
     return `<div class="pgcard${FILT.page===g.key?' on':''}" data-pg="${esc(g.key)}" style="--pc:${col}"
       role="button" tabindex="0" aria-pressed="${FILT.page===g.key}"
-      title="${esc(g.name)} — ${nf(g.total)} คอมเมนต์ · ลบ ${nf(g.negative)} (${share}%)">
+      title="${g.name===UNKNOWN_PG?esc(UNKNOWN_WHY)
+        :esc(g.name)+` — ${nf(g.total)} คอมเมนต์ · ลบ ${nf(g.negative)} (${share}%)`}">
       ${g.url?`<a class="go" href="${esc(g.url)}" target="_blank" rel="noopener"
         title="เปิดเพจนี้บน Facebook">↗</a>`:''}
       <span class="st" title="สถานะของเพจนี้คิดจากคอมเมนต์ของเพจนี้ล้วน ๆ — เทียบกับ “ปกติของเพจนี้เอง” ไม่ได้เทียบข้ามเพจ · เพจที่คนบ่นเป็นปกติอยู่แล้วจึงไม่ขึ้นวิกฤต ส่วนเพจที่ปกติเงียบ แล้วอยู่ ๆ มีคนบ่นรัว ๆ จะขึ้นวิกฤตทันที"><i></i>${esc(st)}</span>
       <span class="nm">${esc(g.name)}</span>
       <span class="num"><b>${nf(g.total)}</b> คอมเมนต์ · ลบ <b style="color:${g.negative?'var(--neg)':'inherit'}">${nf(g.negative)}</b> (${share}%)</span>
       <span class="nbar"><i style="width:${share}%"></i></span>
-      <span class="tp">${tps.length?'ประเด็น: '+esc(tps.join(', ')):'ยังไม่มีประเด็นที่จับได้'}</span></div>`;
+      <span class="tp">${g.name===UNKNOWN_PG
+        ?'❓ ข้อมูลเก่า — รอบหน้าจะรู้เอง'
+        :(tps.length?'ประเด็น: '+esc(tps.join(', ')):'ยังไม่มีประเด็นที่จับได้')}</span></div>`;
   };
   const allShare=total?Math.round(tneg/total*100):0;
   $('#pgGrid').innerHTML=`<div class="pgcard${FILT.page?'':' on'}" data-pg="" style="--pc:var(--accent)"
@@ -1656,7 +1665,9 @@ function renderTable(){
       const rs=seen.get(g.key), neg=rs.filter(c=>c.sentiment==='negative').length;
       const [st,col]=PSTAT[g.status]||['—','var(--muted)'];
       return `<tr class="grp"><td colspan="8"><div class="grph">
-          <span class="gdot" style="background:${col}"></span><b>${esc(g.name)}</b>
+          <span class="gdot" style="background:${col}"></span><b${
+            g.name===UNKNOWN_PG?` title="${esc(UNKNOWN_WHY)}" style="cursor:help"`:''
+          }>${esc(g.name)}${g.name===UNKNOWN_PG?' <span class="aibadge">ทำไม?</span>':''}</b>
           <span class="gmeta">สถานะเพจนี้: <b style="color:${col};font-size:12.5px"
             title="สถานะของเพจนี้คิดจากคอมเมนต์ของเพจนี้ล้วน ๆ — เทียบกับ “ปกติของเพจนี้เอง” ไม่ได้เทียบข้ามเพจ · เพจที่คนบ่นเป็นปกติอยู่แล้วจึงไม่ขึ้นวิกฤต ส่วนเพจที่ปกติเงียบ แล้วอยู่ ๆ มีคนบ่นรัว ๆ จะขึ้นวิกฤตทันที">${esc(st)}</b>
             · แสดง ${nf(rs.length)} จาก ${nf(g.total)} คอมเมนต์ของเพจนี้${neg?` · ลบ ${nf(neg)}`:''}</span>

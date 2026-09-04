@@ -85,18 +85,33 @@ def _comment_id(item: dict, post_id: str) -> str:
     return "c_" + hashlib.sha1(raw).hexdigest()[:10]
 
 
+# path ของ Facebook ที่ segment แรก **ไม่ใช่ชื่อเพจ** — URL แบบนี้บอกไม่ได้ว่าโพสต์อยู่เพจไหน
+# (เช่น reel: facebook.com/reel/1390447323236352 ซึ่งเจอจริงในข้อมูล production 34 คอมเมนต์)
+# ไม่กันไว้ = ได้ "เพจ" ชื่อ reel/watch/groups โผล่มาในรายงาน ซึ่งแย่กว่าบอกว่าไม่รู้
+_NOT_A_PAGE = {
+    "reel", "reels", "watch", "video", "videos", "photo", "photos", "story", "stories",
+    "groups", "group", "events", "event", "marketplace", "gaming", "share", "pages",
+    "permalink.php", "story.php", "photo.php", "video.php", "profile.php", "people",
+    "media", "notes", "l.php", "login", "help", "privacy", "policies",
+}
+
+
 def page_slug(url: str) -> str:
     """ชื่อเพจที่อยู่ใน URL (facebook.com/<slug>/...) — ใช้เป็น id ของเพจเวลาไม่มีชื่อจริง.
 
     ต้องมี เพราะ post_id ของเดิมเป็น "page_1, page_2…" นับใหม่ทุกเพจ → กวาด 3 เพจแล้ว
     โพสต์แรกของทั้ง 3 เพจได้ id เดียวกันหมด คอมเมนต์จึงถูกยำรวมจนแยกเพจไม่ออก
+
+    คืน "" เมื่อ URL บอกเพจไม่ได้ (reel/watch/groups…) — "ไม่รู้" ต้องแยกออกจาก "รู้ว่าเป็น reel"
     """
     try:
         path = url.split("/", 3)[3] if url.count("/") >= 3 else ""
     except IndexError:
         return ""
     slug = path.split("?")[0].split("/")[0].strip()
-    return slug or ""
+    if not slug or slug.lower() in _NOT_A_PAGE:
+        return ""
+    return slug
 
 
 def map_comment_item(it: dict, post_id: str, page_name: str = "", page_url: str = "") -> dict:
@@ -354,9 +369,9 @@ class ApifyFacebookScraper:
         for i, url in enumerate(post_urls, 1):
             # โหมดเจาะโพสต์ก็ข้ามเพจได้ (วางลิงก์โพสต์ของคนละเพจในช่องเดียว) — เพจต้นทาง
             # จึงต้องอ่านจาก URL ของโพสต์นั้น ไม่ใช่เดาว่าเป็นเพจหลักใน targets.json
-            slug = page_slug(url)
-            cs = self.get_comments(url, f"post_{i}", max_comments,
-                                   page_name=slug, page_url=f"https://www.facebook.com/{slug}" if slug else "")
+            slug = page_slug(url)   # ว่าง = URL บอกเพจไม่ได้ (reel/watch) → ปล่อยว่าง ไม่เดา
+            cs = self.get_comments(url, f"post_{i}", max_comments, page_name=slug,
+                                   page_url=f"https://www.facebook.com/{slug}" if slug else "")
             comments += cs
             log(f"    - โพสต์ {i}/{len(post_urls)}: {len(cs)} คอมเมนต์")
         return comments

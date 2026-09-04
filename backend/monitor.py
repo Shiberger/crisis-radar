@@ -110,6 +110,36 @@ def config() -> dict:
 # ปลายทางจริงเป็นไฟล์หรือ Supabase แล้วแต่ env — src/state.py ตัดสินให้ (บน Render ต้องเป็น
 # Supabase ไม่งั้น container restart ทีเดียวผลตรวจล่าสุด + ประวัติแนวโน้มหายหมด)
 
+def _with_pages(result):
+    """เติมสรุปรายเพจให้ผลที่เก็บไว้ก่อนจะมีฟีเจอร์นี้ — คิดใหม่จากคอมเมนต์ชุดเดิม ไม่ scrape ซ้ำ.
+
+    ทำไมต้องทำตอนโหลด ไม่รอรอบตรวจถัดไป: interval จริงคือ 10 ชม. — ถ้าไม่เติมให้ ทีมจะเปิดเว็บ
+    มาเห็นหน้าตาเดิมทั้งวันหลัง deploy แล้วเข้าใจว่า deploy ไม่ติด · เพจกู้จาก comment_url ได้
+    อยู่แล้ว (ดู jobs.backfill_pages) จึงไม่มีเหตุผลให้รอ
+
+    ทำเฉพาะตอนที่ยังไม่มี pages เท่านั้น และคิดจากคอมเมนต์ชุดเดิมล้วน ๆ — ไม่แตะ state
+    (override/คลัง/ที่จำว่าแจ้ง Discord แล้ว) เพราะค่าพวกนั้นติดมากับคอมเมนต์ที่เก็บไว้แล้ว
+    พังตรงไหนก็ยังคืนของเดิมไป ดีกว่าให้ server บูตไม่ขึ้นเพราะผลเก่าหน้าตาไม่ตรงสมมติฐาน
+    """
+    if not isinstance(result, dict) or result.get("pages") or not result.get("comments"):
+        return result
+    try:
+        from src.models import Classified
+        items = [Classified.from_dict(c) for c in result["comments"]]
+        n = jobs.backfill_pages(items)
+        out = jobs.build_result(items, source=result.get("source", ""),
+                                generated_at=result.get("generated_at", ""),
+                                engine=result.get("engine", ""),
+                                llm_on=bool(result.get("llm_on")),
+                                page_name=result.get("page_name", ""))
+        _log(f"เติมสรุปรายเพจให้ผลที่เก็บไว้ — กู้เพจจากลิงก์คอมเมนต์ได้ {n}/{len(items)} รายการ "
+             f"({len(out.get('pages') or [])} เพจ)")
+        return out
+    except Exception as e:  # noqa: BLE001
+        _log(f"เติมสรุปรายเพจให้ผลเก่าไม่สำเร็จ ({e}) — ใช้ผลเดิมไปก่อน")
+        return result
+
+
 def _load() -> None:
     saved = state.read_json(STATE_FILE, default=None)
     if isinstance(saved, dict):
@@ -117,8 +147,11 @@ def _load() -> None:
             updated_ts = float(saved.get("updated_ts") or 0)
         except (TypeError, ValueError):
             updated_ts = 0.0
+        # ต้องคิดให้เสร็จ "ก่อน" จับ _LOCK — _with_pages เรียก _log ซึ่งจับ _LOCK เหมือนกัน
+        # และ _LOCK เป็น threading.Lock ธรรมดา (ไม่ reentrant) → จับซ้อนเมื่อไหร่ค้างตายทันที
+        result = _with_pages(saved.get("result"))
         with _LOCK:
-            _STATE["result"] = saved.get("result")
+            _STATE["result"] = result
             _STATE["updated_ts"] = updated_ts
             _STATE["updated_at"] = saved.get("updated_at", "")
     hist = state.read_json(HISTORY_FILE, default=None)

@@ -1281,6 +1281,54 @@ check("T26c เพจเดียวเหมือนเดิม → ยัง
       [p.comment.comment_id for p in notify._spread(_loud, 3)] == ["big0", "big1", "big2"])
 
 
+# ---- T27: กู้เพจย้อนหลังจากลิงก์คอมเมนต์ (ไม่ต้อง scrape ใหม่ ไม่เสียเครดิต) ----
+# ผลที่ดึงไว้ก่อนมีฟีเจอร์ติดป้ายเพจ ยังกู้ได้ เพราะ comment_url ที่ Apify ส่งมาเป็นลิงก์จริง
+# ที่มี slug เพจอยู่ในตัว — ถ้าไม่กู้ ทีมต้องรอรอบตรวจถัดไป (interval จริง 10 ชม.)
+_bf = [
+    Classified(Comment("facebook", "p/x", "u1", "a", "เกมล่ม", datetime(2026, 7, 15, 14, 0),
+                       comment_url="https://www.facebook.com/thehof.warzth/posts/pfbid02?comment_id=9"),
+               "negative", 0.9),
+    # reel: URL ไม่มีชื่อเพจ → ต้องปล่อยเป็น "ไม่รู้" ห้ามเดาว่าเป็นเพจหลัก
+    Classified(Comment("facebook", "p/x", "u2", "a", "บั๊ก", datetime(2026, 7, 15, 14, 0),
+                       comment_url="https://www.facebook.com/reel/1390447323236352/?comment_id=2"),
+               "negative", 0.9),
+    # ติดป้ายมาแล้ว (ดึงหลังมีฟีเจอร์) → ห้ามไปทับของเดิม
+    Classified(Comment("facebook", "p/x", "u3", "a", "ดี", datetime(2026, 7, 15, 14, 0),
+                       page_name="ชื่อที่ตั้งมาแล้ว", page_url="https://www.facebook.com/keepme",
+                       comment_url="https://www.facebook.com/other/posts/1"), "positive", 0.9),
+]
+_n_bf = jobs.backfill_pages(_bf)
+
+check("T27 กู้เพจย้อนหลังจาก comment_url ได้ — ผลเก่าไม่ต้องรอ scrape รอบใหม่",
+      _n_bf == 1 and _bf[0].comment.page_url == "https://www.facebook.com/thehof.warzth",
+      f"กู้ได้ {_n_bf} · {_bf[0].comment.page_url}")
+
+check("T27b ลิงก์ที่ไม่มีชื่อเพจ (reel/watch) ต้องปล่อยเป็น 'ไม่รู้' ห้ามเดาเป็นเพจหลัก "
+      "— เดาผิดคือส่งทีมไปแก้ผิดเพจ ซึ่งแย่กว่าบอกว่าไม่รู้",
+      not _bf[1].comment.page_name and not _bf[1].comment.page_url)
+
+check("T27c คอมเมนต์ที่ติดป้ายมาแล้วห้ามถูกทับ (ป้ายจากตอน scrape แม่นกว่าเดาจาก URL)",
+      _bf[2].comment.page_url == "https://www.facebook.com/keepme")
+
+check("T27d page_slug ต้องไม่อ่าน path สงวนของ Facebook เป็นชื่อเพจ",
+      all(page_slug(f"https://www.facebook.com/{seg}/123") == ""
+          for seg in ("reel", "watch", "groups", "permalink.php", "profile.php")))
+
+# กลุ่ม "ไม่ระบุเพจ" ต้องยังโผล่ในสรุปรายเพจ ไม่ใช่หายไปเงียบ ๆ — 34 คอมเมนต์ที่หายไปจากรายงาน
+# โดยไม่มีใครรู้ แย่กว่ากลุ่มที่ยอมรับว่า "ยังไม่รู้ว่าเพจไหน"
+check("T27e คอมเมนต์ที่กู้เพจไม่ได้ ต้องยังถูกนับในสรุป (ในกลุ่ม 'ไม่ระบุเพจ') ไม่ใช่หายไปเฉย ๆ",
+      sum(p["total"] for p in jobs.page_stats(_bf)) == 3
+      and any(p["name"] == jobs.UNKNOWN_PAGE for p in jobs.page_stats(_bf)),
+      str([(p["name"], p["total"]) for p in jobs.page_stats(_bf)]))
+
+# build_result ต้องกู้ให้เองโดยไม่ต้องมีใครเรียก backfill แยก — ไม่งั้นเส้นทางไหนลืมเรียกก็พลาด
+_bf2 = [Classified(Comment("facebook", "p/x", "z1", "a", "เกมล่ม", datetime(2026, 7, 15, 14, 0),
+                           comment_url="https://www.facebook.com/combo.cbm/posts/1"), "negative", 0.9)]
+check("T27f build_result กู้เพจให้เองในตัว (ทุกเส้นทางที่ประกอบรายงานได้ผลเหมือนกัน)",
+      jobs.build_result(_bf2, source="sample")["pages"][0]["url"]
+      == "https://www.facebook.com/combo.cbm")
+
+
 # ---- output ----
 print("=" * 64)
 print("CRISIS RADAR — TEST RESULTS")

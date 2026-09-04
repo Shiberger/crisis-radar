@@ -396,6 +396,38 @@ def run_pipeline(params: dict, log=print) -> dict:
 UNKNOWN_PAGE = "ไม่ระบุเพจ"
 
 
+def backfill_pages(items: list[Classified], cfg: dict | None = None) -> int:
+    """กู้ "คอมเมนต์นี้มาจากเพจไหน" ให้ข้อมูลที่ดึงมาก่อนจะมีฟีเจอร์นี้ — จาก URL ของคอมเมนต์เอง.
+
+    ทำไมทำได้: comment_url ที่ Apify ส่งมาเป็นลิงก์จริงบน Facebook ซึ่งมี slug เพจอยู่ในตัว
+    (facebook.com/<slug>/posts/…) จึงอ่านย้อนหลังได้โดย **ไม่ต้อง scrape ใหม่ ไม่เสียเครดิต**
+
+    ทำไมต้องมี: ผลที่เก็บไว้แล้วกู้ไม่ได้ = ทีมต้องรอรอบตรวจถัดไป (ที่ interval 10 ชม.) ถึงจะ
+    เห็นรายงานแยกเพจ ทั้งที่ข้อมูลมีอยู่ครบในมือแล้ว
+
+    URL ที่บอกเพจไม่ได้ (reel/watch/permalink) ปล่อยว่างไว้ → ตกกลุ่ม "ไม่ระบุเพจ"
+    **ห้ามเดาว่าเป็นเพจหลัก** — เดาผิดคือส่งทีมไปแก้ผิดเพจ ซึ่งแย่กว่าบอกว่าไม่รู้
+
+    คืนจำนวนที่กู้ได้ (แก้ items ในที่).
+    """
+    from src.sources.facebook_apify import page_slug
+
+    named = page_names(cfg)
+    n = 0
+    for it in items:
+        c = it.comment
+        if c.page_name or c.page_url:
+            continue
+        slug = page_slug(c.comment_url) or page_slug(c.url)
+        if not slug:
+            continue
+        url = f"https://www.facebook.com/{slug}"
+        c.page_url = url
+        c.page_name = named.get(url.rstrip("/").lower(), slug)
+        n += 1
+    return n
+
+
 def _page_key(c: Classified) -> str:
     """key จัดกลุ่มรายเพจ — กติกาเดียวกับทุกที่ในระบบ (ดู models.page_key)."""
     return page_key(c.comment.page_url, c.comment.page_name)
@@ -454,6 +486,9 @@ def build_result(items: list[Classified], source: str, generated_at: str = "",
     คอมเมนต์ในคลัง (archived) ยังถูกส่งไปหน้าเว็บครบเพื่อให้เปิดดูย้อนหลังได้
     แต่ **ไม่ถูกนับ** ในสถานะ/สถิติ/spike — ถือว่าทีมจัดการไปแล้ว
     """
+    # ติดป้ายเพจให้คอมเมนต์เก่าที่ยังไม่มี ก่อนคิดอะไรทั้งสิ้น — ไม่งั้นสรุปรายเพจจะยำทุกเพจ
+    # เป็นก้อน "ไม่ระบุเพจ" ก้อนเดียว · no-op สำหรับข้อมูลที่ดึงมาหลังมีฟีเจอร์นี้แล้ว
+    backfill_pages(items)
     active = [c for c in items if not c.archived]
     brand = active[0].comment.brand if active else "talesrunner"
     rep = detector.detect(active, brand=brand or "talesrunner")
