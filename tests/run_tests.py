@@ -834,6 +834,91 @@ check("T22e ทุกที่ที่เขียนคำว่า 'AI อ่
       _lit == 1 and "DATA.llm_on?'AI อ่านซ้ำ':'กฎอ่านซ้ำ'" in _html,
       f"string literal {_lit} ที่ · อยู่หลังเงื่อนไข llm_on ทั้งหมด")
 
+# ---- T23: ใบสั่งงาน — "ต้องขอโทษเรื่องไหน" ----
+# ปัญหาที่แก้: alert เดิมบอกได้แค่ "มีคนบ่น" กับ "บ่นเรื่องอะไรบ้าง" · วันที่คอมเมนต์ลบมา
+# พร้อมกันหลายเรื่อง ทีมจับไม่ได้ว่าต้องขอโทษเรื่องไหน แล้วมักจบด้วยประกาศขอโทษรวม ๆ
+from src.notify import brief as _brief                 # noqa: E402
+from src.notify import digest as _dg                   # noqa: E402
+
+
+def _mkc(i, text, topics, reach, sent="negative", archived=False):
+    return {"comment_id": f"b{i}", "text": text, "author": f"a{i}", "reach": reach,
+            "topics": topics, "sentiment": sent, "archived": archived, "comment_url": ""}
+
+
+# เรื่องเดียวกินความโกรธเกือบทั้งหมด → ขอโทษเรื่องนั้นตรง ๆ ได้
+_conc = {"comments": [_mkc(i, "ติดตั้งแล้วเข้าไม่ได้ เด้งตลอด", ["bug/technical"], 20)
+                      for i in range(8)]
+                     + [_mkc(90, "แพงไป", ["billing/price"], 1)]}
+_b = _brief.build(_conc)
+check("T23 เรื่องเดียวกินความโกรธเกือบหมด → บอกให้ขอโทษเรื่องนั้นเรื่องเดียว",
+      _b["focus"] == "concentrated" and _b["lead"]["topic"] == "bug/technical"
+      and _b["apologize"] is True, f"{_b['lead']['share']:.0f}% · {_b['headline']}")
+
+check("T23b ต้องบอก 'อาการที่คนพิมพ์ซ้ำ' ไม่ใช่แค่ชื่อหมวด — ตัวที่ทำให้ประกาศตรงเรื่อง",
+      any(w in ("ติดตั้ง", "เข้าไม่ได้", "เด้ง") for w, _ in _b["lead"]["symptoms"]),
+      str(_b["lead"]["symptoms"]))
+
+# เรื่องที่ "ขอโทษไม่ได้" — ราคาแพงเป็นการตัดสินใจทางธุรกิจ ขอโทษแล้วไม่ลด = เสียหายกว่าเงียบ
+_price = {"comments": [_mkc(i, "แพงมาก ไม่คุ้ม ราคาโหดไป", ["billing/price"], 20)
+                       for i in range(8)]}
+_bp = _brief.build(_price)
+check("T23c เรื่องราคา → ต้องบอกว่า 'อย่าเพิ่งขอโทษ' (ขอโทษแล้วไม่ลดราคา = เสียหายกว่า)",
+      _bp["focus"] == "concentrated" and _bp["apologize"] is False
+      and any("ราคาแพง" in x for x in _bp["avoid"]))
+
+# กระจายทั่ว = เคสอันตรายที่สุด เพราะทีมมักเลือกโพสต์ขอโทษรวม ๆ ซึ่งอ่านออกว่าไม่ได้อ่านคอมเมนต์
+_diff = {"comments": [_mkc(1, "เข้าไม่ได้ เด้ง", ["bug/technical"], 5),
+                      _mkc(2, "ล่มอีกแล้ว", ["bug/technical"], 3),
+                      _mkc(3, "แพงมาก", ["billing/price"], 6),
+                      _mkc(4, "ไม่คุ้มเลย", ["billing/price"], 4),
+                      _mkc(5, "แอดมินตอบช้า", ["service/support"], 5),
+                      _mkc(6, "ทีมงานไม่รับผิดชอบ", ["service/support"], 4),
+                      _mkc(7, "อีเวนต์ห่วย", ["content/event"], 5),
+                      _mkc(8, "โค้ดใช้ไม่ได้", ["rewards/redeem"], 4)]}
+_bd = _brief.build(_diff)
+check("T23d กระจายหลายเรื่องจนโฟกัสไม่ได้ → ห้ามแนะนำให้โพสต์ขอโทษ",
+      _bd["focus"] == "diffuse" and _bd["apologize"] is False
+      and any("ขอโทษรวม" in x for x in _bd["avoid"]), _bd["headline"])
+
+check("T23e ตอนกระจายทั่ว ต้องไม่ชี้เจ้าของเรื่องทีมเดียว (เรื่องอื่นจะตกหล่น)",
+      all("เจ้าของเรื่อง" not in f["value"] for f in _dg.brief_fields(_bd)))
+
+# สัดส่วนต้องรวมได้ ~100% — ถ้านับคอมเมนต์ที่ติดหลายเรื่องเต็มทุกเรื่อง จะเฟ้อเกิน 100%
+# แล้วเกณฑ์ "เรื่องเดียวกิน 45% = โฟกัสได้" จะไม่มีความหมาย (วัดจากข้อมูลจริงเคยได้ 126%)
+_multi = {"comments": [_mkc(i, "เติมเงินแล้วของไม่เข้า เงินหาย",
+                            ["billing/price", "rewards/redeem"], 10) for i in range(6)]}
+_bm = _brief.build(_multi)
+_sum = _bm["lead"]["share"] + sum(o["share"] for o in _bm["others"])
+check("T23f คอมเมนต์ที่พูดหลายเรื่อง ต้องหารน้ำหนัก ไม่ใช่นับเต็มทุกเรื่อง (สัดส่วนรวม ≤ 100%)",
+      99 <= _sum <= 101, f"รวม {_sum:.1f}%")
+
+check("T23g คอมเมนต์ลบน้อยเกิน = ยังไม่ใช่ประเด็นระดับเพจ ไม่ต้องออกประกาศ",
+      _brief.build({"comments": [_mkc(1, "เข้าไม่ได้", ["bug/technical"], 2)]})["focus"] == "none")
+
+check("T23h คอมเมนต์ที่ทีมกด 'อ่านแล้ว' ต้องไม่ถูกดันขึ้นมาสั่งงานซ้ำ",
+      _brief.build({"comments": [_mkc(i, "เข้าไม่ได้ เด้ง", ["bug/technical"], 9, archived=True)
+                                 for i in range(8)]})["focus"] == "none")
+
+# ใบสั่งงานต้องอยู่บนสุดของข้อความ Discord ถัดจากตัวเลข — ถ้าอยู่ท้าย คนจะอ่านคอมเมนต์ดิบก่อน
+_ev = _dg.build_event({**_conc, "status": "CRISIS", "total": 9, "sentiment_mix": {"negative": 9},
+                       "brand": "x", "alert_items": [],
+                       "topic_trends": [{"topic": "bug/technical", "label": "บั๊ก/เทคนิค",
+                                         "negative": 8, "owner": "Dev / QA"}]},
+                      page={"page_name": "x"}, prev=None, cfg={"dashboard_url": "", "roles": {}})
+_names = [f["name"] for f in _ev["discord"]["embeds"][0]["fields"]]
+check("T23i ใบสั่งงานอยู่เหนือรายการคอมเมนต์ดิบในข้อความ Discord",
+      _names.index("🎯 ประเด็นที่ต้องรับมือก่อน") < _names.index("ประเด็นที่ถูกบ่นมากสุด")
+      and "✅ ควรพูดแบบนี้" in _names and "❌ ห้ามพูดแบบนี้" in _names,
+      " → ".join(_names[3:6]))
+
+check("T23j ก้อนดิบที่ส่งให้ n8n ต้องมีใบสั่งงานด้วย (route/เปิด Jira ต่อได้ไม่ต้องแกะข้อความ)",
+      _ev["brief"]["focus"] == "concentrated")
+
+# Discord ตัด field value ที่ 1024 — ข้อความยาวต้องถูกตัดก่อนส่ง ไม่ใช่ให้ปลายทางปฏิเสธทั้งก้อน
+check("T23k ทุก field ยาวไม่เกินเพดานของ Discord",
+      all(len(f["value"]) <= 1024 for f in _ev["discord"]["embeds"][0]["fields"]))
+
 # ---- T21: เพจที่เฝ้า "ชั่วคราว" ต้องหมดอายุเอง ----
 # ค่า Apify คิดต่อเพจต่อรอบ — เปิดเฝ้า 7 เพจตอนพรีเซ้นท์แล้วลืมปิด = เครดิตหมดกลางเดือน
 # แล้วระบบเงียบไปเฉย ๆ ซึ่งแยกไม่ออกจาก "เพจไม่มีดราม่า" → ต้องเลิกเองตรงเวลา

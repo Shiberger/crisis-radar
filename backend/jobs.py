@@ -25,6 +25,7 @@ from src.classify.pipeline import HybridClassifier    # noqa: E402
 from src.crisis import detector                        # noqa: E402
 from src.models import Classified                      # noqa: E402
 from src import notify                                 # noqa: E402
+from src.notify import brief                           # noqa: E402
 from src.sources.sample import SampleFacebookSource   # noqa: E402
 from src.timeutil import now_ict                       # noqa: E402
 
@@ -372,6 +373,9 @@ def build_result(items: list[Classified], source: str, generated_at: str = "",
     # ชั้นลึกสุดที่ใช้จริงในรอบนี้ — หน้าเว็บใช้ตัดสินว่าจะเขียนป้ายว่า "AI" หรือ "กฎออฟไลน์"
     result["engine"] = engine
     result["llm_on"] = llm_on
+    # ใบสั่งงาน "ต้องพูดเรื่องไหน พูดยังไง" — คิดจากผลชุดนี้ตรง ๆ จึงต้องคิดใหม่ทุกครั้งที่
+    # ทีมแก้ label/กดอ่านแล้ว (ซึ่งเรียก build_result อยู่แล้ว) ไม่งั้นคำแนะนำจะค้างของเก่า
+    result["brief"] = brief.build(result)
     return result
 
 

@@ -107,6 +107,23 @@ h2{font-size:16.5px;font-weight:680;letter-spacing:-.01em;margin:0}
       border-radius:8px;width:30px;height:30px;flex:none;cursor:pointer;font-size:13px;line-height:1}
 .urlx:hover{color:var(--neg);border-color:var(--neg)}
 #daysSeg{flex-wrap:wrap}
+/* ใบสั่งงาน — ควรพูด/ห้ามพูด ต้องอ่านแยกกันได้ในสายตาเดียวตอนร่างประกาศ */
+.bhead{font-size:16.5px;font-weight:700;margin-bottom:4px}
+.bwhy{color:var(--muted);font-size:13.5px;line-height:1.6;margin-bottom:10px}
+.bverdict{display:inline-flex;align-items:center;gap:7px;border-radius:9px;padding:8px 13px;
+  font-size:13.5px;font-weight:600;margin-bottom:12px;border:1.5px solid}
+.bverdict.ok{color:var(--neg);border-color:var(--neg);background:color-mix(in srgb,var(--neg) 9%,transparent)}
+.bverdict.no{color:var(--warn);border-color:var(--warn);background:color-mix(in srgb,var(--warn) 9%,transparent)}
+.bsym{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.bsym b{background:var(--surface);border:1px solid var(--border2);border-radius:7px;
+  padding:3px 9px;font-size:12.5px;font-weight:600;font-family:ui-monospace,monospace}
+.bcols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:760px){.bcols{grid-template-columns:1fr}}
+.bcol{border:1px solid var(--border);border-radius:11px;padding:12px 14px}
+.bcol h4{margin:0 0 7px;font-size:13px;letter-spacing:.02em}
+.bcol ul{margin:0;padding-left:17px} .bcol li{font-size:13px;line-height:1.65;margin-bottom:6px}
+.bcol.say h4{color:var(--pos)} .bcol.no h4{color:var(--neg)}
+.bnext{margin-top:12px;font-size:13px;color:var(--muted);line-height:1.65}
 #addPage:disabled{opacity:.45;cursor:not-allowed}
 /* ตัวเลือกเพจที่ทีมดูแล — ติ๊กได้หลายเพจ จัดกลุ่มตามค่ายเพื่อให้กวาดสายตาหาเจอเร็ว */
 .pgroup{margin-bottom:9px}
@@ -606,6 +623,12 @@ tr.arch td.txt{color:var(--ink2)}
     <section class="verdict" id="verdict"></section>
     <div class="kpis" id="kpis"></div>
 
+    <section class="card hidden" id="briefCard">
+      <header><div><h2>ควรสื่อสารยังไง</h2>
+        <div class="sub">ระบบดูว่าความไม่พอใจกระจุกที่เรื่องเดียวหรือกระจายทั่ว แล้วบอกว่าควรพูดเรื่องไหนก่อน</div></div></header>
+      <div id="brief"></div>
+    </section>
+
     <section class="card">
       <header><div><h2>สิ่งที่ควรจัดการ</h2>
         <div class="sub">เรียงจากเรื่องที่ควรรีบดูที่สุด · กด “ดูคอมเมนต์” เพื่อไปอ่านต้นเรื่องจริง</div></div></header>
@@ -996,7 +1019,7 @@ function render(r,opts={}){
   $('#setup').classList.add('hidden');$('#setupSummary').classList.remove('hidden');
 
   paintStatus();
-  renderVerdict(r);renderKpis(r);renderAlerts(r);renderSentiment(r);renderTopics(r);
+  renderVerdict(r);renderKpis(r);renderBrief(r.brief);renderAlerts(r);renderSentiment(r);renderTopics(r);
   renderTimeline();renderTopicFilter(r);renderChips();renderTable();
   if(keep){
     // renderTopicFilter สร้าง <option> ใหม่ทั้งชุด → ค่าที่เลือกไว้หลุด ต้องใส่กลับ
@@ -1176,6 +1199,39 @@ function renderKpis(r){
     <div class="v tnum" ${t.color?`style="color:${t.color}"`:''}>${t.v}</div>
     <div class="d">${t.d}</div></div>`).join('');
 }
+
+/* ═══════════════════ ใบสั่งงาน: ควรสื่อสารยังไง ═══════════════════
+   ตอบคำถามที่ตัวเลขบนหน้านี้ตอบไม่ได้ — "แล้วต้องขอโทษเรื่องไหน"
+   จุดที่ตั้งใจให้เด่นที่สุดคือ "ห้ามพูดแบบนี้": ความเสียหายในเคสจริงส่วนใหญ่มาจากการพูดผิดชนิด
+   (ขอโทษเรื่องราคาทั้งที่ไม่มีแผนลด · ตอบเคสบ่นบริการด้วย template) ไม่ใช่จากการเงียบ  */
+function renderBrief(b){
+  const card=$('#briefCard');
+  if(!b||b.focus==='none'){card.classList.add('hidden');return;}
+  card.classList.remove('hidden');
+  const l=b.lead||{};
+  const verdict=b.apologize
+    ? `<div class="bverdict ok">🙏 ขอโทษได้เลย — เรื่องนี้ความผิดอยู่ฝั่งเราชัดเจน</div>`
+    : `<div class="bverdict no">✋ อย่าเพิ่งขอโทษ — เรื่องนี้ต้องอธิบาย ไม่ใช่ขอโทษ</div>`;
+  // ชี้ทีมเจ้าของเรื่องเฉพาะตอนโฟกัสได้ — ตอนกระจายทั่ว การมอบให้ทีมเดียวทำให้เรื่องอื่นตกหล่น
+  const owner=(l.owner&&(b.focus==='concentrated'||b.focus==='multiple'))
+    ? ` · ส่งต่อ <b>${esc(l.owner)}</b>` : '';
+  const sym=(l.symptoms||[]).length
+    ? `<div class="bsym"><span style="font-size:12.5px;color:var(--muted);align-self:center">
+         คำที่คนพิมพ์ซ้ำ:</span>${(l.symptoms||[]).map(([w,n])=>
+         `<b>${esc(w)} ×${n}</b>`).join('')}</div>` : '';
+  const li=a=>(a||[]).map(x=>`<li>${md(x)}</li>`).join('');
+  $('#brief').innerHTML=
+     `<div class="bhead">${esc(b.headline)}</div>`
+    +`<div class="bwhy">${esc(b.why)}${owner}</div>`
+    +verdict+sym
+    +`<div class="bcols">
+        <div class="bcol say"><h4>✅ ควรพูดแบบนี้</h4><ul>${li(b.say)}</ul></div>
+        <div class="bcol no"><h4>❌ ห้ามพูดแบบนี้</h4><ul>${li(b.avoid)}</ul></div>
+      </div>`
+    +((b.next||[]).length?`<div class="bnext"><b>ทำต่อ:</b> ${(b.next||[]).map(esc).join(' · ')}</div>`:'');
+}
+/* **ตัวหนา** จากฝั่ง server (ใช้ร่วมกับข้อความเดียวกันที่ส่งเข้า Discord) — escape ก่อนเสมอ */
+const md=t=>esc(String(t||'')).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
 
 function renderAlerts(r){
   const items=r.alert_items||[];

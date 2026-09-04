@@ -25,7 +25,7 @@ from __future__ import annotations
 import os
 
 from ..timeutil import now_ict
-from . import alerts
+from . import alerts, brief as brief_mod
 from .payload import COLOR, MAX_FIELD, SENT_TH, STATUS_TH, _cut, owner_of, topic_labels
 
 EVENT = "crisis_radar.daily_digest"
@@ -74,6 +74,51 @@ def _line(row: dict) -> str:
     return f"**{reach:,}** ไลก์+ตอบกลับ · {topics or 'ไม่ระบุประเด็น'}{seen}\n{head}"
 
 
+# "ขอโทษได้ไหม" เป็นคำถามแรกที่ทีมถามเสมอ — ตอบให้ชัดตั้งแต่บรรทัดแรก อย่าให้ต้องตีความเอง
+APOLOGY_TH = {
+    True:  "🙏 **ขอโทษได้เลย** — เรื่องนี้ความผิดอยู่ฝั่งเราชัดเจน",
+    False: "✋ **อย่าเพิ่งขอโทษ** — เรื่องนี้ต้องอธิบาย ไม่ใช่ขอโทษ (ขอโทษแล้วไม่แก้ = เสียหายกว่า)",
+}
+
+
+def brief_fields(b: dict) -> list[dict]:
+    """แปลงใบสั่งงานเป็น field ของ Discord — คืน [] ถ้ายังไม่มีประเด็นให้สั่ง.
+
+    จัด 3 field ไม่ใช่ก้อนเดียว เพราะ Discord ตัด field value ที่ 1024 ตัวอักษร และเพราะ
+    "ควรพูด/ห้ามพูด" ต้องอ่านแยกจากกันได้ในสายตาเดียว — เอาไปวางข้าง ๆ ตอนร่างประกาศได้เลย
+    """
+    if b.get("focus") == "none":
+        return []
+    head = [f"**{b['headline']}**", b["why"]]
+    lead = b.get("lead") or {}
+    # โชว์ "เจ้าของเรื่อง" เฉพาะตอนที่โฟกัสได้จริง — ตอนกระจายทั่ว การชี้ทีมเดียวคือชี้ผิด
+    # (เรื่องใหญ่สุดมีแค่ 24% แปลว่าอีก 76% เป็นของทีมอื่น การมอบให้ทีมเดียวจะทำให้เรื่องอื่นตกหล่น)
+    if lead.get("owner") and b.get("focus") in ("concentrated", "multiple"):
+        head.append(f"เจ้าของเรื่อง: **{lead['owner']}**"
+                    + (f" · คนเห็นสูงสุด {lead['reach_max']:,}" if lead.get("reach_max") else ""))
+    # อาการที่คนพิมพ์ซ้ำ = ส่วนที่ทำให้ประกาศ "ตรงเรื่อง" แทนที่จะลอย — สำคัญกว่าชื่อหมวด
+    if lead.get("symptoms"):
+        head.append("คำที่คนพิมพ์ซ้ำ: "
+                    + " · ".join(f"`{w}` ×{n}" for w, n in lead["symptoms"]))
+    if b.get("second"):
+        head.append(f"เรื่องที่ 2 ที่ต้องพูดแยก: **{b['second']['label']}** "
+                    f"({b['second']['share']:.0f}%) → {b['second']['owner']}")
+    elif b.get("others"):
+        head.append("เรื่องรองที่ยังต้องตอบ: "
+                    + " · ".join(f"{o['label']} {o['share']:.0f}%" for o in b["others"][:3]))
+    head.append(APOLOGY_TH[bool(b.get("apologize"))])
+
+    out = [{"name": "🎯 ประเด็นที่ต้องรับมือก่อน", "inline": False,
+            "value": _cut("\n".join(head), MAX_FIELD)}]
+    if b.get("say"):
+        out.append({"name": "✅ ควรพูดแบบนี้", "inline": False,
+                    "value": _cut("\n".join(f"• {x}" for x in b["say"][:3]), MAX_FIELD)})
+    if b.get("avoid"):
+        out.append({"name": "❌ ห้ามพูดแบบนี้", "inline": False,
+                    "value": _cut("\n".join(f"• {x}" for x in b["avoid"][:2]), MAX_FIELD)})
+    return out
+
+
 def build_discord(result: dict, *, page: dict, prev: dict | None, top: list[dict],
                   dashboard_url: str, role_id: str = "") -> dict:
     status = result.get("status", "NORMAL")
@@ -88,6 +133,11 @@ def build_discord(result: dict, *, page: dict, prev: dict | None, top: list[dict
          "inline": True},
         {"name": "คนคอมเมนต์", "value": f"{int(result.get('unique_authors') or 0):,}", "inline": True},
     ]
+
+    # ใบสั่งงานอยู่บนสุดถัดจากตัวเลข — เป็นส่วนเดียวที่ตอบว่า "แล้วต้องทำอะไร"
+    # ถ้าวางไว้ท้ายข้อความ คนจะอ่านรายการคอมเมนต์ดิบก่อนแล้วสรุปเอง ซึ่งคือสิ่งที่ tool นี้ควรตัดออก
+    for f in brief_fields(brief_mod.build(result)):
+        fields.append(f)
 
     trends = [t for t in (result.get("topic_trends") or []) if t.get("negative")][:3]
     if trends:
@@ -194,6 +244,7 @@ def build_event(result: dict, *, page: dict | None = None, prev: dict | None = N
                           "alerted_at": r.get("alerted_at", "")} for r in top],
         "routing": {"owner": owner_of([t.get("topic") for t in (result.get("topic_trends") or [])]),
                     "role_id": role_id},
+        "brief": brief_mod.build(result),
         "discord": build_discord(result, page=page, prev=prev, top=top,
                                  dashboard_url=cfg["dashboard_url"], role_id=role_id),
     }
