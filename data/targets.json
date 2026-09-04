@@ -4,6 +4,38 @@
   "page_id": "thehof.talesrunner",
   "page_name": "TalesRunner Thailand (Official / thehof)",
   "exclude_authors": ["Tales Runner", "IDRLAB", "idrlab", "HOF"],
+
+  "_page_presets": "เพจที่ทีมดูแลอยู่ — โผล่เป็นตัวเลือกติ๊กได้บนหน้าเว็บ (เลือกหลายเพจในรอบเดียวได้) ไม่ต้องจำ/วางลิงก์เอง. เพิ่มเพจใหม่ = เพิ่มบรรทัดในนี้ ไม่ต้องแก้โค้ด. ยังวางลิงก์เพจนอกรายการเองได้เหมือนเดิม.",
+  "page_presets": [
+    {
+      "group": "HOF (Hall Of Fame)",
+      "pages": [
+        {"name": "Warz TH", "url": "https://www.facebook.com/thehof.warzth"},
+        {"name": "TalesRunner Thailand", "url": "https://www.facebook.com/thehof.talesrunner"},
+        {"name": "Zelfur", "url": "https://www.facebook.com/TheZelfur"}
+      ]
+    },
+    {
+      "group": "Combo Interactive",
+      "pages": [
+        {"name": "Combo CBM", "url": "https://www.facebook.com/combo.cbm"},
+        {"name": "Combo CBPC", "url": "https://www.facebook.com/combo.cbpc"},
+        {"name": "NATZ ceogamer", "url": "https://www.facebook.com/NATZceogamer"}
+      ]
+    },
+    {
+      "group": "iHAVECPU",
+      "pages": [
+        {"name": "iHAVEFiLM (ฟิล์มกระจกกันรอย)", "url": "https://www.facebook.com/iHAVEFiLM"}
+      ]
+    }
+  ],
+
+  "_monitor_pages": "เพจที่ 'ตัวเฝ้าอัตโนมัติ' ตรวจให้เองทุกรอบ (ไม่ต้องมีคนกด). ว่างไว้ = ใช้เพจแรกใน targets[] เหมือนเดิม. ค่า Apify คิดแยกต่อเพจต่อรอบ — ใส่เยอะ = จ่ายเยอะ. env MONITOR_PAGE_URLS ทับค่านี้ได้ (คั่นด้วย , หรือขึ้นบรรทัดใหม่).",
+  "monitor_pages": [
+    "https://www.facebook.com/thehof.talesrunner"
+  ],
+
   "post_urls": [
     "https://www.facebook.com/share/p/17gB7HTXch/",
     "https://www.facebook.com/share/p/17Kn4iXpZ2/",

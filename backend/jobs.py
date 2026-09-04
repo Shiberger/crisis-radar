@@ -69,16 +69,51 @@ def start_job(params: dict) -> str:
     return job_id
 
 
+def page_presets(cfg: dict) -> list[dict]:
+    """เพจที่ทีมดูแลอยู่ จัดกลุ่มตามค่าย — หน้าเว็บเอาไปทำตัวเลือกติ๊กได้ (เลือกหลายเพจ).
+
+    ทำไมอยู่ใน targets.json ไม่ใช่ในโค้ด: รายชื่อเพจเป็นของทีม ไม่ใช่ของระบบ — เพิ่มเพจใหม่
+    ควรเป็นการแก้ไฟล์ config บรรทัดเดียว ไม่ใช่แก้ JS แล้ว deploy ใหม่
+    กรอง URL ที่ไม่ใช่ facebook ทิ้งตั้งแต่ตรงนี้ เพื่อไม่ให้ปุ่มบนหน้าเว็บพาไปยิง Apify ผิดที่
+    """
+    out = []
+    for g in cfg.get("page_presets") or []:
+        pages = [{"name": str(pg.get("name") or pg.get("url", "")).strip(), "url": u}
+                 for pg in (g.get("pages") or [])
+                 for u in _clean_fb_urls([pg.get("url", "")])]
+        if pages:
+            out.append({"group": str(g.get("group") or "อื่น ๆ"), "pages": pages})
+    return out
+
+
+def monitor_page_urls(cfg: dict | None = None) -> list[str]:
+    """เพจที่ตัวเฝ้าอัตโนมัติต้องตรวจทุกรอบ — env ทับไฟล์ได้ (เปลี่ยนบน Render โดยไม่ต้อง deploy).
+
+    ว่างทั้งคู่ = คืน [] แล้วให้ผู้เรียก fallback ไปเพจแรกใน targets[] เหมือนพฤติกรรมเดิม
+    """
+    if cfg is None:
+        try:
+            cfg = json.loads(TARGETS_FILE.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            cfg = {}
+    raw = os.environ.get("MONITOR_PAGE_URLS", "").strip()
+    urls = ([u for u in raw.replace(",", "\n").split("\n")] if raw
+            else list(cfg.get("monitor_pages") or []))
+    return _dedup_urls(_clean_fb_urls([str(u).strip() for u in urls]))[:MAX_PAGES]
+
+
 def get_targets() -> dict:
-    """ค่าตั้งต้นสำหรับฟอร์มหน้าเว็บ — URL เพจ/โพสต์ที่ตั้งไว้ใน data/targets.json."""
+    """ค่าตั้งต้นสำหรับฟอร์มหน้าเว็บ — URL เพจ/โพสต์ + รายชื่อเพจที่ติ๊กเลือกได้."""
     try:
         cfg = json.loads(TARGETS_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return {"page_url": "", "post_urls": []}
+        return {"page_url": "", "post_urls": [], "page_presets": [], "monitor_pages": []}
     page = next((t for t in cfg.get("targets", []) if t.get("type") == "page"), None)
     return {"page_name": cfg.get("page_name", ""),
             "page_url": (page or {}).get("url", ""),
-            "post_urls": cfg.get("post_urls", [])}
+            "post_urls": cfg.get("post_urls", []),
+            "page_presets": page_presets(cfg),
+            "monitor_pages": monitor_page_urls(cfg)}
 
 
 def _clean_fb_urls(raw) -> list[str]:
@@ -191,7 +226,11 @@ def _fetch_facebook(params: dict, log=print):
             comments += scraper.scrape_target(t, max_posts, max_comments, log=log, since=since)
 
     from src.sources.facebook_apify import filter_noise
-    comments, dropped = filter_noise(comments, cfg.get("page_id", ""), cfg.get("exclude_authors"))
+    # แอดมินของทุกเพจที่กวาดรอบนี้ต้องถูกตัด ไม่ใช่แค่เพจหลักใน targets.json — slug ท้าย URL
+    # ใช้เป็น page_id ได้ตรง ๆ เพราะ profile_url ของแอดมินเพจมี slug นั้นอยู่ข้างใน
+    page_ids = [cfg.get("page_id", "")] + [t["url"].rstrip("/").rsplit("/", 1)[-1].split("?")[0]
+                                           for t in targets if t.get("type") == "page"]
+    comments, dropped = filter_noise(comments, page_ids, cfg.get("exclude_authors"))
     if dropped:
         log(f"กรอง admin/โฆษณา (เช่น IDRLAB) ออก {dropped} รายการ")
 

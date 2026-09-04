@@ -108,6 +108,23 @@ h2{font-size:16.5px;font-weight:680;letter-spacing:-.01em;margin:0}
 .urlx:hover{color:var(--neg);border-color:var(--neg)}
 #daysSeg{flex-wrap:wrap}
 #addPage:disabled{opacity:.45;cursor:not-allowed}
+/* ตัวเลือกเพจที่ทีมดูแล — ติ๊กได้หลายเพจ จัดกลุ่มตามค่ายเพื่อให้กวาดสายตาหาเจอเร็ว */
+.pgroup{margin-bottom:9px}
+.pgroup>b{display:block;font-size:11.5px;font-weight:700;color:var(--muted);
+  letter-spacing:.03em;text-transform:uppercase;margin-bottom:5px}
+.pchips{display:flex;flex-wrap:wrap;gap:6px}
+.pchip{position:relative;display:inline-flex;align-items:center;gap:6px;background:var(--surface);
+  border:1.5px solid var(--border);border-radius:999px;padding:6px 13px;font-size:13px;
+  cursor:pointer;user-select:none;transition:border-color .12s,background .12s}
+.pchip:hover{border-color:var(--border2)}
+/* ซ่อน checkbox โดยไม่ทิ้ง accessibility — ยัง focus ด้วยคีย์บอร์ด/อ่านด้วย screen reader ได้
+   (display:none จะตัดออกจาก tab order) · ต้องไม่กินที่ ไม่งั้นตัวหนังสือบนชิปจะโดนบัง */
+.pchip input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.pchip:focus-within{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:2px}
+.pchip.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 11%,transparent);
+  color:var(--accent);font-weight:640}
+.pchip .tick{opacity:0;font-size:11px}
+.pchip.on .tick{opacity:1}
 .runrow{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 .run{background:var(--accent);color:#fff;border:0;border-radius:11px;padding:13px 26px;font-size:15.5px;
   font-weight:680;cursor:pointer;display:inline-flex;align-items:center;gap:9px;box-shadow:0 2px 10px -4px var(--accent)}
@@ -504,10 +521,12 @@ tr.arch td.txt{color:var(--ink2)}
 
       <div class="fields">
         <div class="fld" id="fldPageUrl" style="flex-basis:100%">ลิงก์เพจ Facebook
+          <div id="presets" class="hidden"></div>
+          <span class="tip" id="presetTip" style="margin:-2px 0 8px">ติ๊กเลือกได้หลายเพจ · ค่า Apify คิดแยกต่อเพจ</span>
           <div id="pageList"></div>
           <button type="button" class="ghost" id="addPage"
-                  style="align-self:flex-start;padding:6px 12px;font-size:12.5px">+ เพิ่มเพจ</button>
-          <span class="tip">ใส่ได้หลายเพจในรอบเดียว (สูงสุด 10) · ค่า Apify คิดแยกต่อเพจ</span>
+                  style="align-self:flex-start;padding:6px 12px;font-size:12.5px">+ เพจอื่น (วางลิงก์เอง)</button>
+          <span class="tip">เพจนอกรายการข้างบนก็ใส่เองได้ · รวมแล้วสูงสุด 10 เพจต่อรอบ</span>
         </div>
         <div class="fld" id="fldDays">ช่วงเวลาที่ต้องการดู
           <div class="seg" id="daysSeg">
@@ -740,27 +759,70 @@ $('#scopes').onclick=e=>{const b=e.target.closest('.mode');if(!b)return;
    เก็บเป็น array แล้ววาดใหม่ทั้งชุด — ง่ายกว่าไล่ผูก event ทีละแถว และไม่มีทางหลุด
    แถวแรกลบไม่ได้: ต้องมีอย่างน้อย 1 ช่องเสมอ ไม่งั้นผู้ใช้จะเจอฟอร์มว่างเปล่าที่กดอะไรไม่ได้ */
 const MAX_PAGES=10;
-let PAGES=[''], PAGE_PH='https://www.facebook.com/…';
+/* เพจที่จะตรวจมาจาก 2 ทางรวมกัน:
+     PICKED = เพจที่ทีมดูแลอยู่ ติ๊กจากรายการ (มาจาก data/targets.json → page_presets)
+     PAGES  = ช่องวางลิงก์เอง สำหรับเพจนอกรายการ (เช่นเพจคู่แข่ง/เพจที่เพิ่งเปิด)
+   แยกกันเพราะสองอย่างนี้แก้คนละจังหวะ — รายการค่ายแทบไม่เปลี่ยน ส่วนลิงก์ที่วางเองเปลี่ยนทุกครั้ง
+   ตัวที่ส่งจริงคือผลรวมที่ตัดซ้ำแล้ว (pickedPages) ไม่ใช่ตัวใดตัวหนึ่ง */
+let PAGES=[''], PICKED=new Set(), PRESETS=[], PAGE_PH='https://www.facebook.com/…';
+
+/* รวม 2 ทางเป็นรายการเดียว · ตัดซ้ำแบบไม่สนใจ / ปิดท้าย (ตรงกับ _dedup_urls ฝั่ง server)
+   เพื่อไม่ให้ติ๊กเพจ A แล้ววางลิงก์เพจ A ซ้ำ = จ่าย Apify 2 รอบให้เพจเดียวกัน */
+function pickedPages(){
+  const seen=new Set(), out=[];
+  for(const u of [...PICKED, ...PAGES.map(x=>x.trim()).filter(Boolean)]){
+    const k=u.replace(/\/+$/,'').toLowerCase();
+    if(!seen.has(k)){seen.add(k);out.push(u);}
+  }
+  return out.slice(0,MAX_PAGES);
+}
+
+function drawPresets(){
+  if(!PRESETS.length)return;
+  $('#presets').className='';
+  $('#presets').innerHTML=PRESETS.map(g=>
+    `<div class="pgroup"><b>${esc(g.group)}</b><div class="pchips">${
+      g.pages.map(pg=>`<label class="pchip${PICKED.has(pg.url)?' on':''}">
+        <input type="checkbox" data-url="${esc(pg.url)}"${PICKED.has(pg.url)?' checked':''}>
+        <span class="tick">✓</span>${esc(pg.name)}</label>`).join('')
+    }</div></div>`).join('');
+}
+$('#presets').onchange=e=>{
+  const el=e.target.closest('input[data-url]');if(!el)return;
+  const u=el.dataset.url;
+  // เกินเพดานแล้วติ๊กเพิ่มไม่ได้ — เด้งกลับพร้อมบอกเหตุผล ดีกว่าปล่อยให้ server ปฏิเสธทีหลัง
+  if(el.checked&&!PICKED.has(u)&&pickedPages().length>=MAX_PAGES){
+    el.checked=false;
+    $('#presetTip').innerHTML=`<b>เลือกได้สูงสุด ${MAX_PAGES} เพจต่อรอบ</b> — เอาเพจอื่นออกก่อน`;
+    return;
+  }
+  el.checked?PICKED.add(u):PICKED.delete(u);
+  el.closest('.pchip').classList.toggle('on',el.checked);
+  syncFields();
+};
+
 function drawPages(){
+  // มีเพจที่ติ๊กไว้แล้ว = ช่องวางลิงก์เองไม่จำเป็นต้องเหลือไว้ 1 ช่องเสมอ → ลบได้หมด
+  const keepFirst=PICKED.size===0;
   $('#pageList').innerHTML=PAGES.map((v,i)=>
     `<div class="urlrow"><input type="url" data-i="${i}" value="${esc(v)}"
-        placeholder="${esc(i===0?PAGE_PH:'https://www.facebook.com/…')}">
-     ${i?`<button type="button" class="urlx" data-x="${i}" title="เอาออก">✕</button>`:''}</div>`).join('');
-  $('#addPage').disabled=PAGES.length>=MAX_PAGES;
+        placeholder="${esc(i===0&&keepFirst?PAGE_PH:'https://www.facebook.com/…')}">
+     ${(i||!keepFirst)?`<button type="button" class="urlx" data-x="${i}" title="เอาออก">✕</button>`:''}</div>`).join('');
+  $('#addPage').disabled=pickedPages().length>=MAX_PAGES;
 }
 $('#pageList').oninput=e=>{const el=e.target.closest('input[data-i]');if(!el)return;
   PAGES[+el.dataset.i]=el.value;syncFields();};
 $('#pageList').onclick=e=>{const b=e.target.closest('.urlx');if(!b)return;
   PAGES.splice(+b.dataset.x,1);drawPages();syncFields();};
-$('#addPage').onclick=()=>{if(PAGES.length<MAX_PAGES){PAGES.push('');drawPages();
+$('#addPage').onclick=()=>{if(pickedPages().length<MAX_PAGES){PAGES.push('');drawPages();
   $('#pageList').querySelector('input:last-of-type')?.focus();syncFields();}};
 $('#daysSeg').onclick=e=>{const b=e.target.closest('button[data-days]');if(!b)return;
   DAYS=+b.dataset.days;
   $$('#daysSeg button').forEach(x=>x.classList.toggle('on',+x.dataset.days===DAYS));
   syncFields();};
 
-/* จำนวนเพจที่กรอกจริง (ช่องว่าง = ใช้เพจที่ตั้งไว้ใน targets.json → นับเป็น 1) */
-const pageCount=()=>Math.max(1,PAGES.filter(u=>u.trim()).length);
+/* จำนวนเพจที่จะยิงจริง (ไม่ติ๊ก+ไม่กรอกเลย = ใช้เพจที่ตั้งไว้ใน targets.json → นับเป็น 1) */
+const pageCount=()=>Math.max(1,pickedPages().length);
 
 function syncFields(){
   const page=SCOPE==='page';
@@ -787,7 +849,12 @@ $('#maxp').oninput=syncFields;
 // เติมค่าตั้งต้นจาก data/targets.json — ผู้ใช้จะได้ไม่ต้องไปหา URL เอง
 fetch('/api/targets').then(r=>r.json()).then(t=>{
   PAGE_PH=t.page_url||PAGE_PH;
+  PRESETS=t.page_presets||[];
+  // ติ๊กเพจที่ตัวเฝ้าอัตโนมัติดูอยู่ไว้ให้ก่อน — กดตรวจเองทันทีจะได้ผลชุดเดียวกับหน้าจอเฝ้า
+  const known=new Set(PRESETS.flatMap(g=>g.pages.map(p=>p.url)));
+  (t.monitor_pages||[]).forEach(u=>{if(known.has(u))PICKED.add(u);});
   if(!$('#postUrls').value)$('#postUrls').value=(t.post_urls||[]).join('\n');
+  drawPresets();
 }).catch(()=>{}).finally(()=>{drawPages();syncFields();});
 drawPages();
 // ตอน deploy จะตั้งรหัสไว้กันคนกดยิง Apify เล่น
@@ -851,7 +918,7 @@ async function run(){
   $('#prog').scrollIntoView({behavior:'smooth',block:'center'});
 
   const body={source:SRC,only:'page',scope:SCOPE,
-              page_urls:PAGES.map(s=>s.trim()).filter(Boolean),
+              page_urls:pickedPages(),
               post_urls:$('#postUrls').value.split('\n').map(s=>s.trim()).filter(Boolean),
               days:SCOPE==='page'?DAYS:0,
               max_posts:+$('#maxp').value,max_comments:+$('#maxc').value};

@@ -20,6 +20,9 @@
   MONITOR_DAYS=7              เอาเฉพาะคอมเมนต์ใน N วันล่าสุด (0 = ไม่จำกัด)
                               ช่วยทั้งคุมค่าใช้จ่าย (ข้ามโพสต์เก่า) และให้หน้าจอเป็นข้อมูลสด
   MONITOR_ALWAYS=1            ตรวจตามรอบแม้ไม่มีคนเปิดเว็บ
+  MONITOR_PAGE_URLS           เฝ้าหลายเพจในรอบเดียว (คั่นด้วย , หรือขึ้นบรรทัดใหม่ · สูงสุด 10)
+                              ไม่ตั้ง = ใช้ monitor_pages ใน data/targets.json
+                              **ค่า Apify คิดแยกต่อเพจต่อรอบ** — เฝ้า 3 เพจ = จ่าย 3 เท่า
 """
 from __future__ import annotations
 
@@ -80,6 +83,14 @@ def config() -> dict:
     interval = max(_int_env("MONITOR_INTERVAL_MIN", 120), floor)
 
     t = jobs.get_targets()
+    # เฝ้าได้หลายเพจในรอบเดียว (data/targets.json → monitor_pages หรือ env MONITOR_PAGE_URLS)
+    # ไม่ตั้งไว้ = เพจเดียวตามเดิม — ของเก่าที่ตั้งค่าไว้แล้วจึงไม่เปลี่ยนพฤติกรรม
+    pages = list(t.get("monitor_pages") or [])
+    if not pages and t.get("page_url"):
+        pages = [t["page_url"]]
+    named = {pg["url"].rstrip("/").lower(): pg["name"]
+             for g in (t.get("page_presets") or []) for pg in g["pages"]}
+    labels = [named.get(u.rstrip("/").lower()) or u.rstrip("/").rsplit("/", 1)[-1] for u in pages]
     return {
         "enabled": enabled,
         "source": source,
@@ -88,8 +99,13 @@ def config() -> dict:
         "max_comments": _int_env("MONITOR_MAX_COMMENTS", 30),
         "days": max(0, _int_env("MONITOR_DAYS", 0)),
         "always": _truthy(os.environ.get("MONITOR_ALWAYS", "")),
-        "page_name": t.get("page_name", ""),
-        "page_url": t.get("page_url", ""),
+        # page_name/page_url = ตัวแทน 1 ค่าสำหรับที่ที่โชว์ได้ทีละอัน (ของเดิมเรียกใช้อยู่)
+        "page_name": (labels[0] if len(labels) == 1 else
+                      f"{len(labels)} เพจ ({', '.join(labels[:3])}{'…' if len(labels) > 3 else ''})")
+                     or t.get("page_name", ""),
+        "page_url": pages[0] if pages else t.get("page_url", ""),
+        "page_urls": pages,
+        "page_labels": labels,
     }
 
 
@@ -169,7 +185,7 @@ def _worker(cfg: dict) -> None:
         _log(f"เริ่มตรวจอัตโนมัติ — {cfg['page_name'] or 'เพจที่ตั้งไว้'}")
         result = jobs.run_pipeline({
             "source": cfg["source"], "only": "page", "scope": "page",
-            "page_url": cfg["page_url"],
+            "page_urls": cfg["page_urls"],
             "max_posts": cfg["max_posts"], "max_comments": cfg["max_comments"],
             "days": cfg["days"],
         }, log=_log)
@@ -178,7 +194,7 @@ def _worker(cfg: dict) -> None:
                "total": result.get("total", 0),
                "negative": (result.get("sentiment_mix") or {}).get("negative", 0),
                "alerts": len(result.get("alert_items") or result.get("alerts") or []),
-               "source": cfg["source"]}
+               "source": cfg["source"], "pages": len(cfg["page_urls"])}
         with _LOCK:
             _STATE.update(result=result, updated_ts=time.time(),
                           updated_at=result.get("generated_at", ""), error=None, error_ts=0.0)
@@ -210,6 +226,8 @@ def snapshot() -> dict:
             "page_name": cfg["page_name"],
             "page_url": cfg["page_url"],
             "interval_min": cfg["interval_min"],
+            "page_urls": cfg["page_urls"],
+            "page_labels": cfg["page_labels"],
             "days": cfg["days"],
             "always": cfg["always"],
             "refreshing": _STATE["refreshing"],

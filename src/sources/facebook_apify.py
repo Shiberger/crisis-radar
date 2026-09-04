@@ -120,17 +120,22 @@ def looks_promotional(text: str) -> bool:
     return (has_promo and (has_line or has_phone)) or (has_line and has_phone)
 
 
-def filter_noise(comments: list[dict], page_id: str = "", exclude_authors=None):
+def filter_noise(comments: list[dict], page_id="", exclude_authors=None):
     """คัดคอมเมนต์ที่ไม่ใช่เสียงผู้เล่นออก: ของเพจเอง / รายชื่อ block / โฆษณา.
+
+    page_id รับได้ทั้ง str เดี่ยวและ list — ตอนเฝ้าหลายเพจในรอบเดียว แอดมินของ **ทุกเพจ**
+    ที่กวาดต้องถูกตัดออก ไม่งั้นคำตอบของแอดมินเพจ B จะถูกนับเป็นเสียงผู้เล่นในรายงานรวม
 
     คืน (kept, dropped_count).
     """
+    ids = [page_id] if isinstance(page_id, str) else list(page_id or [])
+    ids = [str(i).lower() for i in ids if str(i).strip()]
     excl = [e.lower() for e in (exclude_authors or [])]
     kept, dropped = [], 0
     for c in comments:
         author = str(c.get("author", "")).lower()
         purl = str(c.get("profile_url", "")).lower()
-        is_page = bool(page_id) and page_id.lower() in purl
+        is_page = any(i in purl for i in ids)
         is_blocked = any(e in author for e in excl)
         if is_page or is_blocked or looks_promotional(c.get("text", "")):
             dropped += 1

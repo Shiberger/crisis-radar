@@ -665,6 +665,73 @@ for bad, why in ((["https://evil.com/x"], "URL นอก facebook"),
 ApifyFacebookScraper.__init__ = _real_init
 
 
+# ---- T19: รายชื่อเพจที่ทีมดูแล (page_presets) + ตัวเฝ้าหลายเพจ ----
+# ทำไมต้องมีเทสนี้: ก่อนหน้านี้ทีมต้องจำ/วาง URL เองทุกครั้ง และตัวเฝ้าอัตโนมัติดูได้เพจเดียว
+# ตัวที่ต้องกันพลาดคือ "รายชื่อจากไฟล์ config ต้องถูกกรองเหมือน URL ที่คนพิมพ์เอง"
+# ไม่งั้นพิมพ์ config ผิดบรรทัดเดียว = ยิง Apify ออกนอก facebook โดยไม่มีใครทัก
+_win_presets = {
+    "targets": [{"type": "page", "name": "A", "url": "https://www.facebook.com/gameA"}],
+    "page_name": "A",
+    "page_presets": [
+        {"group": "ค่าย X", "pages": [
+            {"name": "เพจ 1", "url": "https://www.facebook.com/x1"},
+            {"name": "เพจ 2", "url": "https://www.facebook.com/x2"},
+            {"name": "พิมพ์ผิด", "url": "https://evil.com/x3"},
+        ]},
+        {"group": "ค่ายว่าง", "pages": [{"name": "ไม่ใช่ fb", "url": "https://example.com/y"}]},
+    ],
+    "monitor_pages": ["https://www.facebook.com/x1", "https://www.facebook.com/x1/",
+                      "https://evil.com/x3"],
+}
+_pf = Path(tempfile.mkdtemp(prefix="crisis-radar-targets-")) / "targets.json"
+_pf.write_text(json.dumps(_win_presets, ensure_ascii=False), encoding="utf-8")
+_real_targets_file = jobs.TARGETS_FILE
+jobs.TARGETS_FILE = _pf
+
+_t = jobs.get_targets()
+_groups = [g["group"] for g in _t["page_presets"]]
+_names = [pg["name"] for g in _t["page_presets"] for pg in g["pages"]]
+check("T19 รายชื่อเพจจัดกลุ่มตามค่าย ส่งให้หน้าเว็บทำตัวเลือกติ๊กได้",
+      _groups == ["ค่าย X"] and _names == ["เพจ 1", "เพจ 2"],
+      f"{len(_groups)} กลุ่ม · {len(_names)} เพจ (ตัด URL นอก facebook + กลุ่มที่ไม่เหลือเพจทิ้ง)")
+
+check("T19b เพจที่ตัวเฝ้าอัตโนมัติดู: ตัด URL นอก facebook และตัวซ้ำออกก่อนยิง Apify",
+      _t["monitor_pages"] == ["https://www.facebook.com/x1"],
+      f"เหลือ {len(_t['monitor_pages'])} เพจ จากที่ตั้งไว้ 3 บรรทัด")
+
+os.environ["MONITOR_PAGE_URLS"] = ("https://www.facebook.com/x1, https://www.facebook.com/x2\n"
+                                   "https://evil.com/x3")
+check("T19c env ทับไฟล์ได้ — เพิ่มเพจที่เฝ้าบน Render ได้โดยไม่ต้อง deploy ใหม่",
+      jobs.monitor_page_urls() == ["https://www.facebook.com/x1",
+                                   "https://www.facebook.com/x2"])
+
+import importlib                                        # noqa: E402
+_mon = importlib.import_module("monitor")
+_mcfg = _mon.config()
+check("T19d ตัวเฝ้าอัตโนมัติส่งครบทุกเพจเข้า pipeline (ไม่ใช่เพจเดียวเหมือนเดิม)",
+      _mcfg["page_urls"] == ["https://www.facebook.com/x1", "https://www.facebook.com/x2"]
+      and _mcfg["page_name"] == "2 เพจ (เพจ 1, เพจ 2)",
+      f"โชว์ว่า “{_mcfg['page_name']}”")
+
+del os.environ["MONITOR_PAGE_URLS"]
+
+# แอดมินของ **ทุก** เพจที่กวาดต้องถูกตัด ไม่ใช่แค่เพจหลัก — ไม่งั้นคำตอบของแอดมินเพจ B
+# จะถูกนับเป็นเสียงผู้เล่นในรายงานรวม แล้วสถานะเพจจะเพี้ยนทั้งรอบ
+_kept, _dropped = _fa_mod.filter_noise(
+    [{"author": "แอดมิน A", "profile_url": "https://www.facebook.com/gameA", "text": "แจ้งข่าว"},
+     {"author": "แอดมิน B", "profile_url": "https://www.facebook.com/gameB", "text": "แจ้งข่าว"},
+     {"author": "ผู้เล่น",  "profile_url": "https://www.facebook.com/somebody", "text": "เกมล่ม"}],
+    ["gameA", "gameB"])
+check("T19e กวาดหลายเพจ = ตัดคอมเมนต์ของแอดมินทุกเพจ ไม่ใช่เฉพาะเพจหลัก",
+      len(_kept) == 1 and _dropped == 2, f"เหลือ {len(_kept)} คอมเมนต์ (เสียงผู้เล่นล้วน)")
+
+check("T19f ส่ง page_id เป็น str เดี่ยวยังทำงานเหมือนเดิม (ของเก่าไม่พัง)",
+      _fa_mod.filter_noise([{"author": "แอดมิน A", "text": "x",
+                             "profile_url": "https://www.facebook.com/gameA"}], "gameA")[1] == 1)
+
+jobs.TARGETS_FILE = _real_targets_file
+
+
 # ---- T17: state ถาวร (Supabase) — ของที่ห้ามหายตอน container restart ----
 # ทำไมต้องมีเทสนี้: บน Render free tier ไฟล์ใน data/ หายทุกครั้งที่ container restart
 # ผลคือทีมโดนแจ้ง Discord เรื่องเดิมซ้ำ และ label ที่ทีมแก้เองหายเกลี้ยง
